@@ -55,3 +55,9 @@ ios/Runner/GoogleService-Info.plist
 Get
 Run
 android/app/dart_de
+build/
+.dart_tool/
+.packages
+.pub-cache/
+android/.gradle/
+ios/Pods/
