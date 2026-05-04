@@ -1,0 +1,98 @@
+{
+  "project_info": {
+    "project_number": "613150292675",
+    "project_id": "gymtrackerpro-2cb3a",
+    "storage_bucket": "gymtrackerpro-2cb3a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:613150292675:android:a02f6ebf5023f0f4250076",
+        "android_client_info": {
+          "package_name": "com.example.gymtrackerpromaster2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "613150292675-gfusr43a42eahcd7o9k19nlbrd22ji47.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5mdsN-KQhgyhSF7BmjK7ZAI1fmhl6iD8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "613150292675-gfusr43a42eahcd7o9k19nlbrd22ji47.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "613150292675-nsqipaarteu0fsf3io8gko5v8fggbttt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.gymtrackerpromaster"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:613150292675:android:5239aba45976968f250076",
+        "android_client_info": {
+          "package_name": "com.nidhish.aitrainer"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "613150292675-c7rrhvevtv855olkgomb27d4de6o4vtc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nidhish.aitrainer",
+            "certificate_hash": "94dd563e70312bd4e33c7d8e3cf59e044f11f100"
+          }
+        },
+        {
+          "client_id": "613150292675-jd9d892d4v8o9o52hacmfu3mqu33fvft.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nidhish.aitrainer",
+            "certificate_hash": "f3d085585d0dcc2be35d398c627bba49e0afc09c"
+          }
+        },
+        {
+          "client_id": "613150292675-gfusr43a42eahcd7o9k19nlbrd22ji47.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5mdsN-KQhgyhSF7BmjK7ZAI1fmhl6iD8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "613150292675-gfusr43a42eahcd7o9k19nlbrd22ji47.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "613150292675-nsqipaarteu0fsf3io8gko5v8fggbttt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.gymtrackerpromaster"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
