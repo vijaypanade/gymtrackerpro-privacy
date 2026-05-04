@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # gymtrackerpromaster
 
 A new Flutter project.
@@ -15,3 +16,6 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+=======
+# gymtrackerpro-privacy
+>>>>>>> 01aabc3175049d1fe07acc9744e18f8fa99e43a7
