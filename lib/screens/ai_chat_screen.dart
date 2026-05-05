@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../services/storage_service.dart';
 
 import '../providers/app_provider.dart';
 import '../services/api_service.dart';
@@ -29,6 +30,7 @@ const _planTriggers = [
 bool _wantsPlan(String msg) {
   final lower = msg.toLowerCase();
   return _planTriggers.any((t) => lower.contains(t));
+
 }
 
 class AIChatScreen extends StatefulWidget {
@@ -57,20 +59,60 @@ class _AIChatScreenState extends State<AIChatScreen>
   final List<Map<String, dynamic>> _messages = [];
   bool _isTyping = false;
 
+  static const String _kChatHistory = 'ai_chat_history';
+  static const int _kMaxMessages = 50; // Cap history to prevent storage bloat
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final p = context.read<AppProvider>();
-      setState(() {
-        _messages.add({
-          'role': 'ai',
-          'text': "Hey ${p.profile.name}! 💪\n"
-              "I'm your AI coach. Ask me anything about workouts, diet, or recovery.\n\n"
-              "Type \"generate plan\" to get a full weekly plan.",
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadHistory();
+      if (_messages.isEmpty && mounted) {
+        final p = context.read<AppProvider>();
+        setState(() {
+          _messages.add({
+            'role': 'ai',
+            'text': "Hey \${p.profile.name}! 💪\n"
+                "I'm your AI coach. Ask me anything about workouts, diet, or recovery.\n\n"
+                "Type \"generate plan\" to get a full weekly plan.",
+          });
         });
-      });
+        _saveHistory();
+      }
     });
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final raw = await StorageService.instance.getString(_kChatHistory);
+      if (raw == null || raw.isEmpty) return;
+      final result = StorageService.instance.decodeList(raw, (m) => m);
+      if (!result.hasData) return;
+      final loaded = (result.data as List)
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+      if (loaded.isNotEmpty && mounted) {
+        setState(() {
+          _messages.addAll(loaded);
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      }
+    } catch (e) {
+      debugPrint('Chat load error: \$e');
+    }
+  }
+
+  Future<void> _saveHistory() async {
+    try {
+      // Keep only last N messages to prevent bloat
+      final toSave = _messages.length > _kMaxMessages
+          ? _messages.sublist(_messages.length - _kMaxMessages)
+          : _messages;
+      await StorageService.instance.setJson(_kChatHistory, toSave);
+    } catch (e) {
+      debugPrint('Chat save error: \$e');
+    }
   }
 
   @override
@@ -86,6 +128,14 @@ class _AIChatScreenState extends State<AIChatScreen>
     final text = rawText.trim();
     if (text.isEmpty) return;
 
+    // ── PREMIUM GATE — AI usage limit check ───────────────────────
+    final ap = context.read<AppProvider>();
+    if (!ap.canUseAI()) {
+      HapticFeedback.heavyImpact();
+      _showPaywallSheet();
+      return;
+    }
+
     _ctrl.clear();
     HapticFeedback.lightImpact();
 
@@ -93,6 +143,7 @@ class _AIChatScreenState extends State<AIChatScreen>
       _messages.add({'role': 'user', 'text': text});
       _isTyping = true;
     });
+    _saveHistory();
     _scrollToBottom();
 
     final p = context.read<AppProvider>();
@@ -122,6 +173,7 @@ class _AIChatScreenState extends State<AIChatScreen>
               "text": "❌ Could not generate plan. Try AI Setup from home screen.",
             });
           });
+      _saveHistory();
           return;
         }
 
@@ -169,6 +221,7 @@ class _AIChatScreenState extends State<AIChatScreen>
                 "Open Planner tab to start 🚀",
           });
         });
+        _saveHistory();
         return;
       } catch (e) {
         if (!mounted) return;
@@ -179,6 +232,7 @@ class _AIChatScreenState extends State<AIChatScreen>
             "text": "❌ Error generating plan: $e",
           });
         });
+      _saveHistory();
         return;
       }
     }
@@ -235,6 +289,7 @@ class _AIChatScreenState extends State<AIChatScreen>
         _isTyping = false;
         _messages.add({'role': 'ai', 'text': reply});
       });
+      _saveHistory();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -244,6 +299,7 @@ class _AIChatScreenState extends State<AIChatScreen>
           'text': "⚠️ Something went wrong. Try again 💪",
         });
       });
+      _saveHistory();
     }
 
 
@@ -262,6 +318,7 @@ class _AIChatScreenState extends State<AIChatScreen>
           'showRewardedAd': true,
         });
       });
+      _saveHistory();
       _scrollToBottom();
       return;
     }
@@ -282,6 +339,7 @@ class _AIChatScreenState extends State<AIChatScreen>
           'planData': plan,
         });
       });
+      _saveHistory();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -291,6 +349,7 @@ class _AIChatScreenState extends State<AIChatScreen>
           'text': "⚠️ AI is busy right now. Try again in a moment 💪",
         });
       });
+      _saveHistory();
     }
     _scrollToBottom();
   }
@@ -357,6 +416,107 @@ class _AIChatScreenState extends State<AIChatScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => AIWorkoutScreen(plan: plan)),
+    );
+  }
+
+  void _showPaywallSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgModal,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🔒', style: TextStyle(fontSize: 48)),
+            const SizedBox(height: 12),
+            const Text(
+              'Daily AI Limit Reached',
+              style: TextStyle(
+                fontFamily: 'Rajdhani',
+                color: AppColors.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "You've used your free AI chats today. Upgrade for unlimited.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                color: AppColors.textMuted,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  final ap = context.read<AppProvider>();
+                  await ap.upgradeToPremium();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('🔥 Premium unlocked! Unlimited AI.'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.gold,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  '🔥 Go Premium — ₹99/month',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('📺 Ads coming soon!')),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: AppColors.gold.withValues(alpha: 0.4)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  '📺 Watch Ad for 1 Free Use',
+                  style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Maybe later', style: TextStyle(color: AppColors.textMuted)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../utils/app_constants.dart';
+import '../engines/pr_engine.dart';
 
 // ════════════════════════════════════════════════
 // RARITY ENUM
@@ -532,17 +533,21 @@ class _PRScreenState extends State<_PRScreen>
     return _roundToGymWeight(currentWeight * 1.05);
   }
 
-  // Fix 3: Next target string
+  // Unified: uses calculateWorkoutFeedback — same logic as workout screen
   static String _nextTargetStr(
-      double weight, int reps, String unit, double pct) {
-    if (unit == 'min') return 'Next: ${(weight + 5).toInt()} min';
-    if (unit == 'reps' || weight == 0) return 'Next: ${reps + 2} reps';
-    // Fix 3: use getNextTarget (5% rule) as base, pct adjusts
-    final base = getNextTarget(weight);
-    final next = pct >= 20 ? _roundToGymWeight(weight * 1.10)  // elite jump
-               : pct >= 10 ? _roundToGymWeight(weight * 1.05)  // normal 5%
-               :              base;
-    return 'Next: ${next.toStringAsFixed(1)} kg';
+      double weight, int reps, String unit, double pct,
+      {double prevBestWeight = 0, int prevBestReps = 0}) {
+    final fb = calculateWorkoutFeedback(
+      weight:             weight,
+      reps:               reps,
+      previousBestWeight: prevBestWeight,
+      previousBestReps:   prevBestReps,
+      isBodyweight:       unit == 'reps',
+      unit:               unit,
+    );
+    if (fb.nextWeight <= 0) return 'Next: ${fb.nextReps} reps';
+    if (unit == 'min') return 'Next: ${fb.nextWeight.toInt()} min';
+    return 'Next: ${fb.nextWeight.toStringAsFixed(1)} kg';
   }
 
   // Inline improvement string
@@ -910,7 +915,9 @@ class _PRScreenState extends State<_PRScreen>
                               // Smart next target
                               _nextTargetStr(
                                 widget.weight, widget.reps,
-                                widget.unit, widget.improvePct),
+                                widget.unit, widget.improvePct,
+                                prevBestWeight: widget.prevWeight,
+                                prevBestReps:   widget.prevReps),
                               style: GoogleFonts.inter(
                                   color: _c, fontSize: 12,
                                   fontWeight: FontWeight.w800)),

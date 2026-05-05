@@ -19,6 +19,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../engines/analytics_engine.dart';
+import '../engines/pr_engine.dart' as pre;
 import '../engines/analytics_engine_extensions.dart';
 import '../models/memory_models.dart';
 import '../models/models.dart';
@@ -1019,6 +1020,97 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
 
   String getTrainerMessage(PlannedExercise ex) =>
       analyzeProgression(ex).message;
+
+  /// Smart AI feedback — uses unified central function from pr_engine.
+  String getSmartFeedback(PlannedExercise ex) {
+    final fb = computeFeedback(ex);
+    return fb?.message ?? '';
+  }
+
+  /// Returns the full WorkoutFeedback (message + next target + status).
+  /// Used by both planner UI and PR celebration.
+  pre.WorkoutFeedback? computeFeedback(PlannedExercise ex) {
+    final key = getKey(ex.baseId);
+
+    // History: previous session best (NOT today)
+    final today = DateTime.now();
+    final history = _logs
+        .where((l) =>
+            l.exercise == key &&
+            (l.date.year != today.year ||
+                l.date.month != today.month ||
+                l.date.day != today.day))
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final prev = history.isNotEmpty ? history.first : null;
+
+    // ── PRIORITY 1: Use last DONE set if any ──
+    final doneSets = ex.sets.where((s) => s.done).toList();
+    if (doneSets.isNotEmpty) {
+      final last = doneSets.last;
+      return pre.calculateWorkoutFeedback(
+        weight:             last.weight,
+        reps:               last.reps,
+        previousBestWeight: prev?.weight ?? 0,
+        previousBestReps:   prev?.reps ?? 0,
+        isBodyweight:       ex.bodyweight,
+        unit:               ex.unit,
+      );
+    }
+
+    // ── PRIORITY 2: No sets done yet — show PLANNED target as preview ──
+    // Use first planned set as the target user is about to attempt
+    if (ex.sets.isEmpty) return null;
+    final planned = ex.sets.first;
+
+    // If we have history, base feedback on history vs planned
+    if (prev != null) {
+      return pre.calculateWorkoutFeedback(
+        weight:             planned.weight,
+        reps:               planned.reps,
+        previousBestWeight: prev.weight,
+        previousBestReps:   prev.reps,
+        isBodyweight:       ex.bodyweight,
+        unit:               ex.unit,
+      );
+    }
+
+    // ── PRIORITY 3: No history, not done — show generic plan-aware message ──
+    final reps = planned.reps;
+    String msg;
+    double nextW;
+    int nextR;
+
+    if (ex.bodyweight || ex.unit == 'reps') {
+      msg = '🎯 Target: ${planned.reps} reps — focus on form';
+      nextW = 0;
+      nextR = planned.reps;
+    } else if (ex.unit == 'min') {
+      msg = '⏱️ Target: ${planned.weight.toInt()} min steady pace';
+      nextW = planned.weight;
+      nextR = planned.reps;
+    } else if (reps < 6) {
+      msg = '💪 Heavy day — ${reps} reps · build strength';
+      nextW = planned.weight;
+      nextR = reps;
+    } else if (reps > 12) {
+      msg = '🔥 High volume — ${reps} reps · endurance focus';
+      nextW = planned.weight;
+      nextR = reps;
+    } else {
+      msg = '🎯 Hypertrophy zone — ${reps} reps · control & tempo';
+      nextW = planned.weight;
+      nextR = reps;
+    }
+
+    return pre.WorkoutFeedback(
+      message:    msg,
+      nextWeight: nextW,
+      nextReps:   nextR,
+      status:     pre.ProgressStatus.first,
+      xpEarned:   0,
+    );
+  }
   double getSuggestedWeight(PlannedExercise ex) =>
       analyzeProgression(ex).nextWeight;
 

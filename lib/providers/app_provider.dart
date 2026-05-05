@@ -31,6 +31,7 @@ import '../models/workout_log.dart';
 import '../services/ai_engine.dart';
 import '../services/monetization_service.dart';
 import '../services/storage_service.dart';
+import '../engines/pr_engine.dart' as pre;
 import 'ai_provider.dart';
 import 'analytics_provider.dart';
 import 'settings_provider.dart';
@@ -514,6 +515,9 @@ class AppProvider extends ChangeNotifier {
   SetProgressionHint analyzeProgression(PlannedExercise ex) =>
       workout.analyzeProgression(ex);
   String getTrainerMessage(PlannedExercise ex) => workout.getTrainerMessage(ex);
+  String getSmartFeedback(PlannedExercise ex) => workout.getSmartFeedback(ex);
+  pre.WorkoutFeedback? computeFeedback(PlannedExercise ex) =>
+      workout.computeFeedback(ex);
   double getSuggestedWeight(PlannedExercise ex) => workout.getSuggestedWeight(ex);
   double adaptiveNextWeight(String exerciseKey) =>
       workout.adaptiveNextWeight(exerciseKey, isOnPlateau: analytics.isOnPlateau);

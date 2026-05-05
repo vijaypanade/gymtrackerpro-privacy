@@ -267,6 +267,7 @@ class AIProvider extends ChangeNotifier {
   List<PerformancePattern> _perfMemory = [];
 
   String _aiTagline = '';
+  DateTime? _taglineSetAt;
   String _aiFullPlan = '';
   String _cachedWeightMessage = '';
 
@@ -284,7 +285,13 @@ class AIProvider extends ChangeNotifier {
   List<PerformancePattern> get performanceMemory =>
       List.unmodifiable(_perfMemory);
 
-  String get lastAISuggestion => _aiTagline;
+  String get lastAISuggestion {
+    // Tagline expires after 24 hours — then daily coach message takes over
+    if (_taglineSetAt == null) return _aiTagline;
+    final age = DateTime.now().difference(_taglineSetAt!);
+    if (age.inHours >= 24) return ''; // expired → fallback to coach message
+    return _aiTagline;
+  }
   String get lastAIPlan => _aiFullPlan;
   bool get hasAIPlan => _aiFullPlan.isNotEmpty;
 
@@ -391,6 +398,12 @@ class AIProvider extends ChangeNotifier {
         }
         if (savedTag != null && savedTag.isNotEmpty) {
           _aiTagline = savedTag;
+      final savedTagAt = await StorageService.instance.getString('ai_tagline_set_at');
+      if (savedTagAt != null && savedTagAt.isNotEmpty) {
+        try {
+          _taglineSetAt = DateTime.parse(savedTagAt);
+        } catch (_) {}
+      }
         }
       } catch (e) {
         debugPrint('AI plan restore error: $e');
@@ -546,18 +559,20 @@ class AIProvider extends ChangeNotifier {
     final tagline =
         shortName.length > 60 ? '${shortName.substring(0, 57)}...' : shortName;
     _aiTagline = '🔥 New plan ready: $tagline';
+    _taglineSetAt = DateTime.now();
 
-    _saveDebounce?.cancel();
-    _saveDebounce = Timer(
-      const Duration(milliseconds: 300),
-      _persistAIPlan,
-    );
+    _persistAIPlan();
   }
 
   Future<void> _persistAIPlan() async {
     try {
       await StorageService.instance.setString('ai_full_plan', _aiFullPlan);
       await StorageService.instance.setString('ai_tagline', _aiTagline);
+      if (_taglineSetAt != null) {
+        await StorageService.instance.setString(
+          'ai_tagline_set_at', _taglineSetAt!.toIso8601String(),
+        );
+      }
     } catch (e) {
       debugPrint('_persistAIPlan error: $e');
     }
@@ -1466,9 +1481,11 @@ class AIProvider extends ChangeNotifier {
   String _pickUnique(String key, List<String> messages) {
     if (messages.isEmpty) return '';
     final cached = _lastMessages[key];
-    if (cached != null && messages.contains(cached)) return cached;
-    final index = key.hashCode.abs() % messages.length;
-    final picked = messages[index];
+    final available = messages.where((m) => m != cached).toList();
+    final pool = available.isEmpty ? messages : available;
+    final today = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays + 1;
+    final index = (today + key.hashCode.abs()) % pool.length;
+    final picked = pool[index];
     _lastMessages[key] = picked;
     return picked;
   }

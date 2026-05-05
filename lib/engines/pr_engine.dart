@@ -569,3 +569,195 @@ class PRUtils {
       PREngine.nextTarget(weight, reps, unit, outcome,
           improvePct: improvePct);
 }
+
+// ════════════════════════════════════════════════
+// UNIFIED WORKOUT FEEDBACK — single source of truth
+// Used by: planner screen, PR celebration, workout provider
+// ════════════════════════════════════════════════
+
+class WorkoutFeedback {
+  final String message;        // "🔥 Perfect range — increase slightly"
+  final double nextWeight;     // Next session target weight
+  final int    nextReps;       // Next session target reps
+  final ProgressStatus status; // improved / same / dropped / first
+  final int    xpEarned;       // XP for this set
+
+  const WorkoutFeedback({
+    required this.message,
+    required this.nextWeight,
+    required this.nextReps,
+    required this.status,
+    required this.xpEarned,
+  });
+
+  String get nextTargetDisplay {
+    if (nextWeight <= 0) return '$nextReps reps';
+    return '${nextWeight.toStringAsFixed(1)} kg × $nextReps reps';
+  }
+}
+
+enum ProgressStatus { first, improved, same, dropped, tooHeavy, tooEasy, perfect }
+
+/// SINGLE source of truth for all workout feedback.
+/// Used by workout screen header AND PR celebration screen.
+WorkoutFeedback calculateWorkoutFeedback({
+  required double weight,
+  required int reps,
+  required double previousBestWeight,
+  required int previousBestReps,
+  bool isBodyweight = false,
+  String unit = 'kg',
+}) {
+  // ── First time ever — give SCIENTIFIC rep-based feedback ──
+  if (previousBestWeight == 0 && previousBestReps == 0) {
+    String msg;
+    double nextW;
+    int nextR;
+
+    if (isBodyweight || unit == 'reps') {
+      msg   = '🎯 Focus on form';
+      nextW = 0;
+      nextR = reps + 1;
+    } else if (unit == 'min') {
+      msg   = '⏱️ Build endurance';
+      nextW = weight;
+      nextR = reps;
+    } else if (reps < 6) {
+      msg   = '⚠ Too heavy — reduce';
+      nextW = (weight - 2.5).clamp(0, 500);
+      nextR = 8;
+    } else if (reps > 12) {
+      msg   = '💪 Too light — increase';
+      nextW = (weight + 5).clamp(0, 500);
+      nextR = 10;
+    } else if (reps >= 8 && reps <= 12) {
+      msg   = '🔥 Perfect — push slightly';
+      nextW = (weight + 2.5).clamp(0, 500);
+      nextR = reps;
+    } else {
+      msg   = '👍 Solid — maintain';
+      nextW = (weight + 2.5).clamp(0, 500);
+      nextR = reps + 1;
+    }
+
+    return WorkoutFeedback(
+      message:    msg,
+      nextWeight: nextW,
+      nextReps:   nextR,
+      status:     ProgressStatus.first,
+      xpEarned:   100,
+    );
+  }
+
+  // ── Bodyweight logic ──
+  if (isBodyweight || unit == 'reps') {
+    if (reps > previousBestReps) {
+      return WorkoutFeedback(
+        message:    '📈 Progressing well',
+        nextWeight: 0,
+        nextReps:   reps + 1,
+        status:     ProgressStatus.improved,
+        xpEarned:   75,
+      );
+    }
+    if (reps < previousBestReps - 1) {
+      return WorkoutFeedback(
+        message:    '😐 Slight drop — recover',
+        nextWeight: 0,
+        nextReps:   previousBestReps,
+        status:     ProgressStatus.dropped,
+        xpEarned:   20,
+      );
+    }
+    return WorkoutFeedback(
+      message:    '💪 Solid — control reps',
+      nextWeight: 0,
+      nextReps:   reps + 1,
+      status:     ProgressStatus.same,
+      xpEarned:   30,
+    );
+  }
+
+  // ── Weighted logic — RULE BASED ──
+
+  // CASE: Too heavy
+  if (reps < 6) {
+    return WorkoutFeedback(
+      message:    '⚠ Too heavy — reduce',
+      nextWeight: (weight - 2.5).clamp(0, 500),
+      nextReps:   8,
+      status:     ProgressStatus.tooHeavy,
+      xpEarned:   15,
+    );
+  }
+
+  // CASE: Too easy
+  if (reps > 12) {
+    return WorkoutFeedback(
+      message:    '💪 Too easy — increase',
+      nextWeight: (weight + 5).clamp(0, 500),
+      nextReps:   10,
+      status:     ProgressStatus.tooEasy,
+      xpEarned:   40,
+    );
+  }
+
+  // CASE: Compare with previous
+  final currVolume = weight * reps;
+  final prevVolume = previousBestWeight * previousBestReps;
+
+  // True PR — heavier weight
+  if (weight > previousBestWeight && reps >= 6) {
+    final delta = weight - previousBestWeight;
+    return WorkoutFeedback(
+      message:    '🔥 NEW PR — +${delta.toStringAsFixed(1)} kg',
+      nextWeight: (weight + 2.5).clamp(0, 500),
+      nextReps:   reps,
+      status:     ProgressStatus.improved,
+      xpEarned:   150,
+    );
+  }
+
+  // Volume improved
+  if (currVolume > prevVolume * 1.05) {
+    return WorkoutFeedback(
+      message:    '📈 Progressing well',
+      nextWeight: (weight + 2.5).clamp(0, 500),
+      nextReps:   reps,
+      status:     ProgressStatus.improved,
+      xpEarned:   75,
+    );
+  }
+
+  // Volume dropped significantly
+  if (currVolume < prevVolume * 0.90) {
+    return WorkoutFeedback(
+      message:    '😐 Slight drop — recover',
+      nextWeight: weight.clamp(0, 500),
+      nextReps:   previousBestReps,
+      status:     ProgressStatus.dropped,
+      xpEarned:   20,
+    );
+  }
+
+  // Perfect range 8-12, similar to previous
+  if (reps >= 8 && reps <= 12) {
+    return WorkoutFeedback(
+      message:    '🔥 Perfect — push slightly',
+      nextWeight: (weight + 2.5).clamp(0, 500),
+      nextReps:   reps,
+      status:     ProgressStatus.perfect,
+      xpEarned:   50,
+    );
+  }
+
+  // 6-8 range
+  return WorkoutFeedback(
+    message:    '👍 Good — maintain',
+    nextWeight: (weight + 2.5).clamp(0, 500),
+    nextReps:   reps + 1,
+    status:     ProgressStatus.same,
+    xpEarned:   35,
+  );
+}
+

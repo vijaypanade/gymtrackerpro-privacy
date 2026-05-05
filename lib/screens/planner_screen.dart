@@ -29,10 +29,28 @@ import '../data/exercise_data.dart';
 import 'ai_chat_screen.dart';
 import '../widgets/confetti_celebration.dart';
 import '../widgets/pr_celebration.dart';
+import '../engines/pr_engine.dart' as pre;
 import '../services/ad_service.dart';
 // ════════════════════════════════════════════════
 // HAPTICS HELPER — consistent system
 // ════════════════════════════════════════════════
+/// Combines feedback message with next target for compact header display.
+/// Same logic as PR celebration screen.
+String _buildHeaderMessage(
+    pre.WorkoutFeedback? fb, String fallback, PlannedExercise ex) {
+  if (fb == null) return fallback;
+  // Two-line format: message + next target
+  String next;
+  if (ex.bodyweight || ex.unit == 'reps') {
+    next = '→ ${fb.nextReps} reps';
+  } else if (ex.unit == 'min') {
+    next = '→ ${fb.nextWeight.toInt()} min';
+  } else {
+    next = '→ ${fb.nextWeight.toStringAsFixed(1)} kg';
+  }
+  return '${fb.message}\n$next';
+}
+
 class H{
   static void heavy()     => HapticFeedback.heavyImpact();
   static void medium()    => HapticFeedback.mediumImpact();
@@ -1212,7 +1230,9 @@ class _ExCardState extends State<_ExCard>
     final key  = p.getKey(ex.baseId);
     final pr   = p.getPR(key, ex.unit);
     final prR  = p.getPRReps(key);
-    final msg  = p.getTrainerMessage(ex);
+    // Smart AI feedback (unified — same logic as PR screen)
+    final feedback = p.computeFeedback(ex);
+    final msg = _buildHeaderMessage(feedback, p.getTrainerMessage(ex), ex);
     final adv  = AIEngine.getProgressionSuggestion(
       lastReps: prR, lastWeight: pr, goal: p.goal,
       sessionCount: p.logs.length);
@@ -1333,7 +1353,9 @@ class _ExCardState extends State<_ExCard>
                           const SizedBox(width: 5),
                           Expanded(child: Text(msg, style: GoogleFonts.inter(
                               color: AppColors.orange, fontSize: 10,
-                              fontWeight: FontWeight.w600),
+                              fontWeight: FontWeight.w600,
+                              height: 1.3),
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis)),
                         ] else if (pr > 0) ...[
                           const SizedBox(width: 5),
@@ -1397,6 +1419,7 @@ class _ExCardState extends State<_ExCard>
                     height: 1, indent: AppSpacing.md,
                     endIndent: AppSpacing.md),
                 const SizedBox(height: AppSpacing.sm),
+
                 SizedBox(height: 150, child: ProgressChart(
                     exerciseKey: key, unit: ex.unit)),
                 _SetsPanel(ex: ex, idx: widget.idx,
@@ -1434,6 +1457,97 @@ class _ExCardState extends State<_ExCard>
           ),
         ],
       )) ?? false;
+}
+
+// ════════════════════════════════════════════════
+// AI SUGGESTION BANNER — shows concrete next weight/reps
+// ════════════════════════════════════════════════
+class _AISuggestionBanner extends StatelessWidget {
+  final PlannedExercise ex;
+  final Color color;
+
+  const _AISuggestionBanner({required this.ex, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.read<AppProvider>();
+    final hint = p.analyzeProgression(ex);
+    final isBW = ex.bodyweight;
+    final isMin = ex.unit == 'min';
+
+    // Build clear next-target message
+    String targetText;
+    if (isMin) {
+      targetText = '⏱️ Target: ${hint.targetReps} min';
+    } else if (isBW) {
+      targetText = '🎯 Target: ${hint.targetReps} reps';
+    } else {
+      targetText = '🎯 Target: ${hint.nextWeight.toStringAsFixed(1)} kg × ${hint.targetReps} reps';
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+      padding: const EdgeInsets.all(AppSpacing.sm + 2),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.gold.withValues(alpha: 0.10),
+            AppColors.gold.withValues(alpha: 0.04),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.25),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Center(
+              child: Text('🤖', style: TextStyle(fontSize: 16)),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  targetText,
+                  style: GoogleFonts.inter(
+                    color: AppColors.gold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hint.message,
+                  style: GoogleFonts.inter(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ════════════════════════════════════════════════

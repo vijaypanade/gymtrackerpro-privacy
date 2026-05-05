@@ -40,6 +40,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   String _level    = 'beginner';
   String _activity = 'Moderate';
 
+  // Step 4
+  String _weakMuscle = '';
+
   @override
   void dispose() {
     _pageCtrl.dispose();
@@ -52,7 +55,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _next() {
     HapticFeedback.mediumImpact();
-    if (_page < 2) {
+    if (_page < 3) {
       _pageCtrl.nextPage(
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeOutCubic);
@@ -75,6 +78,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       level:         _level,
       activityLevel: _activity,
     ));
+    // Save weak muscle preference
+    if (_weakMuscle.isNotEmpty) {
+      ap.settings.update('weakMusclePreference', _weakMuscle);
+    }
     ap.completeOnboarding();
     ap.generateAIWorkout().catchError((_) {});
     HapticFeedback.heavyImpact();
@@ -117,7 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         SafeArea(
           child: Column(children: [
             // Progress indicator
-            _ProgressBar(current: _page, total: 3),
+            _ProgressBar(current: _page, total: 4),
             const SizedBox(height: AppSpacing.lg),
 
             // Page content
@@ -140,6 +147,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     onGoal:     (v) => setState(() => _goal = v),
                     onLevel:    (v) => setState(() => _level = v),
                     onActivity: (v) => setState(() => _activity = v)),
+                _Step4(
+                    selected: _weakMuscle,
+                    onSelect: (v) => setState(() => _weakMuscle = v)),
               ],
             )),
 
@@ -742,3 +752,152 @@ class _CTAButtonState extends State<_CTAButton>
     )),
   );
 }
+
+// ════════════════════════════════════════════════
+// STEP 4 — WEAK MUSCLE
+// ════════════════════════════════════════════════
+class _Step4 extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  static const _muscles = [
+    {'key': 'chest',     'label': 'Chest',     'emoji': '💪'},
+    {'key': 'back',      'label': 'Back',      'emoji': '🏋️'},
+    {'key': 'legs',      'label': 'Legs',      'emoji': '🦵'},
+    {'key': 'shoulders', 'label': 'Shoulders', 'emoji': '🔝'},
+    {'key': 'arms',      'label': 'Arms',      'emoji': '💪'},
+    {'key': 'core',      'label': 'Core',      'emoji': '🔥'},
+  ];
+
+  const _Step4({required this.selected, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Any weak point? 🎯',
+            style: TextStyle(
+              fontFamily: 'Rajdhani',
+              color: AppColors.textPrimary,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'AI will give this muscle extra love. Optional — skip if unsure.',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              color: AppColors.textMuted,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.0,
+            children: _muscles.map((m) {
+              final isSelected = selected == m['key'];
+              return GestureDetector(
+                onTap: () => onSelect(m['key']!),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.gold.withValues(alpha: 0.12)
+                        : AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.gold
+                          : AppColors.divider,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: AppColors.gold.withValues(alpha: 0.18),
+                              blurRadius: 10,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(m['emoji']!,
+                          style: const TextStyle(fontSize: 28)),
+                      const SizedBox(height: 6),
+                      Text(
+                        m['label']!,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          color: isSelected
+                              ? AppColors.gold
+                              : AppColors.textPrimary,
+                          fontSize: 12,
+                          fontWeight: isSelected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
+
+          // Skip option
+          GestureDetector(
+            onTap: () => onSelect(''),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: selected.isEmpty
+                    ? AppColors.bgCard
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: selected.isEmpty
+                      ? AppColors.gold.withValues(alpha: 0.3)
+                      : AppColors.divider,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  selected.isEmpty
+                      ? '✓ Skip — no specific weakness'
+                      : 'Skip — no specific weakness',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    color: selected.isEmpty
+                        ? AppColors.gold
+                        : AppColors.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

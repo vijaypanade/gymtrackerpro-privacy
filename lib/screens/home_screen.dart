@@ -3495,91 +3495,139 @@ void _showAIPlanSheet(BuildContext context, String planText) {
     context: context,
     backgroundColor: AppColors.bgModal,
     isScrollControlled: true,
+    useSafeArea: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      maxChildSize: 0.9,
-      minChildSize: 0.4,
+    builder: (sheetContext) => DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
       expand: false,
-      builder: (_, scrollController) => Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      builder: (_, scrollController) => Column(
+        children: [
+          // ── Drag handle ──
+          Container(
+            margin: const EdgeInsets.only(top: 8, bottom: 4),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.divider,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // ── Header ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 12, 8),
+            child: Row(
               children: [
                 const Text('🤖', style: TextStyle(fontSize: 24)),
                 const SizedBox(width: 10),
-                const Text('Your AI Plan',
-                  style: TextStyle(
-                    fontFamily: 'Rajdhani',
-                    color: AppColors.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                const Expanded(
+                  child: Text(
+                    'Your AI Plan',
+                    style: TextStyle(
+                      fontFamily: 'Rajdhani',
+                      color: AppColors.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close, color: AppColors.textMuted),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(sheetContext),
                 ),
               ],
             ),
-            const Divider(color: AppColors.divider),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: scrollController,
-                child: Text(planText,
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                    height: 1.6,
+          ),
+          const Divider(color: AppColors.divider, height: 1),
+
+          // ── Scrollable content ──
+          Expanded(
+            child: SingleChildScrollView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              child: Text(
+                planText,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  height: 1.6,
+                ),
+              ),
+            ),
+          ),
+
+          // ── Fixed bottom button with SafeArea ──
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.bgModal,
+              border: Border(
+                top: BorderSide(
+                  color: AppColors.divider.withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final ap = context.read<AppProvider>();
+                      Navigator.pop(sheetContext);
+                      
+                      // Show loading
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('🤖 Applying plan...'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      }
+                      
+                      final result = await ap.getAIWorkoutPlan();
+                      if (result.isNotEmpty && context.mounted) {
+                        await ap.applyAIWorkout(result);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('✅ Plan applied to Planner!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.gold,
+                      foregroundColor: Colors.black,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      '🚀 Apply This Plan',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () async {
-                  final ap = context.read<AppProvider>();
-                  final result = await ap.getAIWorkoutPlan();
-                  if (result.isNotEmpty) {
-                    await ap.applyAIWorkout(result);
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('✅ Plan applied to Planner!'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.gold,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  '✅ Apply This Plan',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );
