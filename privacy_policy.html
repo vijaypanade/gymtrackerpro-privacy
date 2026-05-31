@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiftOn — Privacy Policy</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      line-height: 1.7;
+      padding: 0 16px 60px;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    header {
+      padding: 48px 0 32px;
+      border-bottom: 1px solid #222;
+      margin-bottom: 40px;
+    }
+    .logo {
+      font-size: 28px;
+      font-weight: 800;
+      color: #BF953F;
+      letter-spacing: -0.5px;
+    }
+    .logo span { color: #fff; }
+    header p {
+      color: #888;
+      margin-top: 6px;
+      font-size: 14px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #BF953F;
+      margin: 36px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    p { margin-bottom: 14px; color: #ccc; font-size: 15px; }
+    ul { margin: 10px 0 16px 20px; }
+    li { color: #ccc; font-size: 15px; margin-bottom: 6px; }
+    a { color: #BF953F; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .badge {
+      display: inline-block;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 24px;
+    }
+    .highlight {
+      background: #111;
+      border-left: 3px solid #BF953F;
+      padding: 14px 18px;
+      border-radius: 0 8px 8px 0;
+      margin: 20px 0;
+    }
+    .highlight p { margin: 0; color: #ddd; }
+    footer {
+      margin-top: 60px;
+      padding-top: 24px;
+      border-top: 1px solid #1e1e1e;
+      color: #555;
+      font-size: 13px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">Lift<span>On</span></div>
+    <p>AI-Powered Personal Training</p>
+  </header>
+
+  <h1>Privacy Policy</h1>
+  <div class="badge">Effective Date: May 29, 2025</div>
+
+  <p>
+    LiftOn ("we", "our", or "us") is built and maintained by <strong>P. Kore</strong>.
+    This Privacy Policy explains what data we collect, why we collect it, and how we protect it.
+    By using LiftOn, you agree to this policy.
+  </p>
+
+  <div class="highlight">
+    <p><strong>Short version:</strong> We collect only what's needed to power your workouts and AI coaching.
+    We never sell your data. Health data stays on your device.</p>
+  </div>
+
+  <!-- ── 1. Data We Collect ── -->
+  <h2>1. Data We Collect</h2>
+
+  <p><strong>Account &amp; Profile Data</strong></p>
+  <ul>
+    <li>Name, email address (via Google Sign-In or email/password)</li>
+    <li>Fitness profile: goal, fitness level, body weight, gender, activity level</li>
+    <li>App settings: training days per week, split style, travel mode preference</li>
+  </ul>
+
+  <p><strong>Workout Data</strong></p>
+  <ul>
+    <li>Weekly workout plans (exercises, sets, reps, weights)</li>
+    <li>Completed workout logs and session history</li>
+    <li>Streak and total workout counts</li>
+    <li>Mood and daily readiness ratings</li>
+  </ul>
+
+  <p><strong>Health Data (Android Health Connect)</strong></p>
+  <ul>
+    <li>Daily step count — used to adjust recovery scores</li>
+    <li>Sleep duration — used to adjust recovery recommendations</li>
+    <li>This data is <strong>read-only</strong> from Health Connect and is <strong>never uploaded</strong> to our servers</li>
+    <li>Health data is processed locally on your device only</li>
+  </ul>
+
+  <p><strong>AI Interaction Data</strong></p>
+  <ul>
+    <li>Prompts sent to our AI coach (workout context, recovery status, goals)</li>
+    <li>AI-generated plans and responses displayed in-app</li>
+    <li>No personally identifiable information is included in AI prompts</li>
+  </ul>
+
+  <!-- ── 2. How We Use Your Data ── -->
+  <h2>2. How We Use Your Data</h2>
+  <ul>
+    <li>Generate personalised AI workout and diet plans</li>
+    <li>Calculate muscle recovery scores and readiness levels</li>
+    <li>Detect plateaus, deload needs, and adaptive training adjustments</li>
+    <li>Deliver daily AI coaching briefs and session insights</li>
+    <li>Sync your plan and history across devices via your account</li>
+    <li>Send optional push notifications (workout reminders, comeback alerts)</li>
+  </ul>
+
+  <!-- ── 3. Data Storage & Security ── -->
+  <h2>3. Data Storage &amp; Security</h2>
+  <p>
+    Your account and workout data is stored securely in <strong>Google Firebase Firestore</strong>,
+    protected by Firebase Authentication. Data is encrypted in transit (HTTPS/TLS) and at rest.
+  </p>
+  <p>
+    Workout history and AI plan cache is also stored locally on your device using
+    SharedPreferences. Health Connect data never leaves your device.
+  </p>
+
+  <!-- ── 4. Third-Party Services ── -->
+  <h2>4. Third-Party Services</h2>
+  <p>LiftOn uses the following third-party services:</p>
+  <ul>
+    <li><strong>Google Firebase</strong> — authentication, cloud database, crash reporting</li>
+    <li><strong>Google Gemini API</strong> — AI workout and diet plan generation (via our secure backend; your personal data is not sent to Gemini)</li>
+    <li><strong>Google AdMob</strong> — display ads for free-tier users. AdMob may collect device identifiers as per Google's privacy policy</li>
+    <li><strong>Android Health Connect</strong> — passive step and sleep data, read-only, on-device only</li>
+    <li><strong>Google Play Billing</strong> — subscription payment processing</li>
+  </ul>
+  <p>Each third-party service operates under its own privacy policy. We are not responsible for their data practices.</p>
+
+  <!-- ── 5. Health Connect Declaration ── -->
+  <h2>5. Health Connect Data — Detailed Declaration</h2>
+  <div class="highlight">
+    <p>LiftOn accesses <strong>Steps</strong> and <strong>Sleep</strong> data from Android Health Connect
+    solely to improve recovery recommendations shown inside the app.
+    This data is <strong>processed locally on your device</strong>, is never uploaded to our servers,
+    and is never shared with any third party.
+    You can revoke Health Connect permissions at any time in Android Settings → Health Connect → App permissions.</p>
+  </div>
+
+  <!-- ── 6. Subscriptions & Payments ── -->
+  <h2>6. Subscriptions &amp; Payments</h2>
+  <p>
+    LiftOn offers a premium subscription (LiftOn Pro) processed entirely through
+    <strong>Google Play Billing</strong>. We do not collect or store your payment card information.
+    Subscription management (cancel, upgrade, restore) is handled through your Google Play account.
+  </p>
+
+  <!-- ── 7. Data Retention ── -->
+  <h2>7. Data Retention</h2>
+  <p>
+    We retain your account and workout data for as long as your account is active.
+    You may request deletion of your data at any time by contacting us at the email below.
+    We will delete your data within 30 days of a verified request.
+  </p>
+
+  <!-- ── 8. Children's Privacy ── -->
+  <h2>8. Children's Privacy</h2>
+  <p>
+    LiftOn is intended for users aged 13 and older. We do not knowingly collect personal data
+    from children under 13. If you believe a child has provided us with personal information,
+    please contact us and we will delete it immediately.
+  </p>
+
+  <!-- ── 9. Your Rights ── -->
+  <h2>9. Your Rights</h2>
+  <ul>
+    <li><strong>Access:</strong> Request a copy of the data we hold about you</li>
+    <li><strong>Correction:</strong> Update inaccurate profile information in-app or via email</li>
+    <li><strong>Deletion:</strong> Request complete account and data deletion</li>
+    <li><strong>Opt-out:</strong> Disable push notifications in device settings at any time</li>
+    <li><strong>Health permissions:</strong> Revoke Health Connect access in Android Settings</li>
+  </ul>
+
+  <!-- ── 10. Changes to This Policy ── -->
+  <h2>10. Changes to This Policy</h2>
+  <p>
+    We may update this Privacy Policy from time to time. Material changes will be communicated
+    via in-app notification. Continued use of LiftOn after changes are posted constitutes
+    acceptance of the updated policy.
+  </p>
+
+  <!-- ── 11. Contact ── -->
+  <h2>11. Contact Us</h2>
+  <p>For any privacy questions, data requests, or concerns:</p>
+  <ul>
+    <li><strong>Developer:</strong> P. Kore</li>
+    <li><strong>Email:</strong> <a href="mailto:gymtrackerpro3@gmail.com">gymtrackerpro3@gmail.com</a></li>
+  </ul>
+
+  <footer>
+    &copy; 2025 LiftOn by P. Kore &nbsp;·&nbsp; All rights reserved
+  </footer>
+
+</div>
+</body>
+</html>
