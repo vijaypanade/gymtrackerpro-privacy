@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Trapezius — diamond/kite-shaped muscle of upper back -->
+  <!-- Upper traps: from occiput, spread to acromion both sides -->
+  <path d="M36,23 C38,21 42,20 50,20 C58,20 62,21 64,23 C68,26 70,31 67,36 C64,41 58,44 50,45 C42,44 36,41 33,36 C30,31 32,26 36,23 Z"
+        fill="white"/>
+  <!-- Lower trap extensions: descend toward thoracic spine -->
+  <path d="M38,44 C36,48 35,54 37,60 C39,64 44,67 50,67 C56,67 61,64 63,60 C65,54 64,48 62,44 C58,46 54,47 50,47 C46,47 42,46 38,44 Z"
+        fill="white" opacity="0.65"/>
+</svg>

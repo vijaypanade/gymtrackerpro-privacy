@@ -8,6 +8,7 @@
 //   6. Context.read safe inside callbacks
 
 import 'package:flutter/material.dart';
+import '../data/exercise_data.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
@@ -20,7 +21,14 @@ class AIWorkoutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final days         = (plan['days'] as List?) ?? [];
+    final days = (plan['days'] as List?) ??
+        [
+          {
+            'day': 'Today',
+            'focus': plan['focus'] ?? 'Workout',
+            'exercises': plan['exercises'] ?? [],
+          }
+        ];
     final workoutName  = plan['workout_name'] as String? ?? 'AI Workout Plan';
     final totalEx      = days.fold<int>(0, (sum, d) {
       final exList = (d['exercises'] as List?) ?? [];
@@ -202,7 +210,21 @@ class _DayCard extends StatelessWidget {
         ),
 
         ...exercises.map((ex) {
-          final name  = ex['name']  as String? ?? '';
+          // Smart name lookup: try 'name' first, fallback to exercise_id lookup
+          var name = ex['name'] as String? ?? '';
+          if (name.isEmpty) {
+            final id = ex['exercise_id'] as String? ?? '';
+            if (id.isNotEmpty) {
+              final found = ExerciseData.list.firstWhere(
+                (e) => e['id'] == id,
+                orElse: () => {},
+              );
+              name = (found['name'] as String?) ??
+                  id.split('_').skip(2).map((w) =>
+                      w.isEmpty ? w : w[0].toUpperCase() + w.substring(1)
+                  ).join(' ');
+            }
+          }
           final sets  = ex['sets'];
           final reps  = ex['reps'];
           final notes = ex['notes'] as String? ?? '';
@@ -252,7 +274,50 @@ class _ActionBar extends StatelessWidget {
       return;
     }
 
-    await p.applyAIWorkout(plan);
+    final normalizedPlan = plan['days'] != null
+        ? plan
+        : {
+            'workout_name': plan['workout_name'] ?? 'AI Workout',
+            'days': List.generate(7, (i) {
+              final todayIndex = DateTime.now().weekday - 1;
+
+              if (i == todayIndex) {
+                return {
+                  'day': 'Today',
+                  'focus': plan['focus'] ?? 'Workout',
+                  'exercises': plan['exercises'] ?? [],
+                };
+              }
+
+              return {
+                'day': 'Rest',
+                'focus': 'Rest',
+                'exercises': [],
+              };
+            }),
+          };
+
+    final daysList = plan['days'] as List?;
+    final isSingleDay = daysList == null || daysList.length == 1;
+
+    if (isSingleDay) {
+      // Single day → add only to today, keep other days untouched
+      final todayIndex = DateTime.now().weekday - 1;
+      final singleDay = daysList != null && daysList.isNotEmpty
+          ? Map<String, dynamic>.from(daysList.first as Map)
+          : <String, dynamic>{};
+
+      await p.applySingleDayAIWorkout(
+        dayIndex: todayIndex,
+        workoutPlan: {
+          'focus': singleDay['focus'] ?? plan['focus'] ?? 'Workout',
+          'exercises': singleDay['exercises'] ?? plan['exercises'] ?? [],
+        },
+      );
+    } else {
+      // Full week plan → replace whole planner
+      await p.applyAIWorkout(normalizedPlan);
+    }
     if (!context.mounted) return;
     Navigator.pop(context);
 

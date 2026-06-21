@@ -412,7 +412,15 @@ class AnalyticsEngine {
   // MUSCLE IMBALANCE SCORE
   // ══════════════════════════════════════════════════════════════
   static String getMuscleImbalance(List<WorkoutLog> logs) {
-    if (logs.isEmpty) return 'Start training to unlock insights';
+    if (logs.isEmpty) {
+      return 'Start training to unlock insights';
+    }
+
+    // Prevent fake AI insights for brand-new users.
+    // Wait until enough real workout history exists.
+    if (logs.length < 10) {
+      return 'Complete more workouts to unlock muscle balance insights';
+    }
 
     final volumeByMuscle = <String, double>{};
     for (final log in logs) {
@@ -434,10 +442,10 @@ class AnalyticsEngine {
 
     final diff = ((maxVol - minVol) / maxVol) * 100;
 
-    if (diff < 15)      return 'Excellent muscle balance 💪';
+    if (diff < 15)      return 'Excellent muscle balance';
     else if (diff < 30) return '$weakest slightly lagging';
-    else if (diff < 50) return '⚠️ $weakest needs attention';
-    else                return '🚨 Significant $weakest imbalance — prioritize today';
+    else if (diff < 50) return '$weakest needs attention';
+    else                return 'Significant $weakest imbalance detected';
   }
 
   // ══════════════════════════════════════════════════════════════

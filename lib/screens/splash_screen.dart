@@ -1,201 +1,301 @@
-// lib/screens/splash_screen.dart — v5 Cinematic Splash
-// ✅ FIX: Removed hardcoded test_user_123 / "Vijay" Firestore call
+import 'dart:async';
 import 'package:flutter/material.dart';
-import '../utils/app_constants.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'main_shell.dart';
 import 'login_screen.dart';
 import '../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-
+  /// Completes when all providers are initialized. Navigation is gated on
+  /// BOTH this future AND the minimum animation duration.
+  final Future<void>? readyFuture;
+  const SplashScreen({super.key, this.readyFuture});
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
 
+  // Phase 1 — Logo entrance (0–700 ms)
   late final AnimationController _logoCtrl;
-  late final AnimationController _textCtrl;
-  late final AnimationController _glowCtrl;
-  late final AnimationController _barCtrl;
+  late final Animation<double>   _logoScale;
+  late final Animation<double>   _logoFade;
 
-  late final Animation<double> _logoScale;
-  late final Animation<double> _logoOpacity;
-  late final Animation<double> _textOpacity;
-  late final Animation<Offset>  _textSlide;
-  late final Animation<double> _glowPulse;
-  late final Animation<double> _barProgress;
+  // Ambient glow breathing (starts at 700 ms, loops)
+  late final AnimationController _glowCtrl;
+  late final Animation<double>   _glowOpacity;
+
+  // Phase 2 — Brand name + tagline stagger (starts at 1200 ms)
+  late final AnimationController _textCtrl;
+  late final Animation<double>   _brandFade;
+  late final Animation<double>   _taglineFade;
+
+  // Status line — only shown if startup exceeds 2 s
+  late final AnimationController _statusCtrl;
+  late final Animation<double>   _statusFade;
+  bool _showStatus = false;
 
   @override
   void initState() {
     super.initState();
 
-    // ✅ FIX: खालील 4 lines पूर्णपणे DELETE केल्या:
-    //   userId: "test_user_123",   ← सगळे users एकाच document मध्ये जात होते!
-    //   name: "Vijay",             ← तुमचं नाव सर्व users ला दिसत होतं!
-    // );
-    // Firestore write आता LoginScreen नंतर AuthService मधून होतो (real UID ने)
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor:         Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ));
 
-    _logoCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
-    _textCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
-    _glowCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))
-      ..repeat(reverse: true);
-    _barCtrl  = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
+    // ── Phase 1: Logo entrance ────────────────────────────────────────────────
+    _logoCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700));
+    _logoScale = Tween<double>(begin: 0.92, end: 1.0).animate(
+        CurvedAnimation(parent: _logoCtrl, curve: Curves.easeOutCubic));
+    _logoFade  = CurvedAnimation(parent: _logoCtrl, curve: Curves.easeOut);
 
-    _logoScale   = Tween<double>(begin: 0.6, end: 1.0).animate(
-        CurvedAnimation(parent: _logoCtrl, curve: Curves.easeOutBack));
-    _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _logoCtrl, curve: Curves.easeIn));
-    _textOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _textCtrl, curve: Curves.easeOut));
-    _textSlide   = Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(
-        CurvedAnimation(parent: _textCtrl, curve: Curves.easeOutCubic));
-    _glowPulse   = Tween<double>(begin: 0.3, end: 0.9).animate(_glowCtrl);
-    _barProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _barCtrl, curve: Curves.easeInOut));
+    // ── Glow breathing ───────────────────────────────────────────────────────
+    _glowCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2200));
+    _glowOpacity = Tween<double>(begin: 0.15, end: 0.35).animate(
+        CurvedAnimation(parent: _glowCtrl, curve: Curves.easeInOut));
 
-    _runSequence();
+    // ── Phase 2: Brand + tagline ─────────────────────────────────────────────
+    _textCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700));
+    _brandFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+            parent: _textCtrl,
+            curve: const Interval(0.0, 0.55, curve: Curves.easeOut)));
+    _taglineFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+            parent: _textCtrl,
+            curve: const Interval(0.40, 1.0, curve: Curves.easeOut)));
+
+    // ── Status text ──────────────────────────────────────────────────────────
+    _statusCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 600));
+    _statusFade = CurvedAnimation(parent: _statusCtrl, curve: Curves.easeOut);
+
+    _runAnimation();
+    _setupNavigation();
   }
 
-  Future<void> _runSequence() async {
-    await Future.delayed(const Duration(milliseconds: 100));
+  // Drives the visual sequence regardless of provider readiness.
+  Future<void> _runAnimation() async {
     _logoCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 300));
-    _textCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 200));
-    _barCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 1400));
+
+    // 700 ms — logo settled → haptic + start glow
+    await Future<void>.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
-    final isSignedIn = AuthService.instance.isSignedIn;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, a1, __) => isSignedIn
-            ? const MainShell()
-            : const LoginScreen(),
-        transitionDuration: const Duration(milliseconds: 400),
-        transitionsBuilder: (_, a1, __, child) =>
-            FadeTransition(opacity: a1, child: child),
-      ),
-    );
+    HapticFeedback.lightImpact();
+    _glowCtrl.repeat(reverse: true);
+
+    // 1200 ms — fade in brand text
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    _textCtrl.forward();
+  }
+
+  void _setupNavigation() {
+    bool providerReady = false;
+
+    // Show status text if providers haven't resolved by 2 s
+    Future<void>.delayed(const Duration(milliseconds: 2000)).then((_) {
+      if (!mounted || providerReady) return;
+      setState(() => _showStatus = true);
+      _statusCtrl.forward();
+    });
+
+    // Navigate when BOTH min visual hold (2.5 s) AND providers are ready
+    Future.wait<void>([
+      Future<void>.delayed(const Duration(milliseconds: 2500)),
+      widget.readyFuture ?? Future<void>.value(),
+    ]).then((_) {
+      providerReady = true;
+      if (!mounted) return;
+      final isLoggedIn = AuthService.instance.currentUser != null;
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) =>
+              isLoggedIn ? const MainShell() : const LoginScreen(),
+          transitionDuration: const Duration(milliseconds: 400),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+        ),
+      );
+    });
   }
 
   @override
   void dispose() {
-    _logoCtrl.dispose(); _textCtrl.dispose();
-    _glowCtrl.dispose(); _barCtrl.dispose();
+    _logoCtrl.dispose();
+    _glowCtrl.dispose();
+    _textCtrl.dispose();
+    _statusCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: Stack(children: [
-
-        // ── Ambient glow
-        AnimatedBuilder(
-          animation: _glowPulse,
-          builder: (_, __) => Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0, -0.2),
-                  radius: 0.75,
-                  colors: [
-                    AppColors.gold.withValues(alpha: 0.07 * _glowPulse.value),
-                    Colors.transparent,
-                  ],
-                ),
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Warm black background
+          Container(
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment.center,
+                radius: 1.2,
+                colors: [Color(0xFF120E08), Colors.black],
+                stops: [0.0, 0.75],
               ),
             ),
           ),
-        ),
 
-        // ── Content
-        Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+          // ── Center column: glow + logo + text ─────────────────────────────
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Logo with ambient glow — phase 1
+                AnimatedBuilder(
+                  animation: _logoCtrl,
+                  builder: (_, __) => Opacity(
+                    opacity: _logoFade.value,
+                    child: Transform.scale(
+                      scale: _logoScale.value,
+                      child: _GlowLogo(glowAnim: _glowOpacity),
+                    ),
+                  ),
+                ),
 
-              // Logo
-              AnimatedBuilder(
-                animation: _logoCtrl,
-                builder: (_, __) => Opacity(
-                  opacity: _logoOpacity.value,
-                  child: Transform.scale(
-                    scale: _logoScale.value,
-                    child: Container(
-                      width: 88, height: 88,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: AppGradients.gold,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.gold.withValues(alpha: 0.40),
-                            blurRadius: 28, spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.fitness_center_rounded,
-                        color: Colors.black, size: 42,
+                const SizedBox(height: 36),
+
+                // LIFTON — phase 2
+                AnimatedBuilder(
+                  animation: _brandFade,
+                  builder: (_, __) => Opacity(
+                    opacity: _brandFade.value,
+                    child: Text(
+                      'LIFTON',
+                      style: GoogleFonts.rajdhani(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 8,
                       ),
                     ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 32),
+                const SizedBox(height: 8),
 
-              // Text
-              AnimatedBuilder(
-                animation: _textCtrl,
-                builder: (_, child) => Opacity(
-                  opacity: _textOpacity.value,
-                  child: SlideTransition(position: _textSlide, child: child),
-                ),
-                child: Column(children: [
-                  Text('AI TRAINER', style: TextStyle(fontFamily: 'Rajdhani',
-                    color: AppColors.gold, fontSize: 26,
-                    fontWeight: FontWeight.w900, letterSpacing: 4,
-                  )),
-                  const SizedBox(height: 6),
-                  Text('TRAIN · TRACK · DOMINATE', style: TextStyle(fontFamily: 'Inter',
-                    color: AppColors.textMuted, fontSize: 10,
-                    letterSpacing: 3.5, fontWeight: FontWeight.w600,
-                  )),
-                ]),
-              ),
-            ],
-          ),
-        ),
-
-        // ── Progress bar at bottom
-        Positioned(
-          bottom: 52, left: 60, right: 60,
-          child: AnimatedBuilder(
-            animation: _barCtrl,
-            builder: (_, __) => Opacity(
-              opacity: _barProgress.value,
-              child: Column(children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: _barProgress.value,
-                    backgroundColor: AppColors.bgElevated,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.gold),
-                    minHeight: 2,
+                // Tagline — phase 2 (250 ms after brand)
+                AnimatedBuilder(
+                  animation: _taglineFade,
+                  builder: (_, __) => Opacity(
+                    opacity: _taglineFade.value,
+                    child: Text(
+                      'The gym plan that adjusts itself.',
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFFD4AF37).withValues(alpha: 0.65),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                Text('Loading your stats...', style: TextStyle(fontFamily: 'Inter',
-                  color: AppColors.textMuted, fontSize: 11)),
-              ]),
+              ],
+            ),
+          ),
+
+          // ── Status line — only if startup > 2 s ───────────────────────────
+          if (_showStatus)
+            Positioned(
+              bottom: 72,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: FadeTransition(
+                  opacity: _statusFade,
+                  child: Text(
+                    'Preparing your training system...',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.40),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Logo tile with animated ambient glow ──────────────────────────────────────
+
+class _GlowLogo extends StatelessWidget {
+  final Animation<double> glowAnim;
+  const _GlowLogo({required this.glowAnim});
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: glowAnim,
+    builder: (_, __) => Stack(
+      alignment: Alignment.center,
+      children: [
+        // Radial ambient glow — breathes with glowAnim
+        Container(
+          width: 280,
+          height: 280,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [
+                const Color(0xFFD4AF37).withValues(alpha: glowAnim.value),
+                Colors.transparent,
+              ],
             ),
           ),
         ),
-      ]),
-    );
-  }
+
+        // Logo tile
+        Container(
+          width: 180,
+          height: 180,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(42),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFD4AF37).withValues(alpha: 0.22),
+                blurRadius: 48,
+                spreadRadius: 4,
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.60),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(42),
+            child: Image.asset(
+              'assets/header_logo.png',
+              width: 180,
+              height: 180,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

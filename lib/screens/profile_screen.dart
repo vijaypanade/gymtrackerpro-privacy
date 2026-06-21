@@ -1,14 +1,10 @@
-// lib/screens/profile_screen.dart — v9.0 PREMIUM
-// FIXES:
-//   • NULL CRASH: macros['fats']! → null-safe with fallbacks (NO ! operators on map)
-//   • Both 'fat' and 'fats' keys handled
-// UPGRADES:
-//   • Gradient stat summary row (workouts, streak, XP)
-//   • Nutrition tiles with animated progress bars
-//   • Info card with icon-prefixed rows
-//   • Edit form with gold focus borders
+// lib/screens/profile_screen.dart — v11.0 ATHLETE IDENTITY
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
+import '../services/health_connect_service.dart';
+import '../services/rest_timer_service.dart';
 import 'login_screen.dart';
 
 import 'package:provider/provider.dart';
@@ -19,22 +15,19 @@ import '../providers/gamification_provider.dart';
 import '../models/models.dart';
 import '../utils/app_constants.dart';
 import '../widgets/shared_widgets.dart';
-import '../services/ai_engine.dart';
-import 'body_measurement_screen.dart';
-import 'one_rm_screen.dart';
+import '../widgets/profile_rank_badge.dart';
+import 'onboarding_screen.dart';
+import 'premium_screen.dart';
+import '../utils/app_routes.dart';
 
-// ════════════════════════════════════════════════
-// HAPTICS — consistent system (Phase 1)
-// ════════════════════════════════════════════════
-class H{
-  static void heavy()     => H.heavy();
-  static void medium()    => H.medium();
-  static void light()     => H.light();
-  static void selection() => H.selection();
-  static void success()   => H.heavy();
-  static void tap()       => H.light();
+class H {
+  static void heavy()     => HapticFeedback.heavyImpact();
+  static void medium()    => HapticFeedback.mediumImpact();
+  static void light()     => HapticFeedback.lightImpact();
+  static void selection() => HapticFeedback.selectionClick();
+  static void success()   => HapticFeedback.heavyImpact();
+  static void tap()       => HapticFeedback.lightImpact();
 }
-
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -43,9 +36,12 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _name, _age, _weight, _height;
-  bool _editing = false;
+  bool _editing         = false;
+  bool _detailsExpanded = true;
   String _goal = 'muscle_gain', _level = 'beginner',
-      _trainer = 'friendly', _gender = 'male', _activity = 'Moderate';
+      _trainer = 'friendly', _gender = 'male', _activity = 'Moderate',
+      _workoutTime = 'evening',
+      _bodyType = 'mesomorph';
 
   @override
   void initState() {
@@ -58,6 +54,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _goal    = p.goal;        _level   = p.level;
     _trainer = p.trainerType; _gender  = p.gender;
     _activity = p.activityLevel;
+    _workoutTime = p.workoutTime;
+    _bodyType = p.bodyType;
   }
 
   @override
@@ -70,18 +68,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _save() {
     final ap = context.read<AppProvider>();
     ap.updateProfile(ap.profile.copyWith(
-      name:          _name.text.trim().isEmpty ? 'Champion' : _name.text.trim(),
-      age:           int.tryParse(_age.text)       ?? 25,
-      weightKg:      double.tryParse(_weight.text)  ?? 70.0,
-      heightCm:      double.tryParse(_height.text)  ?? 170.0,
-      goal:          _goal,     level:         _level,
-      trainerType:   _trainer,  gender:        _gender,
-      activityLevel: _activity,
+      name:           _name.text.trim().isEmpty ? 'Champion' : _name.text.trim(),
+      age:            int.tryParse(_age.text)       ?? 25,
+      weightKg:       double.tryParse(_weight.text)  ?? 70.0,
+      heightCm:       double.tryParse(_height.text)  ?? 170.0,
+      goal:           _goal,     level:         _level,
+      trainerType:    _trainer,  gender:        _gender,
+      activityLevel:  _activity,
+      workoutTime:    _workoutTime,
+      bodyType:       _bodyType,
     ));
-    setState(() => _editing = false);
+    setState(() { _editing = false; _detailsExpanded = false; });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('✅ Profile updated!',
-          style: TextStyle(fontFamily: 'Inter',fontWeight: FontWeight.w600)),
+      content: Text('Profile updated!',
+          style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600)),
       backgroundColor: AppColors.green,
       behavior: SnackBarBehavior.floating,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
@@ -89,81 +89,188 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ));
   }
 
-  // ── Null-safe macro helper ──────────────────────
-  // Handles both 'fat' and 'fats' keys, never throws.
-  static Map<String, double> _safeMacros(double tdee, double weightKg, String goal) {
-    try {
-      final raw = AIEngine.getMacros(tdee: tdee, weightKg: weightKg, goal: goal);
-      if (raw == null) throw Exception('null map');
-      return {
-        'protein': ((raw['protein'] as num?)?.toDouble()) ?? (weightKg * 2.0),
-        'carbs':   ((raw['carbs']   as num?)?.toDouble()) ?? (tdee * 0.45 / 4),
-        'fat':     ((raw['fat']     as num?)?.toDouble() ??
-                    (raw['fats']    as num?)?.toDouble()) ?? (tdee * 0.25 / 9),
-      };
-    } catch (_) {
-      // Fallback: standard macro split
-      final protein = weightKg * 2.0;
-      final fat     = tdee * 0.25 / 9;
-      final carbs   = (tdee - protein * 4 - fat * 9) / 4;
-      return {
-        'protein': protein.clamp(80, 300),
-        'carbs':   carbs.clamp(50, 500),
-        'fat':     fat.clamp(30, 150),
-      };
+  Future<void> _resetAllData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(children: [
+          Icon(Icons.delete_forever_rounded, color: Colors.orange, size: 22),
+          SizedBox(width: 10),
+          Text('Reset All Data?', style: TextStyle(
+            fontFamily: 'Rajdhani', color: Colors.white,
+            fontWeight: FontWeight.w900, fontSize: 20)),
+        ]),
+        content: const Text(
+          'This will permanently delete all your workout history, logs, streak, and profile. You will go through onboarding again.\n\nThis cannot be undone.',
+          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 13, height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange, foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Reset Everything',
+                style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final doubleConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Are you sure?', style: TextStyle(
+            fontFamily: 'Rajdhani', color: Colors.orange,
+            fontWeight: FontWeight.w900, fontSize: 20)),
+        content: const Text(
+          'All data will be gone. Tap "Delete" to confirm.',
+          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Go Back',
+                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red, foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (doubleConfirmed != true || !mounted) return;
+
+    await context.read<AppProvider>().resetAllData();
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+      (_) => false,
+    );
+  }
+
+  Future<void> _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(children: [
+          Icon(Icons.logout_rounded, color: Colors.red, size: 22),
+          SizedBox(width: 10),
+          Text('Sign Out?', style: TextStyle(
+            fontFamily: 'Rajdhani', color: Colors.white,
+            fontWeight: FontWeight.w900, fontSize: 20)),
+        ]),
+        content: const Text(
+          'Your data is saved to your account. You can log back in anytime.',
+          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red, foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    RestTimerService().stop();
+    await AuthService.instance.signOut();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => LoginScreen()),
+        (_) => false,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Selector2<AppProvider, GamificationProvider,
-        ({UserProfile profile, int totalWorkouts, int currentStreak, XPSystem xp, double tdee})>(
-      selector: (_, ap, gp) => (
-        profile:        ap.profile,
-        totalWorkouts:  ap.streak.totalWorkouts,
-        currentStreak:  ap.streak.currentStreak,
-        xp:             gp.xp,
-        tdee:           ap.tdee,
-      ),
+    return Selector2<AppProvider, GamificationProvider, ({
+      UserProfile profile,
+      int totalWorkouts, int currentStreak, int longestStreak,
+      XPSystem xp,
+      double tdee,
+      bool isPremium,
+      bool healthConnected,
+      int recoveryScore,
+      double sleepHours,
+      int todaySteps,
+      double lifetimeKg,
+    })>(
+      selector: (_, ap, gp) {
+        final rs  = ap.recoveryState;
+        return (
+          profile:          ap.profile,
+          totalWorkouts:    ap.streak.totalWorkouts,
+          currentStreak:    ap.streak.currentStreak,
+          longestStreak:    ap.streak.longestStreak,
+          xp:               gp.xp,
+          tdee:             ap.tdee,
+          isPremium:        ap.isPremium,
+          healthConnected:  ap.healthConnectLinked,
+          recoveryScore:    rs.overallScore.round(),
+          sleepHours:       ap.coachSleepHours,
+          todaySteps:       ap.healthTodaySteps,
+          lifetimeKg:       ap.lifetimeVolumeKg,
+        );
+      },
       builder: (context, d, _) {
         final p      = d.profile;
         final xp     = d.xp;
-        // SAFE: no ! operators anywhere on this map
-        final macros = _safeMacros(d.tdee, p.weightKg, p.goal);
 
         return Scaffold(
           backgroundColor: AppColors.bg,
           body: Stack(children: [
-            // Ambient top glow
             Positioned(top: -80, left: -60, right: -60,
               child: IgnorePointer(child: Container(
                 height: 280,
                 decoration: BoxDecoration(gradient: RadialGradient(
                   center: Alignment.topCenter, radius: 0.7,
-                  colors: [
-                    AppColors.gold.withValues(alpha: 0.05),
-                    Colors.transparent,
-                  ],
+                  colors: [AppColors.gold.withValues(alpha: 0.05), Colors.transparent],
                 )),
               )),
             ),
             CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                // ── APP BAR ───────────────────────────
                 SliverAppBar(
                   backgroundColor: Colors.transparent,
-                  floating: true, snap: true, elevation: 0,
+                  floating: false, snap: false, pinned: true, elevation: 0,
                   titleSpacing: AppSpacing.lg,
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('PROFILE', style: TextStyle(fontFamily: 'Rajdhani',
+                      Text('Profile', style: TextStyle(fontFamily: 'Inter',
                           color: AppColors.textPrimary, fontSize: 20,
-                          fontWeight: FontWeight.w900, letterSpacing: 1.8)),
-                      Text('Your fitness identity', style: TextStyle(fontFamily: 'Inter',
-                          color: AppColors.textMuted, fontSize: 11)),
+                          fontWeight: FontWeight.w600, letterSpacing: -0.3)),
+                      Text('Your Lifton Identity', style: TextStyle(fontFamily: 'Inter',
+                          color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 11)),
                     ],
                   ),
                   actions: [
@@ -172,7 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: GestureDetector(
                         onTap: () {
                           if (_editing) _save();
-                          else setState(() => _editing = true);
+                          else setState(() { _editing = true; _detailsExpanded = true; });
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -201,112 +308,104 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg, AppSpacing.xs, AppSpacing.lg, 80),
+                      AppSpacing.lg, AppSpacing.xs, AppSpacing.lg, 20),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
 
-                      // ── HERO CARD ─────────────────────
+                      // ── P1: ATHLETE IDENTITY HERO ──────────────────────────
                       _FI(child: _HeroCard(
                           p: p, xp: xp,
                           totalWorkouts: d.totalWorkouts,
-                          currentStreak: d.currentStreak)),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // ── XP PROGRESS ───────────────────
-                      _FI(delay: 50, child: Column(children: [
-                        _AnimXPBar(progress: xp.rankProgress),
-                        const SizedBox(height: AppSpacing.xs),
-                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                          Text('${xp.rank.displayName} → ${xp.nextRankName}',
-                              style: TextStyle(fontFamily: 'Inter',
-                                  color: AppColors.textMuted, fontSize: 11)),
-                          Text('${(xp.rankProgress * 100).toInt()}%',
-                              style: TextStyle(fontFamily: 'Inter',
-                                  color: AppColors.gold, fontSize: 11,
-                                  fontWeight: FontWeight.w700)),
-                        ]),
-                      ])),
-                      const SizedBox(height: AppSpacing.xxl),
-
-                      // ── NUTRITION ─────────────────────
-                      _SLabel(text: 'DAILY NUTRITION TARGETS'),
-                      const SizedBox(height: AppSpacing.md),
-                      _FI(delay: 90, child: _NutritionCard(
-                          tdee: d.tdee, macros: macros)),
-                      const SizedBox(height: AppSpacing.xxl),
-
-                      // ── PERSONAL INFO ─────────────────
-                      _SLabel(text: 'PERSONAL DETAILS'),
-                      const SizedBox(height: AppSpacing.md),
-                      _FI(delay: 130, child: _editing
-                          ? _EditForm(
-                              name: _name, age: _age,
-                              weight: _weight, height: _height,
-                              goal: _goal, level: _level,
-                              trainer: _trainer, gender: _gender,
-                              activity: _activity,
-                              onGoal:     (v) => setState(() => _goal = v!),
-                              onLevel:    (v) => setState(() => _level = v!),
-                              onTrainer:  (v) => setState(() => _trainer = v!),
-                              onGender:   (v) => setState(() => _gender = v!),
-                              onActivity: (v) => setState(() => _activity = v!),
-                              onSave: _save,
-                            )
-                          : _InfoCard(p: p)),
-                      const SizedBox(height: AppSpacing.xxl),
-
-                      // ── TOOLS ─────────────────────────
-                      _SLabel(text: 'BODY TOOLS'),
-                      const SizedBox(height: AppSpacing.md),
-                      _FI(delay: 170, child: Row(children: [
-                        Expanded(child: _ToolBtn(
-                          emoji: '📏', title: 'Body Stats',
-                          sub: 'Track measurements',
-                          color: AppColors.blue,
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) =>
-                                  const BodyMeasurementScreen())),
-                        )),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(child: _ToolBtn(
-                          emoji: '⚖️', title: '1RM Calculator',
-                          sub: 'Find your max lift',
-                          color: AppColors.purple,
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) =>
-                                  const OneRmScreen())),
-                        )),
-                      ])),
+                          currentStreak: d.currentStreak,
+                          longestStreak: d.longestStreak,
+                          recoveryScore: d.recoveryScore,
+                          lifetimeKg:   d.lifetimeKg)),
                       const SizedBox(height: AppSpacing.lg),
-                      // ── SIGN OUT ─────────────────────
-                      GestureDetector(
-                        onTap: () async {
-                          await AuthService.instance.signOut();
-                          if (context.mounted) {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(builder: (_) => LoginScreen()),
-                              (_) => false,
-                            );
-                          }
+
+                      // ── P4: PREMIUM BENEFITS ────────────────────────────────
+                      _FI(delay: 70, child: _SubscriptionCard(isPremium: d.isPremium)),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // ── P5: HEALTH CONNECT ──────────────────────────────────
+                      _FI(delay: 85, child: _HealthConnectCard(
+                        connected:  d.healthConnected,
+                        sleepHours: d.sleepHours,
+                        todaySteps: d.todaySteps,
+                      )),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // ── P6: PERSONAL DETAILS (COLLAPSIBLE) ─────────────────
+                      _ExpandableLabel(
+                        text: 'Personal details',
+                        expanded: _detailsExpanded || _editing,
+                        onTap: _editing ? null : () {
+                          H.light();
+                          setState(() => _detailsExpanded = !_detailsExpanded);
                         },
-                        child: Container(
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        child: SizedBox(
                           width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.red.withOpacity(0.3)),
+                          child: (_detailsExpanded || _editing)
+                              ? _editing
+                                  ? _EditForm(
+                                      name: _name, age: _age,
+                                      weight: _weight, height: _height,
+                                      goal: _goal, level: _level,
+                                      trainer: _trainer, gender: _gender,
+                                      activity: _activity,
+                                      bodyType: _bodyType,
+                                      onGoal:     (v) => setState(() => _goal = v!),
+                                      onLevel:    (v) => setState(() => _level = v!),
+                                      onTrainer:  (v) => setState(() => _trainer = v!),
+                                      onGender:   (v) => setState(() => _gender = v!),
+                                      onActivity: (v) => setState(() => _activity = v!),
+                                      onBodyType: (v) => setState(() => _bodyType = v!),
+                                      onSave: _save,
+                                    )
+                                  : _InfoCard(p: p)
+                              : const SizedBox.shrink(),
+                        ),
+                      ),
+                      if (_detailsExpanded || _editing)
+                        const SizedBox(height: AppSpacing.xxl),
+
+                      // ── SIGN OUT (ghost) ────────────────────────────────────
+                      Center(
+                        child: GestureDetector(
+                          onTap: _signOut,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.logout_rounded,
+                                  color: AppColors.textMuted.withValues(alpha: 0.45),
+                                  size: 14),
+                              const SizedBox(width: 6),
+                              Text('Sign Out',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  color: AppColors.textMuted.withValues(alpha: 0.45),
+                                  fontSize: 12, fontWeight: FontWeight.w500)),
+                            ]),
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.logout_rounded, color: Colors.red, size: 18),
-                              SizedBox(width: 8),
-                              Text('Sign Out', style: TextStyle(
-                                fontFamily: 'Inter', color: Colors.red,
-                                fontSize: 14, fontWeight: FontWeight.w700)),
-                            ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+
+                      // ── RESET (near-invisible) ──────────────────────────────
+                      Center(
+                        child: GestureDetector(
+                          onTap: _resetAllData,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Text('Reset All Data',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                color: AppColors.textMuted.withValues(alpha: 0.25),
+                                fontSize: 11, fontWeight: FontWeight.w400)),
                           ),
                         ),
                       ),
@@ -323,306 +422,489 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+
 // ════════════════════════════════════════════════
-// HERO CARD — rank orb + stats row
+// P1 — ATHLETE IDENTITY HERO
 // ════════════════════════════════════════════════
 class _HeroCard extends StatelessWidget {
   final UserProfile p;
   final XPSystem xp;
-  final int totalWorkouts, currentStreak;
-  const _HeroCard({required this.p, required this.xp,
-      required this.totalWorkouts, required this.currentStreak});
+  final int totalWorkouts, currentStreak, longestStreak, recoveryScore;
+  final double lifetimeKg;
 
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(AppSpacing.lg),
-    decoration: BoxDecoration(
-      color: const Color(0xFF0C0C07),
-      borderRadius: BorderRadius.circular(AppSpacing.lg),
-      border: Border.all(color: AppColors.gold.withValues(alpha: 0.22)),
-      boxShadow: [BoxShadow(
-          color: AppColors.gold.withValues(alpha: 0.07), blurRadius: 22)],
-    ),
-    child: Column(children: [
-      Row(children: [
-        _PulseOrb(emoji: xp.rank.emoji,
-            gradient: AppGradients.rankGradient(xp.rank.index)),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(p.name, style: TextStyle(fontFamily: 'Rajdhani',
-              color: AppColors.textPrimary, fontSize: 22,
-              fontWeight: FontWeight.w900)),
-          const SizedBox(height: AppSpacing.xs),
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                gradient: AppGradients.rankGradient(xp.rank.index),
-                borderRadius: BorderRadius.circular(6)),
-              child: Text(xp.rank.displayName, style: TextStyle(fontFamily: 'Inter',
-                  color: Colors.white, fontSize: 10,
-                  fontWeight: FontWeight.w800)),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.bgElevated,
-                borderRadius: BorderRadius.circular(6)),
-              child: Text(p.level.toUpperCase(), style: TextStyle(fontFamily: 'Inter',
-                  color: AppColors.textSecondary, fontSize: 10,
-                  fontWeight: FontWeight.w700)),
-            ),
-          ]),
-          const SizedBox(height: AppSpacing.xs),
-          Text('${xp.totalXP} XP · $totalWorkouts workouts',
-              style: TextStyle(fontFamily: 'Inter',
-                  color: AppColors.textMuted, fontSize: 11)),
-        ])),
-        // BMI circle
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          CircularPercentIndicator(
-            radius: 28, lineWidth: 3.5,
-            percent: (p.bmi / 40).clamp(0.0, 1.0),
-            center: Text(p.bmi.toStringAsFixed(1), style: TextStyle(fontFamily: 'Rajdhani',
-                fontSize: 11, fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary)),
-            progressColor: p.bmiCategory == 'Normal'   ? AppColors.green
-                : p.bmiCategory == 'Overweight' ? AppColors.yellow
-                : AppColors.red,
-            backgroundColor: AppColors.bgElevated,
-            circularStrokeCap: CircularStrokeCap.round,
-          ),
-          const SizedBox(height: 3),
-          Text('BMI', style: TextStyle(fontFamily: 'Inter',
-              color: AppColors.textMuted, fontSize: 9)),
-        ]),
-      ]),
+  const _HeroCard({
+    required this.p, required this.xp,
+    required this.totalWorkouts, required this.currentStreak,
+    required this.longestStreak, required this.recoveryScore,
+    required this.lifetimeKg,
+  });
 
-      const SizedBox(height: AppSpacing.md),
-      const Divider(color: AppColors.divider, height: 1),
-      const SizedBox(height: AppSpacing.md),
+  static String _levelColor(String level) => level == 'advanced'
+      ? 'advanced' : level == 'intermediate' ? 'intermediate' : 'beginner';
 
-      // Quick stats row
-      Row(children: [
-        _QuickStat(value: '$totalWorkouts', label: 'Sessions', emoji: '🏋️',
-            color: AppColors.gold),
-        _vDivider(),
-        _QuickStat(value: '${currentStreak}d', label: 'Streak', emoji: '🔥',
-            color: AppColors.orange),
-        _vDivider(),
-        _QuickStat(value: '${xp.weeklyXP}', label: 'Week XP', emoji: '⚡',
-            color: AppColors.purple),
-        _vDivider(),
-        _QuickStat(value: p.bmiCategory, label: 'Status', emoji: '💪',
-            color: p.bmiCategory == 'Normal' ? AppColors.green : AppColors.yellow),
-      ]),
-    ]),
-  );
-
-  Widget _vDivider() => Container(
-    height: 32, width: 1,
-    color: AppColors.divider.withValues(alpha: 0.5));
-}
-
-class _QuickStat extends StatelessWidget {
-  final String value, label, emoji;
-  final Color color;
-  const _QuickStat({required this.value, required this.label,
-      required this.emoji, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Expanded(child: Column(children: [
-    Text(emoji, style: const TextStyle(fontSize: 14)),
-    const SizedBox(height: 2),
-    Text(value, style: TextStyle(fontFamily: 'Rajdhani',
-        color: color, fontSize: 13, fontWeight: FontWeight.w900),
-        overflow: TextOverflow.ellipsis),
-    Text(label, style: TextStyle(fontFamily: 'Inter',
-        color: AppColors.textMuted, fontSize: 8.5),
-        textAlign: TextAlign.center),
-  ]));
-}
-
-// ════════════════════════════════════════════════
-// ANIMATED XP BAR
-// ════════════════════════════════════════════════
-class _AnimXPBar extends StatefulWidget {
-  final double progress;
-  const _AnimXPBar({required this.progress});
-  @override State<_AnimXPBar> createState() => _AnimXPBarState();
-}
-class _AnimXPBarState extends State<_AnimXPBar>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _c;
-  late Animation<double> _a;
-  @override void initState() {
-    super.initState();
-    _c = AnimationController(vsync: this,
-        duration: const Duration(milliseconds: 950));
-    _a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
-    _c.forward();
+  static Color _lc(String level) {
+    switch (level) {
+      case 'intermediate': return AppColors.gold.withValues(alpha: 0.82);
+      case 'advanced':     return AppColors.gold;
+      default:             return AppColors.textSecondary;
+    }
   }
-  @override void dispose() { _c.dispose(); super.dispose(); }
-  @override Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _a,
-    builder: (_, __) => XPProgressBar(progress: widget.progress * _a.value),
-  );
-}
 
-// ════════════════════════════════════════════════
-// NUTRITION CARD — NULL-SAFE, no ! operators
-// ════════════════════════════════════════════════
-class _NutritionCard extends StatelessWidget {
-  final double tdee;
-  final Map<String, double> macros;
-  const _NutritionCard({required this.tdee, required this.macros});
+  static Color _lb(String level) {
+    switch (level) {
+      case 'intermediate': return AppColors.gold.withValues(alpha: 0.10);
+      case 'advanced':     return AppColors.gold.withValues(alpha: 0.12);
+      default:             return AppColors.bgElevated;
+    }
+  }
+
+  // Dynamic statement driven by real signals — no hardcoded generic copy.
+  static String _statement(int streak, int workouts, int recovScore) {
+    if (streak >= 30) return '$streak days of straight discipline.';
+    if (streak >= 14) return 'Two weeks strong. The body adapts.';
+    if (streak >= 7)  return '$streak days strong. Consistency compounds.';
+    if (recovScore >= 85) return 'Fully primed. Make today count.';
+    if (recovScore < 40)  return 'Recovery is part of the work.';
+    if (workouts >= 100)  return '$workouts sessions logged. The record speaks.';
+    if (workouts >= 50)   return '$workouts sessions in. Keep the standard high.';
+    if (workouts >= 10)   return 'The foundation is forming. Show up.';
+    return 'Session one starts the record.';
+  }
+
+  // Top X% badge — only shown for gladiator and above.
+  static String _topPct(UserRank rank) {
+    switch (rank) {
+      case UserRank.beast:     return 'TOP 1%';
+      case UserRank.legend:    return 'TOP 3%';
+      case UserRank.champion:  return 'TOP 10%';
+      case UserRank.gladiator: return 'TOP 20%';
+      default:                 return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // All values null-safe with fallbacks — ZERO ! operators
-    final protein = (macros['protein'] ?? 150.0).toDouble();
-    final carbs   = (macros['carbs']   ?? 250.0).toDouble();
-    final fat     = (macros['fat'] ?? macros['fats'] ?? 60.0).toDouble();
+    final topPct = _topPct(xp.rank);
+    final level  = _levelColor(p.level);
 
-    // Total macros in kcal for progress bars
-    final totalKcal = protein * 4 + carbs * 4 + fat * 9;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C0C07),
+        borderRadius: BorderRadius.circular(AppSpacing.lg),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.28)),
+        boxShadow: [
+          BoxShadow(color: AppColors.gold.withValues(alpha: 0.13), blurRadius: 32),
+          BoxShadow(color: AppColors.gold.withValues(alpha: 0.06), blurRadius: 8, spreadRadius: 1),
+        ],
+      ),
+      child: Column(children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ProfileHeaderBadge(rank: xp.rank),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(p.name, style: TextStyle(fontFamily: 'Rajdhani',
+                color: AppColors.textPrimary, fontSize: 22,
+                fontWeight: FontWeight.w900)),
+            const SizedBox(height: AppSpacing.xs),
+            // Level chip + Top X% chip inline
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _lb(level),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                      color: _lc(level).withValues(alpha: 0.30), width: 0.5)),
+                child: Text(
+                    '${p.level[0].toUpperCase()}${p.level.substring(1)}',
+                    style: TextStyle(fontFamily: 'Inter', color: _lc(level),
+                    fontSize: 10, fontWeight: FontWeight.w600)),
+              ),
+              if (topPct.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                        color: AppColors.gold.withValues(alpha: 0.30), width: 0.5)),
+                  child: Text(topPct, style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: AppColors.gold.withValues(alpha: 0.85),
+                      fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                ),
+              ],
+            ]),
+            const SizedBox(height: AppSpacing.xs),
+            // Dynamic statement
+            Text(
+              _statement(currentStreak, totalWorkouts, recoveryScore),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                color: AppColors.gold.withValues(alpha: 0.80),
+                fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+            ),
+          ])),
+          // BMI circle
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            CircularPercentIndicator(
+              radius: 22, lineWidth: 2.5,
+              percent: (p.bmi / 40).clamp(0.0, 1.0),
+              center: Text(p.bmi.toStringAsFixed(1), style: TextStyle(
+                  fontFamily: 'Rajdhani', fontSize: 9,
+                  fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              progressColor: p.bmiCategory == 'Normal'    ? const Color(0xFFC8AA6E)
+                  : p.bmiCategory == 'Overweight' ? AppColors.yellow
+                  : AppColors.red,
+              backgroundColor: AppColors.bgElevated,
+              circularStrokeCap: CircularStrokeCap.round,
+            ),
+            const SizedBox(height: 3),
+            Text('BMI', style: TextStyle(fontFamily: 'Inter',
+                color: AppColors.textMuted.withValues(alpha: 0.65), fontSize: 8)),
+          ]),
+        ]),
+
+        const SizedBox(height: AppSpacing.md),
+        const Divider(color: AppColors.divider, height: 1),
+        const SizedBox(height: AppSpacing.md),
+
+        // Stat row: Tonnes | Sessions | Best Streak
+        IntrinsicHeight(child: Row(children: [
+          _heroStat('${(lifetimeKg / 1000).toStringAsFixed(1)}T',
+              'Lifted', AppColors.gold),
+          _heroDiv(),
+          _heroStat('$totalWorkouts', 'Sessions', AppColors.textPrimary),
+          _heroDiv(),
+          _heroStat('${longestStreak}d', 'Best Streak', AppColors.orange),
+        ])),
+        const SizedBox(height: AppSpacing.md),
+        const Divider(color: AppColors.divider, height: 1),
+        const SizedBox(height: AppSpacing.md),
+
+        // Rank progression
+        XPProgressBar(progress: xp.rankProgress),
+        const SizedBox(height: AppSpacing.xs),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('${xp.rank.displayName} → ${xp.nextRankName}',
+              style: TextStyle(fontFamily: 'Inter',
+                  color: AppColors.textMuted, fontSize: 11)),
+          Text('${(xp.rankProgress * 100).toInt()}%',
+              style: TextStyle(fontFamily: 'Inter',
+                  color: AppColors.gold, fontSize: 11,
+                  fontWeight: FontWeight.w700)),
+        ]),
+      ]),
+    );
+  }
+
+  static Widget _heroStat(String value, String label, Color color) => Expanded(
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Text(value, style: TextStyle(fontFamily: 'Rajdhani', color: color,
+          fontSize: 26, fontWeight: FontWeight.w900, height: 1.0),
+          overflow: TextOverflow.ellipsis),
+      const SizedBox(height: 3),
+      Text(label, style: TextStyle(fontFamily: 'Inter',
+          color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 9,
+          fontWeight: FontWeight.w400, letterSpacing: 0),
+          textAlign: TextAlign.center),
+    ]),
+  );
+
+  static Widget _heroDiv() => Container(
+      width: 0.5, margin: const EdgeInsets.symmetric(horizontal: 4),
+      color: AppColors.divider.withValues(alpha: 0.45));
+}
+
+
+// ════════════════════════════════════════════════
+// P4 — PREMIUM
+// ════════════════════════════════════════════════
+class _SubscriptionCard extends StatelessWidget {
+  final bool isPremium;
+  const _SubscriptionCard({required this.isPremium});
+
+  static const _features = [
+    'AI Coach',
+    'Recovery Intelligence',
+    'Exercise Mastery',
+    'Advanced Analytics',
+    'PR Tracking',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (isPremium) return _buildPremiumActive(context);
+    return _buildUpgradeCTA(context);
+  }
+
+  Widget _buildPremiumActive(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C0C07),
+        borderRadius: BorderRadius.circular(AppSpacing.lg),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.20), width: 0.8),
+      ),
+      child: Row(children: [
+        Container(width: 3, height: 14, decoration: BoxDecoration(
+          color: AppColors.gold, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 8),
+        Text('Premium', style: TextStyle(
+          fontFamily: 'Inter', color: AppColors.gold,
+          fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0)),
+        const Spacer(),
+        Icon(Icons.check_circle_rounded,
+            color: AppColors.gold.withValues(alpha: 0.65), size: 13),
+        const SizedBox(width: 5),
+        Text('All features active', style: TextStyle(
+          fontFamily: 'Inter', color: AppColors.textMuted,
+          fontSize: 11, fontWeight: FontWeight.w400)),
+      ]),
+    );
+  }
+
+  Widget _buildUpgradeCTA(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, slideRoute(const PremiumScreen())),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0C0C07),
+          borderRadius: BorderRadius.circular(AppSpacing.lg),
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.28), width: 0.8),
+          boxShadow: [BoxShadow(
+              color: AppColors.gold.withValues(alpha: 0.08), blurRadius: 22)],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(width: 3, height: 14, decoration: BoxDecoration(
+              gradient: AppGradients.gold,
+              borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 8),
+            Text('Premium', style: TextStyle(
+              fontFamily: 'Inter', color: AppColors.textPrimary,
+              fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0)),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.30), width: 0.5)),
+              child: Text('Upgrade', style: TextStyle(
+                fontFamily: 'Inter', color: AppColors.gold,
+                fontSize: 11, fontWeight: FontWeight.w700)),
+            ),
+          ]),
+          const SizedBox(height: AppSpacing.md),
+          ..._features.map((f) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(children: [
+              Icon(Icons.check_rounded,
+                  color: AppColors.gold.withValues(alpha: 0.55), size: 13),
+              const SizedBox(width: 8),
+              Text(f, style: TextStyle(
+                fontFamily: 'Inter',
+                color: AppColors.textMuted.withValues(alpha: 0.80),
+                fontSize: 12, fontWeight: FontWeight.w400)),
+            ]),
+          )),
+          const SizedBox(height: AppSpacing.sm),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            Text('Unlock the full coaching system',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                color: AppColors.gold.withValues(alpha: 0.55),
+                fontSize: 11, fontWeight: FontWeight.w500)),
+            const SizedBox(width: 4),
+            Icon(Icons.arrow_forward_rounded,
+                color: AppColors.gold.withValues(alpha: 0.55), size: 12),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+
+
+// ════════════════════════════════════════════════
+// P5 — HEALTH CONNECT (upgraded)
+// ════════════════════════════════════════════════
+class _HealthConnectCard extends StatefulWidget {
+  final bool connected;
+  final double sleepHours;
+  final int todaySteps;
+
+  const _HealthConnectCard({
+    required this.connected,
+    required this.sleepHours,
+    required this.todaySteps,
+  });
+
+  @override
+  State<_HealthConnectCard> createState() => _HealthConnectCardState();
+}
+
+class _HealthConnectCardState extends State<_HealthConnectCard> {
+  bool _loading = false;
+
+  String _formatSteps(int s) =>
+      s >= 1000 ? '${(s / 1000).toStringAsFixed(1)}k' : '$s';
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.connected) return _buildConnect(context);
+    return _buildConnected(context);
+  }
+
+  Widget _buildConnected(BuildContext context) {
+    final hasSleep = widget.sleepHours > 0;
+    final hasSteps = widget.todaySteps > 0;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(AppSpacing.lg),
-        border: Border.all(color: AppColors.borderSoft, width: 0.5),
+        border: Border.all(
+            color: AppColors.borderSoft.withValues(alpha: 0.18), width: 0.5),
       ),
-      child: Column(children: [
-        // Calorie total hero
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
+          Container(width: 2, height: 12, decoration: BoxDecoration(
+            color: const Color(0xFF66BB6A).withValues(alpha: 0.70),
+            borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: 7),
+          Text('Health connect', style: TextStyle(
+            fontFamily: 'Inter', color: AppColors.textPrimary,
+            fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0)),
+          const Spacer(),
           Container(
-            width: 44, height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: AppColors.orange.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(child: Text('🔥',
-                style: TextStyle(fontSize: 22))),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${tdee.toInt()} kcal', style: TextStyle(fontFamily: 'Rajdhani',
-                color: AppColors.orange, fontSize: 24,
-                fontWeight: FontWeight.w900)),
-            Text('Daily calorie target', style: TextStyle(fontFamily: 'Inter',
-                color: AppColors.textMuted, fontSize: 11)),
-          ])),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.orange.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text('TDEE', style: TextStyle(fontFamily: 'Inter',
-                color: AppColors.orange, fontSize: 9,
-                fontWeight: FontWeight.w800, letterSpacing: 1)),
+              color: const Color(0xFF66BB6A).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                  color: const Color(0xFF66BB6A).withValues(alpha: 0.20), width: 0.5)),
+            child: Text('Connected', style: TextStyle(
+              fontFamily: 'Inter',
+              color: const Color(0xFF66BB6A).withValues(alpha: 0.85),
+              fontSize: 9, fontWeight: FontWeight.w700)),
           ),
         ]),
-
-        const SizedBox(height: AppSpacing.lg),
-        const Divider(color: AppColors.divider, height: 1),
-        const SizedBox(height: AppSpacing.lg),
-
-        // Macro bars
-        _MacroBar(
-          emoji: '🍗', label: 'Protein', value: protein,
-          unit: 'g', color: AppColors.blue,
-          percent: totalKcal > 0
-              ? (protein * 4 / totalKcal).clamp(0.0, 1.0) : 0.0,
-        ),
         const SizedBox(height: AppSpacing.md),
-        _MacroBar(
-          emoji: '🌾', label: 'Carbs', value: carbs,
-          unit: 'g', color: AppColors.purple,
-          percent: totalKcal > 0
-              ? (carbs * 4 / totalKcal).clamp(0.0, 1.0) : 0.0,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _MacroBar(
-          emoji: '🥑', label: 'Fats', value: fat,
-          unit: 'g', color: AppColors.green,
-          percent: totalKcal > 0
-              ? (fat * 9 / totalKcal).clamp(0.0, 1.0) : 0.0,
-        ),
+        if (!hasSleep && !hasSteps)
+          Text('No recent health data',
+              style: TextStyle(fontFamily: 'Inter',
+                  color: AppColors.textMuted, fontSize: 12))
+        else
+          IntrinsicHeight(child: Row(children: [
+            if (hasSleep) Expanded(child: _HealthCell(
+              label: 'Sleep', value: '${widget.sleepHours.toStringAsFixed(1)}h',
+              icon: Icons.bedtime_rounded, color: const Color(0xFF9B8DC4))),
+            if (hasSleep && hasSteps) Container(
+              width: 0.5, margin: const EdgeInsets.symmetric(horizontal: 4),
+              color: AppColors.divider.withValues(alpha: 0.45)),
+            if (hasSteps) Expanded(child: _HealthCell(
+              label: 'Steps', value: _formatSteps(widget.todaySteps),
+              icon: Icons.directions_walk_rounded, color: AppColors.gold)),
+          ])),
       ]),
+    );
+  }
+
+  Widget _buildConnect(BuildContext context) {
+    return GestureDetector(
+      onTap: _loading ? null : () async {
+        H.tap();
+        setState(() => _loading = true);
+        final ok = await context.read<AppProvider>().requestHealthPermissions();
+        if (!mounted) return;
+        setState(() => _loading = false);
+        if (!ok) {
+          // Permission not granted — open HC app or Play Store
+          await HealthConnectService.instance.openOrInstall();
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppSpacing.lg),
+          border: Border.all(
+              color: AppColors.borderSoft.withValues(alpha: 0.18), width: 0.5),
+        ),
+        child: Row(children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.18), width: 0.5)),
+            child: Icon(Icons.favorite_border_rounded,
+                color: AppColors.gold.withValues(alpha: 0.65), size: 16)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Health Connect', style: TextStyle(
+              fontFamily: 'Inter', color: AppColors.textSecondary,
+              fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 2),
+            Text('Connect to unlock sleep + recovery intelligence',
+              style: TextStyle(
+                fontFamily: 'Inter', color: AppColors.textMuted,
+                fontSize: 11, fontWeight: FontWeight.w400)),
+          ])),
+          const SizedBox(width: 8),
+          if (_loading)
+            SizedBox(width: 14, height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: AppColors.textMuted.withValues(alpha: 0.50)))
+          else
+            Icon(Icons.arrow_forward_ios_rounded,
+                size: 12, color: AppColors.textMuted.withValues(alpha: 0.40)),
+        ]),
+      ),
     );
   }
 }
 
-class _MacroBar extends StatefulWidget {
-  final String emoji, label, unit;
-  final double value, percent;
+class _HealthCell extends StatelessWidget {
+  final String label, value;
+  final IconData icon;
   final Color color;
-  const _MacroBar({required this.emoji, required this.label,
-      required this.value, required this.unit,
-      required this.color, required this.percent});
-  @override State<_MacroBar> createState() => _MacroBarState();
-}
-
-class _MacroBarState extends State<_MacroBar>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _c;
-  late Animation<double> _a;
-
-  @override void initState() {
-    super.initState();
-    _c = AnimationController(vsync: this,
-        duration: const Duration(milliseconds: 900));
-    _a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
-    Future.delayed(const Duration(milliseconds: 200),
-            () { if (mounted) _c.forward(); });
-  }
-  @override void dispose() { _c.dispose(); super.dispose(); }
+  const _HealthCell({
+    required this.label, required this.value,
+    required this.icon, required this.color,
+  });
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _a,
-    builder: (_, __) => Column(children: [
-      Row(children: [
-        Text(widget.emoji, style: const TextStyle(fontSize: 16)),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(child: Text(widget.label, style: TextStyle(fontFamily: 'Inter',
-            color: AppColors.textSecondary, fontSize: 13,
-            fontWeight: FontWeight.w600))),
-        Text(
-          '${widget.value.toInt()} ${widget.unit}',
-          style: TextStyle(fontFamily: 'Rajdhani',
-              color: widget.color, fontSize: 16,
-              fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        Text(
-          '${(widget.percent * 100).toInt()}%',
-          style: TextStyle(fontFamily: 'Inter',
-              color: AppColors.textMuted, fontSize: 10),
-        ),
-      ]),
-      const SizedBox(height: AppSpacing.xs),
-      ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: LinearProgressIndicator(
-          value: widget.percent * _a.value,
-          minHeight: 5,
-          backgroundColor: AppColors.bgElevated,
-          valueColor: AlwaysStoppedAnimation(widget.color),
-        ),
-      ),
-    ]),
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, color: color.withValues(alpha: 0.65), size: 16),
+      const SizedBox(height: 4),
+      Text(value, style: TextStyle(fontFamily: 'Rajdhani',
+          color: color, fontSize: 22, fontWeight: FontWeight.w900, height: 1.0)),
+      const SizedBox(height: 2),
+      Text(label, style: TextStyle(fontFamily: 'Inter',
+          color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 9,
+          fontWeight: FontWeight.w400, letterSpacing: 0)),
+    ],
   );
 }
 
+
 // ════════════════════════════════════════════════
-// INFO CARD (read-only)
+// INFO CARD — compact 3×2 grid (read view)
 // ════════════════════════════════════════════════
 class _InfoCard extends StatelessWidget {
   final UserProfile p;
@@ -630,78 +912,90 @@ class _InfoCard extends StatelessWidget {
 
   String _goalLabel(String g) {
     switch (g) {
-      case 'muscle_gain': return 'Muscle Gain 💪';
-      case 'fat_loss':    return 'Fat Loss 🔥';
-      case 'strength':    return 'Strength ⚡';
+      case 'muscle_gain': return 'Muscle Gain';
+      case 'fat_loss':    return 'Fat Loss';
+      case 'strength':    return 'Strength';
       default:            return g;
     }
   }
+
   String _trainerLabel(String t) {
     switch (t) {
-      case 'friendly':     return 'Friendly 🤝';
-      case 'strict':       return 'Strict 😈';
-      case 'military':     return 'Military 🪖';
-      case 'motivational': return 'Hype 🚀';
+      case 'friendly':     return 'Friendly';
+      case 'strict':       return 'Strict';
+      case 'military':     return 'Military';
+      case 'motivational': return 'Hype';
       default:             return t;
     }
   }
 
   @override
   Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(AppSpacing.lg),
     decoration: BoxDecoration(
-      color: AppColors.bgCard,
+      color: const Color(0xFF0F0F0F),
       borderRadius: BorderRadius.circular(AppSpacing.lg),
-      border: Border.all(color: AppColors.borderSoft, width: 0.5),
+      border: Border.all(color: AppColors.gold.withValues(alpha: 0.12), width: 0.8),
     ),
     child: Column(children: [
-      _R('👤', 'Name',        p.name),
-      _D(), _R('🎂', 'Age',   '${p.age} years'),
-      _D(), _R('⚖️', 'Weight','${p.weightKg} kg'),
-      _D(), _R('📏', 'Height','${p.heightCm} cm'),
-      _D(), _R('🧬', 'Gender', p.gender == 'male' ? 'Male' : 'Female'),
-      _D(), _R('🎯', 'Goal',   _goalLabel(p.goal)),
-      _D(), _R('📈', 'Level',  p.level.toUpperCase()),
-      _D(), _R('🤖', 'Trainer',_trainerLabel(p.trainerType)),
-      _D(), _R('🏃', 'Activity',p.activityLevel),
-      _D(), _R('📊', 'BMI',   '${p.bmi.toStringAsFixed(1)} · ${p.bmiCategory}'),
+      Row(children: [
+        Expanded(child: _InfoField(label: 'Goal',   value: _goalLabel(p.goal))),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(child: _InfoField(label: 'Level',  value: '${p.level[0].toUpperCase()}${p.level.substring(1)}')),
+      ]),
+      const SizedBox(height: AppSpacing.sm),
+      Row(children: [
+        Expanded(child: _InfoField(label: 'Age',    value: '${p.age} yrs')),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(child: _InfoField(label: 'Weight', value: '${p.weightKg} kg')),
+      ]),
+      const SizedBox(height: AppSpacing.sm),
+      Row(children: [
+        Expanded(child: _InfoField(label: 'Coach',    value: _trainerLabel(p.trainerType))),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(child: _InfoField(label: 'Activity', value: p.activityLevel)),
+      ]),
     ]),
   );
-
-  Widget _D() => Divider(
-      indent: AppSpacing.lg, endIndent: AppSpacing.lg,
-      color: AppColors.divider.withValues(alpha: 0.5), height: 1);
 }
 
-class _R extends StatelessWidget {
-  final String icon, label, value;
-  const _R(this.icon, this.label, this.value);
+class _InfoField extends StatelessWidget {
+  final String label, value;
+  const _InfoField({required this.label, required this.value});
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-    child: Row(children: [
-      Text(icon, style: const TextStyle(fontSize: 14)),
-      const SizedBox(width: AppSpacing.sm),
-      Expanded(child: Text(label, style: TextStyle(fontFamily: 'Inter',
-          color: AppColors.textMuted, fontSize: 13))),
-      Flexible(child: Text(value,
-          style: TextStyle(fontFamily: 'Inter',
+        horizontal: AppSpacing.md, vertical: AppSpacing.sm + 2),
+    decoration: BoxDecoration(
+      color: const Color(0xFF161616),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.07), width: 0.6),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: TextStyle(fontFamily: 'Inter',
+          color: AppColors.textMuted.withValues(alpha: 0.45), fontSize: 9,
+          fontWeight: FontWeight.w400, letterSpacing: 0)),
+      const SizedBox(height: 4),
+      Text(value,
+          style: const TextStyle(fontFamily: 'Inter',
               color: AppColors.textPrimary, fontSize: 13,
-              fontWeight: FontWeight.w600),
-          textAlign: TextAlign.end,
-          overflow: TextOverflow.ellipsis)),
+              fontWeight: FontWeight.w500),
+          overflow: TextOverflow.ellipsis),
     ]),
   );
 }
 
+
 // ════════════════════════════════════════════════
-// EDIT FORM
+// EDIT FORM — 3 grouped sections
 // ════════════════════════════════════════════════
 class _EditForm extends StatelessWidget {
   final TextEditingController name, age, weight, height;
-  final String goal, level, trainer, gender, activity;
-  final ValueChanged<String?> onGoal, onLevel, onTrainer, onGender, onActivity;
+  final String goal, level, trainer, gender, activity, bodyType;
+  final ValueChanged<String?> onGoal, onLevel, onTrainer, onGender, onActivity,
+      onBodyType;
   final VoidCallback onSave;
 
   const _EditForm({
@@ -709,17 +1003,23 @@ class _EditForm extends StatelessWidget {
     required this.weight, required this.height,
     required this.goal, required this.level,
     required this.trainer, required this.gender, required this.activity,
+    required this.bodyType,
     required this.onGoal, required this.onLevel,
     required this.onTrainer, required this.onGender, required this.onActivity,
+    required this.onBodyType,
     required this.onSave,
   });
 
   @override
-  Widget build(BuildContext context) => Column(children: [
+  Widget build(BuildContext context) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+    _FSec('Body & physical'),
+    const SizedBox(height: AppSpacing.sm),
     _TF(ctrl: name, label: 'Name', cap: TextCapitalization.words),
     const SizedBox(height: AppSpacing.sm),
     Row(children: [
-      Expanded(child: _TF(ctrl: age, label: 'Age', isNumber: true)),
+      Expanded(child: _TF(ctrl: age,    label: 'Age',         isNumber: true)),
       const SizedBox(width: AppSpacing.sm),
       Expanded(child: _TF(ctrl: weight, label: 'Weight (kg)', isDecimal: true)),
       const SizedBox(width: AppSpacing.sm),
@@ -731,10 +1031,20 @@ class _EditForm extends StatelessWidget {
         labels: {'male': 'Male', 'female': 'Female'},
         onChanged: onGender),
     const SizedBox(height: AppSpacing.sm),
+    _DD(label: 'Body Type', value: bodyType,
+        items: ['ectomorph', 'mesomorph', 'endomorph'],
+        labels: {'ectomorph': 'Ectomorph (slim)',
+          'mesomorph': 'Mesomorph (athletic)',
+          'endomorph': 'Endomorph (heavy)'},
+        onChanged: onBodyType),
+
+    const SizedBox(height: AppSpacing.md),
+    _FSec('Training & goals'),
+    const SizedBox(height: AppSpacing.sm),
     _DD(label: 'Goal', value: goal,
         items: ['muscle_gain', 'fat_loss', 'strength'],
-        labels: {'muscle_gain': 'Muscle Gain 💪',
-          'fat_loss': 'Fat Loss 🔥', 'strength': 'Strength ⚡'},
+        labels: {'muscle_gain': 'Muscle Gain',
+          'fat_loss': 'Fat Loss', 'strength': 'Strength'},
         onChanged: onGoal),
     const SizedBox(height: AppSpacing.sm),
     _DD(label: 'Training Level', value: level,
@@ -743,18 +1053,67 @@ class _EditForm extends StatelessWidget {
     const SizedBox(height: AppSpacing.sm),
     _DD(label: 'AI Trainer Style', value: trainer,
         items: ['friendly', 'strict', 'military', 'motivational'],
-        labels: {'friendly': 'Friendly 🤝', 'strict': 'Strict 😈',
-          'military': 'Military 🪖', 'motivational': 'Hype 🚀'},
+        labels: {'friendly': 'Friendly', 'strict': 'Strict',
+          'military': 'Military', 'motivational': 'Hype'},
         onChanged: onTrainer),
     const SizedBox(height: AppSpacing.sm),
     _DD(label: 'Activity Level', value: activity,
-        items: ['Sedentary','Light','Moderate','High','Very High'],
+        items: ['Sedentary', 'Light', 'Moderate', 'High', 'Very High'],
         onChanged: onActivity),
+
     const SizedBox(height: AppSpacing.lg),
-    GoldButton(text: 'Save Profile ✅', width: double.infinity, onTap: onSave),
+    GoldButton(text: 'Save Profile', width: double.infinity, onTap: onSave),
   ]);
 }
 
+
+// ════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════
+
+Widget _FSec(String title) => Row(children: [
+  Container(width: 2, height: 10,
+    decoration: BoxDecoration(
+      color: AppColors.gold.withValues(alpha: 0.50),
+      borderRadius: BorderRadius.circular(2)),
+  ),
+  const SizedBox(width: 6),
+  Text(title, style: TextStyle(fontFamily: 'Inter',
+      color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 10,
+      fontWeight: FontWeight.w400, letterSpacing: 0)),
+]);
+
+// Expandable section label — shows chevron, toggles expand state.
+class _ExpandableLabel extends StatelessWidget {
+  final String text;
+  final bool expanded;
+  final VoidCallback? onTap;
+  const _ExpandableLabel({required this.text, required this.expanded, this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    behavior: HitTestBehavior.opaque,
+    child: Row(children: [
+      Container(width: 3, height: 14, decoration: BoxDecoration(
+          gradient: AppGradients.gold,
+          borderRadius: BorderRadius.circular(2))),
+      const SizedBox(width: AppSpacing.sm),
+      Text(text, style: TextStyle(fontFamily: 'Inter',
+          color: AppColors.textMuted.withValues(alpha: 0.65), fontSize: 11,
+          fontWeight: FontWeight.w500, letterSpacing: 0)),
+      const Spacer(),
+      Icon(
+        expanded
+            ? Icons.keyboard_arrow_up_rounded
+            : Icons.keyboard_arrow_down_rounded,
+        color: AppColors.textMuted.withValues(alpha: 0.60),
+        size: 18),
+    ]),
+  );
+}
+
+// ── Input field ───────────────────────────────────────────────────────────────
 class _TF extends StatelessWidget {
   final TextEditingController ctrl;
   final String label;
@@ -771,27 +1130,27 @@ class _TF extends StatelessWidget {
     keyboardType: isDecimal
         ? const TextInputType.numberWithOptions(decimal: true)
         : isNumber ? TextInputType.number : TextInputType.text,
-    style: TextStyle(fontFamily: 'Inter',color: AppColors.textPrimary, fontSize: 14),
+    style: TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 14),
     decoration: InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(fontFamily: 'Inter',color: AppColors.textMuted),
-      filled: true, fillColor: AppColors.bgCardLight,
+      labelStyle: TextStyle(
+        fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.34), fontSize: 12),
+      filled: true, fillColor: const Color(0xFF141414),
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.borderMedium)),
+        borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.borderMedium)),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.04), width: 0.6)),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.gold, width: 1.2)),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: AppColors.gold.withValues(alpha: 0.22), width: 0.8)),
       isDense: true,
-      contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.md),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
     ),
   );
 }
 
+// ── Dropdown ──────────────────────────────────────────────────────────────────
 class _DD extends StatelessWidget {
   final String label, value;
   final List<String> items;
@@ -807,147 +1166,30 @@ class _DD extends StatelessWidget {
   Widget build(BuildContext context) => DropdownButtonFormField<String>(
     value: value, onChanged: onChanged,
     dropdownColor: AppColors.bgModal,
-    style: TextStyle(fontFamily: 'Inter',color: AppColors.textPrimary, fontSize: 14),
+    style: TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 14),
+    iconEnabledColor: Colors.white.withValues(alpha: 0.72),
     decoration: InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(fontFamily: 'Inter',color: AppColors.textMuted),
-      filled: true, fillColor: AppColors.bgCardLight,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      labelStyle: TextStyle(
+        fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.34), fontSize: 12),
+      filled: true, fillColor: const Color(0xFF141414),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.borderMedium)),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.04), width: 0.6)),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.gold, width: 1.2)),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: AppColors.gold.withValues(alpha: 0.22), width: 0.8)),
       isDense: true,
-      contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.md),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
     ),
     items: items.map((i) => DropdownMenuItem(
-        value: i,
-        child: Text(labels?[i] ?? _cap(i)))).toList(),
+        value: i, child: Text(labels?[i] ?? _cap(i)))).toList(),
   );
 }
 
-// ════════════════════════════════════════════════
-// TOOL BUTTON
-// ════════════════════════════════════════════════
-class _ToolBtn extends StatefulWidget {
-  final String emoji, title, sub;
-  final Color color;
-  final VoidCallback onTap;
-  const _ToolBtn({required this.emoji, required this.title,
-      required this.sub, required this.color, required this.onTap});
-  @override State<_ToolBtn> createState() => _ToolBtnState();
-}
-
-class _ToolBtnState extends State<_ToolBtn>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _c;
-  late Animation<double> _s;
-  @override void initState() {
-    super.initState();
-    _c = AnimationController(vsync: this,
-        duration: const Duration(milliseconds: 80),
-        reverseDuration: const Duration(milliseconds: 160));
-    _s = Tween<double>(begin: 1.0, end: 0.95)
-        .animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut));
-  }
-  @override void dispose() { _c.dispose(); super.dispose(); }
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTapDown:   (_) => _c.forward(),
-    onTapUp:     (_) { _c.reverse(); widget.onTap(); },
-    onTapCancel: () => _c.reverse(),
-    child: ScaleTransition(scale: _s, child: Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(AppSpacing.md),
-        border: Border.all(
-            color: widget.color.withValues(alpha: 0.22), width: 0.8),
-        boxShadow: [BoxShadow(
-            color: widget.color.withValues(alpha: 0.07), blurRadius: 10)],
-      ),
-      child: Row(children: [
-        Container(
-          width: 38, height: 38,
-          decoration: BoxDecoration(
-            color: widget.color.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Center(child: Text(widget.emoji,
-              style: const TextStyle(fontSize: 18))),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.title, style: TextStyle(fontFamily: 'Rajdhani',
-              color: AppColors.textPrimary, fontSize: 14,
-              fontWeight: FontWeight.w800)),
-          Text(widget.sub, style: TextStyle(fontFamily: 'Inter',
-              color: AppColors.textMuted, fontSize: 10)),
-        ])),
-        Icon(Icons.arrow_forward_ios_rounded,
-            color: widget.color, size: 13),
-      ]),
-    )),
-  );
-}
-
-// ════════════════════════════════════════════════
-// HELPERS
-// ════════════════════════════════════════════════
-class _SLabel extends StatelessWidget {
-  final String text;
-  const _SLabel({required this.text});
-  @override
-  Widget build(BuildContext context) => Row(children: [
-    Container(width: 3, height: 14, decoration: BoxDecoration(
-        gradient: AppGradients.gold,
-        borderRadius: BorderRadius.circular(2))),
-    const SizedBox(width: AppSpacing.sm),
-    Text(text, style: TextStyle(fontFamily: 'Inter',
-        color: AppColors.textPrimary, fontSize: 11,
-        fontWeight: FontWeight.w800, letterSpacing: 1.1)),
-  ]);
-}
-
-class _PulseOrb extends StatefulWidget {
-  final String emoji; final Gradient gradient;
-  const _PulseOrb({required this.emoji, required this.gradient});
-  @override State<_PulseOrb> createState() => _PulseOrbState();
-}
-class _PulseOrbState extends State<_PulseOrb>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _c;
-  late Animation<double> _p;
-  @override void initState() {
-    super.initState();
-    _c = AnimationController(vsync: this,
-        duration: const Duration(milliseconds: 2200))
-        ..repeat(reverse: true);
-    _p = Tween<double>(begin: 0.8, end: 1.0)
-        .animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut));
-  }
-  @override void dispose() { _c.dispose(); super.dispose(); }
-  @override Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _p,
-    builder: (_, __) => Container(
-      width: 58, height: 58,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle, gradient: widget.gradient,
-        boxShadow: [BoxShadow(
-          color: AppColors.gold.withValues(alpha: 0.30 * _p.value),
-          blurRadius: 18 * _p.value, spreadRadius: 2 * _p.value)],
-      ),
-      child: Center(child: Text(widget.emoji,
-          style: const TextStyle(fontSize: 28))),
-    ),
-  );
-}
-
+// ── Fade + slide entrance ─────────────────────────────────────────────────────
 class _FI extends StatefulWidget {
   final Widget child; final int delay;
   const _FI({required this.child, this.delay = 0});

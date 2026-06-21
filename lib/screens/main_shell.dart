@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../services/connectivity_service.dart';
 import '../utils/app_constants.dart';
 import 'home_screen.dart';
 import 'planner_screen.dart';
@@ -45,7 +46,7 @@ class MainShellState extends State<MainShell>
     _NavItem(icon: Icons.home_rounded,        label: 'Home'),
     _NavItem(icon: Icons.calendar_month_rounded, label: 'Planner'),
     _NavItem(icon: Icons.bar_chart_rounded,   label: 'Stats'),
-    _NavItem(icon: Icons.build_rounded,       label: 'Tools'),
+    _NavItem(icon: Icons.science_outlined,      label: 'Tools'),
     _NavItem(icon: Icons.person_rounded,      label: 'Profile'),
   ];
 
@@ -54,8 +55,8 @@ class MainShellState extends State<MainShell>
     super.initState();
     _iconControllers = List.generate(5, (_) => AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200),
-      reverseDuration: const Duration(milliseconds: 150),
+      duration: AppDurations.normal,
+      reverseDuration: AppDurations.fast,
     ));
     _iconScales = _iconControllers.map((c) =>
       Tween<double>(begin: 1.0, end: 1.25)
@@ -98,16 +99,21 @@ class MainShellState extends State<MainShell>
       },
       child: Scaffold(
       backgroundColor: AppColors.bg,
-      body: _AnimatedTabBody(
-        current:  _current,
-        previous: _previous,
-        screens:  _screens,
-      ),
+      body: Column(children: [
+        _OfflineBanner(),
+        Expanded(child: _AnimatedTabBody(
+          current:  _current,
+          previous: _previous,
+          screens:  _screens,
+        )),
+      ]),
       bottomNavigationBar: _PremiumNavBar(
         current:    _current,
         items:      _items,
         scales:     _iconScales,
         onSelect:   changeTab,
+        ftueMode:   context.select<AppProvider, bool>(
+                      (ap) => ap.streak.totalWorkouts == 0),
       ),
       ),
     );
@@ -197,12 +203,14 @@ class _PremiumNavBar extends StatelessWidget {
   final List<_NavItem> items;
   final List<Animation<double>> scales;
   final ValueChanged<int> onSelect;
+  final bool ftueMode;
 
   const _PremiumNavBar({
     required this.current,
     required this.items,
     required this.scales,
     required this.onSelect,
+    this.ftueMode = false,
   });
 
   @override
@@ -227,6 +235,7 @@ class _PremiumNavBar extends StatelessWidget {
             selected: i == current,
             scale:    scales[i],
             onTap:    () => onSelect(i),
+            ftueMode: ftueMode,
           )),
         ),
       ),
@@ -239,57 +248,47 @@ class _NavTile extends StatelessWidget {
   final bool selected;
   final Animation<double> scale;
   final VoidCallback onTap;
+  final bool ftueMode;
 
   const _NavTile({
     required this.item, required this.selected,
     required this.scale, required this.onTap,
+    this.ftueMode = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final dimmed = ftueMode && !selected;
+    return AnimatedOpacity(
+      opacity: dimmed ? 0.38 : 1.0,
+      duration: const Duration(milliseconds: 400),
+      child: GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        height: 58,
+        height: 54,
         alignment: Alignment.center,
         child: ScaleTransition(
           scale: scale,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-            // Icon with glow indicator
-            Stack(alignment: Alignment.topCenter, children: [
-              // Gold dot indicator above icon
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: selected ? 20 : 0,
-                height: selected ? 3 : 0,
-                margin: const EdgeInsets.only(bottom: 4),
-                decoration: BoxDecoration(
-                  gradient: selected ? AppGradients.gold : null,
-                  borderRadius: BorderRadius.circular(2),
-                  boxShadow: selected ? [BoxShadow(
-                      color: AppColors.gold.withValues(alpha: 0.5),
-                      blurRadius: 6)] : [],
-                ),
-              ),
-            ]),
-
             // Icon
             AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 38, height: 32,
+              duration: AppDurations.normal,
+              width: 34, height: 28,
               decoration: BoxDecoration(
                 color: selected
-                    ? AppColors.gold.withValues(alpha: 0.12)
+                    ? AppColors.gold.withValues(alpha: 0.10)
                     : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
               ),
               child: Icon(
                 item.icon,
-                size: 22,
-                color: selected ? AppColors.gold : AppColors.textMuted,
+                size: 21,
+                color: selected
+                    ? AppColors.gold
+                    : AppColors.textSecondary.withValues(alpha: 0.82),
               ),
             ),
 
@@ -297,24 +296,101 @@ class _NavTile extends StatelessWidget {
 
             // Label
             AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
+              duration: AppDurations.normal,
               style: GoogleFonts.inter(
-                color: selected ? AppColors.gold : AppColors.textMuted,
-                fontSize: 10,
-                fontWeight: selected
-                    ? FontWeight.w700 : FontWeight.w500,
+                color: selected
+                    ? AppColors.gold
+                    : AppColors.textSecondary.withValues(alpha: 0.82),
+                fontSize: 9.5,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
               ),
               child: Text(item.label),
+            ),
+            const SizedBox(height: 4),
+            // WHOOP-style bottom accent line
+            AnimatedOpacity(
+              opacity: selected ? 1.0 : 0.0,
+              duration: AppDurations.normal,
+              child: Container(
+                width: 14,
+                height: 2,
+                decoration: BoxDecoration(
+                  gradient: AppGradients.gold,
+                  borderRadius: BorderRadius.circular(1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.gold.withValues(alpha: 0.40),
+                      blurRadius: 3,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ]),
         ),
       ),
+    ),
     );
   }
 }
+
 
 class _NavItem {
   final IconData icon;
   final String label;
   const _NavItem({required this.icon, required this.label});
+}
+
+// ════════════════════════════════════════════════
+// OFFLINE BANNER — Phase S1
+// Appears at the top when internet is lost.
+// Auto-dismisses when connectivity returns.
+// Uses StreamBuilder — no Provider, no state leak.
+// ════════════════════════════════════════════════
+class _OfflineBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<bool>(
+      initialData: ConnectivityService.instance.isOnline,
+      stream:      ConnectivityService.instance.onlineStream,
+      builder: (_, snap) {
+        final online = snap.data ?? true;
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: online
+              ? const SizedBox.shrink()
+              : _OfflineBannerBody(key: const ValueKey('offline')),
+        );
+      },
+    );
+  }
+}
+
+class _OfflineBannerBody extends StatelessWidget {
+  const _OfflineBannerBody({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        color: const Color(0xFF1A1208),
+        child: Row(children: [
+          Icon(Icons.wifi_off_rounded,
+              size: 13, color: AppColors.gold.withValues(alpha: 0.70)),
+          const SizedBox(width: 8),
+          Text('No internet connection',
+              style: GoogleFonts.inter(
+                  color: AppColors.textMuted,
+                  fontSize: 11.5, fontWeight: FontWeight.w500)),
+          const Spacer(),
+          Text('Working offline',
+              style: GoogleFonts.inter(
+                  color: AppColors.textMuted.withValues(alpha: 0.50),
+                  fontSize: 10, fontWeight: FontWeight.w400)),
+        ]),
+      ),
+    );
+  }
 }

@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Posterior deltoid caps — rounded mass at back of shoulder -->
+  <!-- Left rear delt -->
+  <path d="M15,27 C16,24 20,23 24,24 C28,25 30,28 30,33 C30,37 28,40 25,41 C22,42 18,41 16,38 C14,35 14,30 15,27 Z"
+        fill="white"/>
+  <!-- Right rear delt -->
+  <path d="M85,27 C84,24 80,23 76,24 C72,25 70,28 70,33 C70,37 72,40 75,41 C78,42 82,41 84,38 C86,35 86,30 85,27 Z"
+        fill="white"/>
+</svg>

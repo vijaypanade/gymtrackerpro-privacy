@@ -1,0 +1,15 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Quadriceps — four-headed muscle group, anterior thigh -->
+  <!-- Left quad: wider at proximal, tapers to patella -->
+  <path d="M30,102 C28,106 27,113 28,121 C29,129 31,137 33,143 C35,149 38,152 41,152 C44,152 46,150 47,146 C48,141 48,133 47,125 C46,117 44,108 42,103 C40,99 36,99 33,100 Z"
+        fill="white"/>
+  <!-- Vastus medialis teardrop on inner left quad (near knee) -->
+  <path d="M38,135 C36,137 35,141 37,145 C39,148 42,148 44,145 C45,141 44,137 42,134 Z"
+        fill="white" opacity="0.7"/>
+  <!-- Right quad -->
+  <path d="M70,102 C72,106 73,113 72,121 C71,129 69,137 67,143 C65,149 62,152 59,152 C56,152 54,150 53,146 C52,141 52,133 53,125 C54,117 56,108 58,103 C60,99 64,99 67,100 Z"
+        fill="white"/>
+  <!-- Vastus medialis teardrop on inner right quad -->
+  <path d="M62,135 C64,137 65,141 63,145 C61,148 58,148 56,145 C55,141 56,137 58,134 Z"
+        fill="white" opacity="0.7"/>
+</svg>

@@ -42,7 +42,7 @@ class _GoldButtonState extends State<GoldButton> with SingleTickerProviderStateM
   @override
   void dispose() { _ctrl.dispose(); super.dispose(); }
 
-  void _down(_) { _ctrl.forward(); }
+  void _down(_) { HapticFeedback.lightImpact(); _ctrl.forward(); }
   void _up(_)   { _ctrl.reverse(); }
 
   @override
@@ -52,24 +52,46 @@ class _GoldButtonState extends State<GoldButton> with SingleTickerProviderStateM
 
     return GestureDetector(
       onTapDown: _down, onTapUp: _up, onTapCancel: () => _ctrl.reverse(),
-      onTap: () { HapticFeedback.lightImpact(); widget.onTap(); },
+      onTap: widget.onTap,
       child: AnimatedBuilder(
         animation: _scale,
         builder: (_, child) => Transform.scale(scale: _scale.value, child: child),
         child: Container(
           width: widget.width,
-          padding: EdgeInsets.symmetric(horizontal: 22, vertical: vPad),
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.small ? 14 : 18,
+            vertical: vPad,
+          ),
           decoration: BoxDecoration(
-            gradient: AppGradients.gold,
-            borderRadius: BorderRadius.circular(AppRadii.md),
+            borderRadius: BorderRadius.circular(22),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF8C6A1A),
+                Color(0xFFBF953F),
+                Color(0xFFF7E08A),
+                Color(0xFFFCF6BA),
+              ],
+              stops: [0.0, 0.35, 0.75, 1.0],
+            ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.gold.withValues(alpha: 0.30),
-                blurRadius: 18, spreadRadius: 0, offset: const Offset(0, 4),
+                color: Colors.black87,
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: AppColors.gold.withValues(alpha: 0.20),
+                blurRadius: 10,
+                spreadRadius: 0,
+                offset: const Offset(0, 3),
               ),
             ],
             border: Border.all(
-              color: AppColors.goldLight.withValues(alpha: 0.2), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.18),
+              width: 0.9,
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -83,7 +105,8 @@ class _GoldButtonState extends State<GoldButton> with SingleTickerProviderStateM
                 color: Colors.black,
                 fontSize: fontSize,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
+                letterSpacing: 0.1,
+                overflow: TextOverflow.ellipsis,
               )),
             ],
           ),
@@ -182,12 +205,29 @@ class PremiumCard extends StatelessWidget {
     final container = Container(
       padding: padding ?? const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: bgColor ?? AppColors.bgCard,
+        gradient: bgColor != null
+            ? null
+            : const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF1A1A1A),
+                  Color(0xFF111111),
+                ],
+              ),
+        color: bgColor,
         borderRadius: r,
         border: Border.all(
-          color: borderColor ?? AppColors.borderSoft, width: 0.5),
+          color: borderColor ??
+              Colors.white.withValues(alpha: 0.055),
+          width: 0.8,
+        ),
         boxShadow: shadow ?? [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.26),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: child,
@@ -312,7 +352,7 @@ class XPProgressBar extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: progress.clamp(0.0, 1.0)),
       duration: const Duration(milliseconds: 900),
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutBack,
       builder: (_, val, __) => ClipRRect(
         borderRadius: BorderRadius.circular(AppRadii.pill),
         child: Stack(children: [
@@ -425,7 +465,7 @@ class AppLogoWidget extends StatelessWidget {
       ),
       if (showText) ...[
         SizedBox(height: size * 0.12),
-        Text('GYMTRACKER PRO', style: TextStyle(fontFamily: 'Rajdhani',
+        Text('LIFTON', style: TextStyle(fontFamily: 'Rajdhani',
           color: AppColors.gold, fontWeight: FontWeight.w900,
           fontSize: size * 0.20, letterSpacing: 1.5)),
       ],
@@ -480,21 +520,6 @@ class InfoChip extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════
-// WATER PROGRESS INDICATOR
-// ══════════════════════════════════════════════
-class WaterGlassWidget extends StatelessWidget {
-  final double progress;
-  final double size;
-
-  const WaterGlassWidget({super.key, required this.progress, this.size = 60});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = progress >= 0.7 ? AppColors.green : AppColors.blue;
-    return Icon(Icons.water_drop_rounded, color: color, size: size);
-  }
-}
 
 // ══════════════════════════════════════════════
 // QUICK STATS ROW — 3 chips

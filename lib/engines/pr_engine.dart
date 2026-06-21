@@ -706,9 +706,13 @@ WorkoutFeedback calculateWorkoutFeedback({
   final currVolume = weight * reps;
   final prevVolume = previousBestWeight * previousBestReps;
 
-  // True PR — heavier weight
-  if (weight > previousBestWeight && reps >= 6) {
+  // True PR — only if weight increased WITHOUT major rep collapse
+  if (weight > previousBestWeight &&
+      reps >= 6 &&
+      reps >= (previousBestReps - 1)) {
+
     final delta = weight - previousBestWeight;
+
     return WorkoutFeedback(
       message:    '🔥 NEW PR — +${delta.toStringAsFixed(1)} kg',
       nextWeight: (weight + 2.5).clamp(0, 500),

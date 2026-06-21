@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Tibialis anterior — shin muscle, lateral to tibia -->
+  <!-- Left shin: tapers from proximal bulk to distal tendon -->
+  <path d="M34,150 C33,153 33,159 34,165 C35,169 37,171 39,171 C41,171 42,169 42,165 C42,159 41,153 40,150 C39,148 37,148 35,149 Z"
+        fill="white"/>
+  <!-- Right shin -->
+  <path d="M66,150 C67,153 67,159 66,165 C65,169 63,171 61,171 C59,171 58,169 58,165 C58,159 59,153 60,150 C61,148 63,148 65,149 Z"
+        fill="white"/>
+</svg>

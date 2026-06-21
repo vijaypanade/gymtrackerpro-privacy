@@ -21,8 +21,15 @@ import 'package:flutter/foundation.dart';
 
 import '../models/memory_models.dart';
 import '../models/models.dart';
+import '../models/readiness.dart';
+import '../models/split_template.dart';
 import '../models/workout_log.dart';
+import '../models/workout_readiness_profile.dart';
+import '../services/ai_quota_service.dart' show AiRequestType;
 import '../services/api_service.dart';
+import '../services/connectivity_service.dart';
+import '../services/monetization_service.dart' show MonetizationService;
+import '../services/exercise_candidate_service.dart';
 import '../services/storage_service.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -234,6 +241,15 @@ class AIWorkoutRequest {
   final double weeklyVolumeTrend;
   final List<ExerciseMemory> exerciseHistory;
   final WeeklyMemory? lastWeekMemory;
+  final bool travelMode;
+  final bool bodyweightOnly;
+  final SplitStyle splitStyle;
+  final List<({String muscle, int score})> muscleRecoveryScores;
+  final int readinessScore; // 0 = not set; 1–5 = subjective daily readiness
+  // V2 adaptive scheduling — non-null only when splitStyle == aiAdaptive.
+  // When present, _buildPrompt() uses profile-based slot constraints instead
+  // of the raw recovery score binary rules.
+  final WorkoutReadinessProfile? adaptiveReadiness;
 
   const AIWorkoutRequest({
     required this.goal,
@@ -251,6 +267,12 @@ class AIWorkoutRequest {
     this.weeklyVolumeTrend = 0,
     this.exerciseHistory = const [],
     this.lastWeekMemory,
+    this.travelMode = false,
+    this.bodyweightOnly = false,
+    this.splitStyle = SplitStyle.pushPullLegs,
+    this.muscleRecoveryScores = const [],
+    this.readinessScore = 0,
+    this.adaptiveReadiness,
   });
 
   String get cleanGoal => goal.replaceAll('_', ' ');
@@ -275,12 +297,21 @@ class AIProvider extends ChangeNotifier {
 
   bool _loaded = false;
   bool _generatingPlan = false;
+  bool _generatingSessionInsight = false;
+  String _lastSessionInsight = '';
+  String _dailyBrief = '';
+  String _dailyBriefDate = '';
+  bool _briefOffline = false;
 
   static const int _maxMemory = 10;
 
   // ── Public state ─────────────────────────────────────────
   bool get isLoaded => _loaded;
   bool get isGeneratingPlan => _generatingPlan;
+  bool get isGeneratingSessionInsight => _generatingSessionInsight;
+  bool get isBriefOffline => _briefOffline;
+  String get lastSessionInsight => _lastSessionInsight;
+  String get dailyBrief => _dailyBrief;
   AICoachInsight get insight => _insight;
   List<PerformancePattern> get performanceMemory =>
       List.unmodifiable(_perfMemory);
@@ -408,6 +439,18 @@ class AIProvider extends ChangeNotifier {
       } catch (e) {
         debugPrint('AI plan restore error: $e');
       }
+
+      // 4. Daily brief persistence — survive app restart
+      try {
+        final savedBrief     = await StorageService.instance.getString('ai_daily_brief');
+        final savedBriefDate = await StorageService.instance.getString('ai_daily_brief_date');
+        if (savedBrief != null && savedBriefDate == _todayStr && savedBrief.isNotEmpty) {
+          _dailyBrief     = savedBrief;
+          _dailyBriefDate = savedBriefDate ?? '';
+        }
+      } catch (e) {
+        debugPrint('Daily brief restore error: $e');
+      }
     } catch (e) {
       debugPrint('AIProvider.load error: $e');
     } finally {
@@ -501,6 +544,137 @@ class AIProvider extends ChangeNotifier {
   }
 
   // ═════════════════════════════════════════════════════════
+  // GEMINI SESSION INSIGHT — real AI analysis after workout
+  // ═════════════════════════════════════════════════════════
+  Future<void> generateSessionInsight({
+    required DayPlan day,
+    required MoodType mood,
+    required String goal,
+    required String level,
+    required int streak,
+  }) async {
+    if (_generatingSessionInsight) return;
+    _generatingSessionInsight = true;
+    _lastSessionInsight = '';
+    notifyListeners();
+
+    try {
+      // Today is _perfMemory[0], previous session is [1]
+      final today = _perfMemory.isNotEmpty ? _perfMemory[0] : null;
+      final prev  = _perfMemory.length > 1  ? _perfMemory[1] : null;
+
+      final setsCompleted = today?.setsCompleted ?? 0;
+      final setsPlanned   = today?.setsPlanned   ?? 0;
+      final volume        = today?.volume        ?? 0.0;
+      final muscles       = (today?.musclesTrained ?? []).join(', ');
+      final bestEx        = today?.bestExercise  ?? '';
+
+      final prevLine = prev != null
+          ? 'Previous session: ${prev.setsCompleted} sets, ${prev.volume.toStringAsFixed(0)}kg total volume.'
+          : 'This is one of their first sessions.';
+
+      final volumeChange = (prev != null && prev.volume > 0)
+          ? ' (${((volume - prev.volume) / prev.volume * 100).toStringAsFixed(0)}% vs last session)'
+          : '';
+
+      final prompt =
+          'You are an elite personal trainer. Analyze this workout and give EXACTLY 2 sentences '
+          'of specific, data-driven feedback. Be direct and motivating. No markdown, no lists.\n\n'
+          'ATHLETE: $level level, goal: ${goal.replaceAll("_", " ")}, streak: $streak days\n'
+          'TODAY: $setsCompleted/$setsPlanned sets completed, '
+          '${volume.toStringAsFixed(0)}kg volume$volumeChange\n'
+          '${muscles.isNotEmpty ? "Muscles trained: $muscles\n" : ""}'
+          '${bestEx.isNotEmpty ? "Best lift today: $bestEx\n" : ""}'
+          'Mood: ${mood.name}\n'
+          '$prevLine\n\n'
+          'Respond with exactly 2 sentences. Start with one relevant emoji.';
+
+      final response = await ApiService.askAI(prompt, type: AiRequestType.insight);
+
+      if (!response.startsWith('⚠️') && !response.startsWith('❌')) {
+        _lastSessionInsight = response;
+      }
+    } catch (e) {
+      debugPrint('generateSessionInsight error: $e');
+    } finally {
+      _generatingSessionInsight = false;
+      notifyListeners();
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════
+  // DAILY GEMINI BRIEF — replaces rule-based home coach message
+  // ═════════════════════════════════════════════════════════
+  Future<void> generateDailyBrief({
+    required String goal,
+    required String level,
+    required int streak,
+    required String todayWorkoutTitle,
+    required List<String> todayExercises,
+    required List<({String muscle, int score})> muscleScores,
+    required List<({String name, double bestWeight, int bestReps})> exerciseHistory,
+    bool forceRefresh = false,
+  }) async {
+    // One brief per day — unless explicitly refreshed after workout completion
+    if (!forceRefresh &&
+        _dailyBriefDate == _todayStr &&
+        _dailyBrief.isNotEmpty) {
+      return;
+    }
+
+    // Skip network call when offline — UI will show cached brief or offline state.
+    if (!ConnectivityService.instance.isOnline) {
+      _briefOffline = _dailyBrief.isEmpty;
+      notifyListeners();
+      return;
+    }
+    _briefOffline = false;
+
+    try {
+      final muscles = muscleScores
+          .map((m) => '${m.muscle}: ${m.score}%')
+          .join(', ');
+
+      final history = exerciseHistory.take(5).map((e) {
+        if (e.bestWeight > 0) return '${e.name} ${e.bestWeight}kg×${e.bestReps}';
+        return '${e.name} ${e.bestReps}reps';
+      }).join(', ');
+
+      final todayBlock = todayExercises.isNotEmpty
+          ? 'Today\'s planned: ${todayWorkoutTitle.isNotEmpty ? todayWorkoutTitle : "workout"} — ${todayExercises.take(3).join(", ")}'
+          : 'Rest day today';
+
+      final prompt =
+          'You are an elite fitness coach. Give a SINGLE sentence morning brief — '
+          'specific, data-driven, actionable. No fluff. Start with one emoji.\n\n'
+          'ATHLETE: $level | goal: ${goal.replaceAll("_", " ")} | streak: $streak days\n'
+          '$todayBlock\n'
+          'Recovery — $muscles\n'
+          '${history.isNotEmpty ? "Recent bests: $history" : ""}\n\n'
+          'One sentence. Reference specific muscle recovery or last weight. Be a coach, not a chatbot.';
+
+      final response = await ApiService.askAI(prompt, type: AiRequestType.brief);
+      if (!response.startsWith('⚠️') && !response.startsWith('❌')) {
+        _dailyBrief     = response;
+        _dailyBriefDate = _todayStr;
+        _briefOffline   = false;
+        notifyListeners();
+        // Persist so brief survives app restart
+        StorageService.instance.setString('ai_daily_brief',      _dailyBrief).ignore();
+        StorageService.instance.setString('ai_daily_brief_date', _dailyBriefDate).ignore();
+      }
+    } catch (e) {
+      debugPrint('generateDailyBrief error: $e');
+    }
+  }
+
+  void invalidateDailyBrief() {
+    _dailyBrief = '';
+    _dailyBriefDate = '';
+    notifyListeners();
+  }
+
+  // ═════════════════════════════════════════════════════════
   // AI WORKOUT PLAN GENERATION
   // ═════════════════════════════════════════════════════════
   Future<Map<String, dynamic>> generateWorkoutPlan(
@@ -510,7 +684,17 @@ class AIProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final prompt = _buildPrompt(request);
-      final raw = await ApiService.askAI(prompt);
+      // Workout plan is a full JSON week — must use plan type for 16k token limit + JSON mode.
+      final raw = await ApiService.askAI(
+        prompt,
+        timeout:   const Duration(seconds: 120),
+        type:      AiRequestType.plan,
+        isPremium: MonetizationService.instance.isPremium,
+      );
+
+      debugPrint('================ AI RAW RESPONSE ================');
+      debugPrint(raw);
+      debugPrint('================================================');
 
       if (raw.startsWith('⚠️') || raw.startsWith('❌')) {
         debugPrint('AIProvider backend returned error: $raw');
@@ -615,27 +799,198 @@ class AIProvider extends ChangeNotifier {
     final buf = StringBuffer();
     buf.writeln('You are a professional gym coach AI.');
     buf.writeln('Your task is to generate a weekly workout plan.');
+
+    // Week structure rules — always enforced
+    final promptDayNames = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    final todayWeekday = DateTime.now().weekday; // 1=Mon, 7=Sun
+    final todayDayName = promptDayNames[todayWeekday - 1];
+    buf.writeln('\nWEEK STRUCTURE (MANDATORY):');
+    buf.writeln('Day 1=Monday, Day 2=Tuesday, Day 3=Wednesday, Day 4=Thursday, Day 5=Friday, Day 6=Saturday, Day 7=Sunday.');
+    buf.writeln('Sunday (Day 7) = ALWAYS Rest — never schedule workouts on Sunday. Gym is closed on Sunday.');
+    if (r.totalWorkouts == 0 && todayWeekday > 1 && todayWeekday < 7) {
+      // New user joining mid-week
+      buf.writeln('NEW USER STARTING TODAY ($todayDayName): Mark all days before $todayDayName as Rest.');
+      buf.writeln('Place workouts only from $todayDayName through Saturday. Do NOT assign workouts to past days.');
+    }
+
     buf.writeln('\nSTRICT RULES:');
     buf.writeln('- Output ONLY JSON');
     buf.writeln('- NO explanation');
     buf.writeln('- NO markdown');
     buf.writeln('- NO extra text');
-    buf.writeln('- Keep response SHORT');
+    buf.writeln('- Response MUST be complete — do NOT truncate exercises');
     buf.writeln('- Exercise names must be in ENGLISH only');
     buf.writeln('- Focus must be clear (Push, Pull, Legs, Rest etc.)');
+    buf.writeln('- NEVER repeat the same exercise_id twice on the same day');
+    buf.writeln('- NEVER add core/ab/plank exercises unless the day explicitly targets "core" — core is NOT a filler');
+    buf.writeln('- Each muscle listed for a day MUST have at least 2 exercises — missing muscles are a critical error');
+    if (r.travelMode || r.bodyweightOnly) {
+      buf.writeln('');
+      buf.writeln('🚨 TRAVEL MODE ACTIVE — CRITICAL:');
+      buf.writeln('- ONLY bodyweight exercises (NO gym, NO equipment)');
+      buf.writeln('- NO barbell, dumbbell, cable, machine, or any weights');
+      buf.writeln('- Use ONLY: Push-ups, Pull-ups, Squats, Lunges, Plank,');
+      buf.writeln('  Burpees, Mountain Climbers, Dips (chair), Pike Push-ups,');
+      buf.writeln('  Glute Bridges, Calf Raises, Crunches, Russian Twists,');
+      buf.writeln('  Jumping Jacks, High Knees, Wall Sit, Superman');
+      buf.writeln('- User has NO access to gym — hotel/home workouts only');
+    }
+    // ── Split style constraint ─────────────────────────
+    buf.writeln('');
+    if (r.splitStyle == SplitStyle.aiAdaptive) {
+      final profile = r.adaptiveReadiness;
+      if (profile != null) {
+        // V2: profile-based scheduling — no contradictory binary rules.
+        buf.writeln('SPLIT STYLE: AI ADAPTIVE');
+        buf.writeln('Recovery status: ${profile.readinessExplanation}');
+        buf.writeln('Output EXACTLY ${profile.effectiveDaysThisWeek} training days.');
+        if (profile.isDeloadWeek) {
+          buf.writeln('DELOAD WEEK: Reduce load to 60% of normal. Focus on form and technique.');
+        }
+        if (profile.muscleSlots.isNotEmpty) {
+          buf.writeln('MUSCLE SCHEDULE — distribute target sets across training days:');
+          for (final slot in profile.muscleSlots) {
+            buf.writeln('  ${slot.muscle}: ${slot.targetSets} sets total this week');
+          }
+        }
+        buf.writeln('Pair synergists across days (chest+triceps, back+biceps, quads+hamstrings).');
+        buf.writeln('Prioritise compound movements. Place rest between sessions targeting the same muscle.');
+      } else {
+        // Fallback: V1 prompt (no profile computed — e.g., first launch with no data).
+        buf.writeln(SplitTemplate.adaptivePromptConstraints(
+          recoveryScores: r.muscleRecoveryScores,
+          daysPerWeek:    r.daysPerWeek,
+          goal:           r.goal,
+          streak:         r.currentStreak,
+        ));
+      }
+    } else {
+      final template = SplitTemplate.forStyle(r.splitStyle, r.daysPerWeek);
+      buf.writeln(template.toCompactPromptConstraints());
+    }
+
+    // ── Daily readiness — highest priority modifier ────────
+    if (r.readinessScore > 0) {
+      buf.writeln('');
+      buf.writeln(ReadinessLevelX.fromScore(r.readinessScore).promptBlock);
+    }
+
     buf.writeln('\nUSER PROFILE:');
     buf.writeln('Goal: ${r.goal.replaceAll("_", " ")}');
     buf.writeln('Level: ${r.level}');
-    buf.writeln('Days per week: ${r.daysPerWeek}');
+    final effectiveDays =
+        (r.splitStyle == SplitStyle.aiAdaptive && r.adaptiveReadiness != null)
+            ? r.adaptiveReadiness!.effectiveDaysThisWeek
+            : r.daysPerWeek;
+
+    buf.writeln('Days per week: $effectiveDays');
     buf.writeln('Workout streak: ${r.currentStreak}');
     buf.writeln('Total workouts: ${r.totalWorkouts}');
+
+    // ── Sports Science Protocols (MANDATORY — override AI defaults) ──────
+    buf.writeln('\nSPORTS SCIENCE PROTOCOLS — FOLLOW EXACTLY:');
+
+    // Volume per muscle per week
+    final volumeRule = switch (r.level) {
+      'beginner'     => '6–10 sets per muscle per week',
+      'intermediate' => '10–15 sets per muscle per week',
+      _              => '15–20 sets per muscle per week',
+    };
+    buf.writeln('VOLUME: $volumeRule');
+
+    // Rep, rest, and ratio rules by goal
+    final goal = r.goal.toLowerCase();
+    // Sets are always 3 — controlled by app, not AI
+    buf.writeln('SETS: Always output "sets": 3 for every exercise. Do NOT output 4 or 5 sets.');
+
+    if (goal.contains('muscle') || goal.contains('hypertrophy') || goal.contains('gain')) {
+      buf.writeln('REPS: 8–12 per set (hypertrophy range)');
+      buf.writeln('REST: 90–120 seconds between sets');
+      buf.writeln('EXERCISE MIX: 60% compound movements, 40% isolation');
+    } else if (goal.contains('strength') || goal.contains('power')) {
+      buf.writeln('REPS: 4–6 per set for compounds, 8–10 for accessories');
+      buf.writeln('REST: 3–5 minutes between compound sets, 90 seconds between isolation');
+      buf.writeln('EXERCISE MIX: 80%+ compound movements, minimal isolation');
+    } else if (goal.contains('fat') || goal.contains('weight_loss') || goal.contains('cut')) {
+      buf.writeln('REPS: 12–15 per set (higher reps, shorter rest = metabolic effect)');
+      buf.writeln('REST: 45–60 seconds between sets');
+      buf.writeln('EXERCISE MIX: supersets preferred — pair antagonist muscles');
+      buf.writeln('FINISHER: Add 1 HIIT finisher at end of each session (10 min)');
+    } else {
+      buf.writeln('REPS: 8–12 per set');
+      buf.writeln('REST: 60–90 seconds between sets');
+      buf.writeln('SETS PER EXERCISE: 3–4 sets');
+    }
+
+    // Exercises per session — split-aware HARD MINIMUM
+    final bool isFullBody = r.splitStyle == SplitStyle.fullBody;
+
+    final int minEx;
+    final int maxEx;
+    if (isFullBody) {
+      // Full body: 2-3 per muscle × 4-5 muscle groups = 10-15 total
+      minEx = switch (r.level) { 'beginner' => 8, 'intermediate' => 10, _ => 12 };
+      maxEx = switch (r.level) { 'beginner' => 10, 'intermediate' => 14, _ => 16 };
+    } else {
+      // Standard dedicated muscle days (PPL, Upper/Lower, Antagonist, Adaptive)
+      minEx = switch (r.level) { 'beginner' => 4, 'intermediate' => 6, _ => 8 };
+      maxEx = switch (r.level) { 'beginner' => 5, 'intermediate' => 7, _ => 10 };
+    }
+    buf.writeln('EXERCISES PER SESSION: minimum $minEx, maximum $maxEx exercises per workout day');
+    buf.writeln('CRITICAL: Never generate fewer than $minEx exercises on any training day. Rest days = 0 exercises.');
+
+    // Frequency-aware volume per session (full body only — other splits handled by split constraints)
+    final weeklyFrequency = r.daysPerWeek;
+    if (isFullBody) {
+      final setsPerSession = switch (r.level) {
+        'beginner'     => '2–3',
+        'intermediate' => '3–4',
+        _              => '4–5',
+      };
+      buf.writeln('FULL BODY VOLUME: $setsPerSession sets per muscle group per session (trained $weeklyFrequency×/week).');
+    }
+
+    // Progressive overload instruction
+    if (r.exerciseHistory.isNotEmpty) {
+      buf.writeln('PROGRESSIVE OVERLOAD: Build on user\'s existing bests listed below. Add 2.5–5kg or 1–2 reps vs last session.');
+    }
     buf.writeln('\nCONDITIONS:');
     if (r.weakMuscles.isNotEmpty) {
       buf.writeln('Prioritize muscles: ${r.weakMuscles.join(", ")}');
     }
     if (r.isOnPlateau) buf.writeln('User is stuck → change exercises');
     if (r.needsDeload) buf.writeln('Deload needed → reduce intensity');
-    if (r.isFatigued) buf.writeln('User fatigued → keep moderate load');
+    // Per-muscle recovery constraints.
+    // Skipped for AI Adaptive when a profile is available — the slot schedule
+    // above already encodes volume decisions without contradictory binary rules.
+    final bool useAdaptiveProfile =
+        r.splitStyle == SplitStyle.aiAdaptive && r.adaptiveReadiness != null;
+    if (r.muscleRecoveryScores.isNotEmpty && !useAdaptiveProfile) {
+      final suppressed = r.muscleRecoveryScores.where((m) => m.score < 60).toList();
+      final prime = r.muscleRecoveryScores.where((m) => m.score >= 80).toList();
+      buf.writeln('\nMUSCLE RECOVERY STATUS (FOLLOW EXACTLY):');
+      for (final m in r.muscleRecoveryScores) {
+        final label = m.score < 50
+            ? 'SUPPRESSED — DO NOT TRAIN'
+            : m.score < 70
+                ? 'LOW RECOVERY — light/accessory only'
+                : m.score < 85
+                    ? 'MODERATE — OK to train'
+                    : 'PRIME — prioritize today';
+        buf.writeln('  ${m.muscle}: ${m.score}% — $label');
+      }
+      if (suppressed.isNotEmpty) {
+        final names = suppressed.map((m) => m.muscle).join(', ');
+        buf.writeln('CRITICAL: Zero exercises targeting: $names');
+        buf.writeln('Replace those muscle days with PRIME muscles or rest.');
+      }
+      if (prime.isNotEmpty) {
+        final names = prime.map((m) => m.muscle).join(', ');
+        buf.writeln('BUILD PLAN AROUND: $names (fully recovered)');
+      }
+    } else if (r.isFatigued && !useAdaptiveProfile) {
+      buf.writeln('User fatigued → keep moderate load');
+    }
     buf.writeln('Performance: ${r.performanceTrend}');
     buf.writeln('Volume trend: ${r.weeklyVolumeTrend.toStringAsFixed(1)}');
     if (r.missedDays.isNotEmpty) {
@@ -667,30 +1022,50 @@ class AIProvider extends ChangeNotifier {
       buf.writeln('IMPORTANT: Generate DIFFERENT exercises than last week to avoid boredom and pattern adaptation. Rotate variations.');
     }
 
+    // ── VALID EXERCISE CANDIDATES ─────────────────────
+    final candidates = ExerciseCandidateService.select(
+      splitStyle: r.splitStyle,
+      targetMuscles: _targetMusclesForCandidates(r),
+      daysPerWeek: r.daysPerWeek,
+      level: r.level,
+      travelMode: r.travelMode,
+      bodyweightOnly: r.bodyweightOnly,
+      recentExerciseHistory: r.exerciseHistory,
+    );
+
+    buf.writeln('\nAVAILABLE EXERCISE CANDIDATES (USE ONLY THESE IDS):');
+    buf.writeln('Format: exercise_id|name|muscle|equipment|type');
+    buf.writeln(ExerciseCandidateService.toPromptLines(candidates));
+
+    buf.writeln('\nCRITICAL AI RULES:');
+    buf.writeln('- You MUST use ONLY exercise_id values from AVAILABLE EXERCISE CANDIDATES');
+    buf.writeln('- NEVER invent exercise IDs');
+    buf.writeln('- NEVER invent exercise names');
+    buf.writeln('- Every exercise object MUST contain exercise_id');
+    buf.writeln('- Prefer exercise_id over name');
+
     buf.writeln('\nOUTPUT FORMAT (FOLLOW EXACTLY):');
-    buf.writeln('''
-{
-  "workout_name": "Push Pull Legs",
-  "days": [
-    {
-      "day": "Monday",
-      "focus": "Push",
-      "exercises": [
-        {"name": "Bench Press", "sets": 4, "reps": "8-12"},
-        {"name": "Incline Dumbbell Press", "sets": 3, "reps": "10-12"}
-      ]
-    },
-    {
-      "day": "Tuesday",
-      "focus": "Pull",
-      "exercises": [
-        {"name": "Pull Ups", "sets": 4, "reps": "6-10"}
-      ]
-    }
-  ]
-}
-''');
+    buf.writeln('{"workout_name":"Plan Name","days":[{"day":"Monday","focus":"Back & Biceps","exercises":[{"exercise_id":"id_from_candidates","sets":3,"reps":"8-12"}]},{"day":"Tuesday","focus":"Rest","exercises":[]}]}');
     return buf.toString();
+  }
+
+  List<String> _targetMusclesForCandidates(AIWorkoutRequest r) {
+    final muscles = <String>{};
+    if (r.splitStyle == SplitStyle.aiAdaptive && r.adaptiveReadiness != null) {
+      muscles.addAll(r.adaptiveReadiness!.muscleSlots.map((s) => s.muscle));
+    } else if (r.splitStyle != SplitStyle.aiAdaptive) {
+      final template = SplitTemplate.forStyle(r.splitStyle, r.daysPerWeek);
+      muscles.addAll(template.trainingDays.expand((d) => d.muscles));
+    } else {
+      muscles.addAll(r.muscleRecoveryScores
+          .where((m) => m.score >= 60)
+          .map((m) => m.muscle));
+    }
+    muscles.addAll(r.weakMuscles);
+    if (muscles.isEmpty) {
+      muscles.addAll(['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs']);
+    }
+    return muscles.toList();
   }
 
   Map<String, dynamic> _parseResponse(String raw) {
@@ -909,23 +1284,23 @@ class AIProvider extends ChangeNotifier {
     switch (s) {
       case WeightSuggestion.increase:
         _cachedWeightMessage = _pickUnique('weight_inc', [
-          '📈 Strength improving — increase weight slightly (2.5–5kg).',
-          '💪 Your body is adapting — push heavier today.',
-          '🚀 Progress detected — time to overload safely.',
+          'Performance trend is improving.',
+          'Recovery appears stable for progression.',
+          'Training output is increasing consistently.',
         ]);
         break;
       case WeightSuggestion.decrease:
         _cachedWeightMessage = _pickUnique('weight_dec', [
-          '⬇️ Performance drop detected — reduce weight and focus on control.',
-          '⚠️ Recovery or fatigue issue — go lighter today.',
-          '🎯 Reset the weight — rebuild stronger with better form.',
+          'Performance drop detected — reduce weight and focus on control.',
+          'Recovery or fatigue issue — go lighter today.',
+          'Reset the weight — rebuild stronger with better form.',
         ]);
         break;
       case WeightSuggestion.maintain:
         _cachedWeightMessage = _pickUnique('weight_main', [
-          '🎯 Maintain weight — focus on clean reps.',
-          '🔁 Consistency phase — master the movement.',
-          '⚖️ Stable performance — keep the same load.',
+          'Maintain weight — focus on clean reps.',
+          'Consistency phase — master the movement.',
+          'Stable performance — keep the same load.',
         ]);
         break;
     }

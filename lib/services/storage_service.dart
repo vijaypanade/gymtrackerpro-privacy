@@ -43,8 +43,8 @@ class StorageKeys {
   static const String streak            = 'streak_data_v4';
   static const String history           = 'history_v4';
   static const String favorites         = 'favorites_v4';
+  static const String customExercises   = 'custom_exercises_v1';
   static const String settings          = 'settings_v4';
-  static const String waterDate         = 'last_water_date_v4';
   static const String logs              = 'workout_logs_v4';
   static const String measurements      = 'body_measurements_v2';
   static const String mood              = 'today_mood_v2';
@@ -54,6 +54,9 @@ class StorageKeys {
   static const String weeklyMemory      = 'weekly_memory_v1';
   static const String analyticsCache    = 'analytics_cache_v1';
   static const String onboardingDone    = 'onboarding_done';
+  static const String athleteMemory     = 'athlete_memory_v1';
+  static const String dailyMission      = 'daily_mission_v1';
+  static const String weeklyNarrative   = 'weekly_narrative_v1';
 
   // Hive box names
   static const String hiveWorkoutBox  = 'workoutBox';

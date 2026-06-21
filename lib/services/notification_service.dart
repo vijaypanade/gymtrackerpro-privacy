@@ -10,9 +10,13 @@
 //    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 //
 // NOTIFICATION TYPES:
-//   - Streak at risk    → fires at 8PM if no workout logged
-//   - Inactivity alert  → fires after 3 days no workout
-//   - Weekly summary    → fires every Sunday 9AM
+//   - Streak at risk       → fires at 8PM if no workout logged
+//   - Streak milestone     → fires immediately on milestone hit
+//   - Inactivity alert     → fires after 3 days no workout
+//   - Weekly summary       → fires every Sunday 9AM
+//   - PR celebration       → immediate on new personal record
+//   - Recovery coach       → fires next morning if muscle < 50%
+//   - Recovery ready       → fires morning after full recovery
 // ══════════════════════════════════════════════════════════
 
 import 'package:flutter/foundation.dart';
@@ -27,7 +31,18 @@ class NotifIds {
   static const weeklySummary   = 1003;
   static const prCelebration   = 1004;
   static const missionReminder = 1005;
+  static const recoveryCoach   = 1006;
+  static const streakMilestone = 1007;
+  static const recoveryReady   = 1008;
+  static const momentumProtect = 1009;
+  static const weeklyNarrative = 1010;
+  static const silentDay5      = 2001;
+  static const silentDay6      = 2002;
+  static const silentDay7      = 2003;
 }
+
+// Streak milestone thresholds that warrant a dedicated notification
+const _streakMilestones = [7, 14, 30, 60, 100];
 
 class NotificationService {
   NotificationService._();
@@ -63,11 +78,10 @@ class NotificationService {
         ?.requestNotificationsPermission();
 
     _initialized = true;
-    debugPrint('✅ NotificationService initialized');
+    debugPrint('NotificationService initialized');
   }
 
   void _onTap(NotificationResponse response) {
-    // TODO: Navigate to relevant screen based on payload
     debugPrint('Notification tapped: ${response.payload}');
   }
 
@@ -81,30 +95,31 @@ class NotificationService {
   }) async {
     if (!_initialized) return;
 
-    // Cancel existing
     await _plugin.cancel(NotifIds.streakRisk);
 
-    // Don't schedule if already worked out
     if (hasWorkedOutToday) return;
-    // Don't schedule for streak = 0 (no streak to protect)
     if (currentStreak == 0) return;
 
     final now  = DateTime.now();
-    final fire = DateTime(now.year, now.month, now.day, 20, 0); // 8PM today
+    final fire = DateTime(now.year, now.month, now.day, 20, 0);
 
-    // Already past 8PM → skip
     if (fire.isBefore(now)) return;
 
-    String title = '🔥 $currentStreak-Day Streak at Risk!';
-    String body;
-    if (currentStreak >= 14) {
-      body = '$userName, don\'t lose a $currentStreak-day streak. '
-             'Even 20 minutes counts. Go!';
+    final String title;
+    final String body;
+
+    if (currentStreak >= 30) {
+      title = '$currentStreak days. Don\'t stop now.';
+      body  = 'One session protects everything you\'ve built, $userName.';
+    } else if (currentStreak >= 14) {
+      title = 'Streak at risk — $currentStreak days on the line.';
+      body  = 'It only takes 20 minutes. Your body is ready, $userName.';
     } else if (currentStreak >= 7) {
-      body = 'Your $currentStreak-day streak ends tonight if you skip. '
-             'Quick workout?';
+      title = '$currentStreak-day habit in progress.';
+      body  = 'This is the window where habits form. Train today.';
     } else {
-      body = 'Keep the $currentStreak-day chain going. Train today!';
+      title = 'Training window closing.';
+      body  = 'Protect your $currentStreak-day streak. Even a short session counts.';
     }
 
     await _scheduleExact(
@@ -113,6 +128,49 @@ class NotificationService {
       body:    body,
       time:    fire,
       payload: 'streak_risk',
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // STREAK MILESTONE — fires immediately when milestone hit
+  // Use: call after workout save when streak crosses threshold
+  // ─────────────────────────────────────────────────────────
+  Future<void> scheduleStreakMilestoneNotification({
+    required int    streak,
+    required String userName,
+  }) async {
+    if (!_initialized) return;
+    if (!_streakMilestones.contains(streak)) return;
+
+    final String title;
+    final String body;
+
+    switch (streak) {
+      case 7:
+        title = '7 days straight.';
+        body  = 'Research shows habits start forming here. Keep going, $userName.';
+      case 14:
+        title = '14 days. That\'s a system.';
+        body  = 'Two weeks of consistent training — you\'re building something real.';
+      case 30:
+        title = '30 days. One month.';
+        body  = 'Automatic behavior threshold reached. This is who you are now, $userName.';
+      case 60:
+        title = '60 days of showing up.';
+        body  = 'Most people quit in week two. You\'re still here. That\'s the difference.';
+      case 100:
+        title = '100 days. Top 1%.';
+        body  = 'Consistency at this level is rare. $userName, this is elite.';
+      default:
+        return;
+    }
+
+    // Show immediately (no scheduling delay needed)
+    await _plugin.show(
+      NotifIds.streakMilestone,
+      title,
+      body,
+      _notifDetails(),
     );
   }
 
@@ -126,17 +184,16 @@ class NotificationService {
     if (!_initialized) return;
     await _plugin.cancel(NotifIds.inactivity);
 
-    final daysSince  = DateTime.now().difference(lastWorkoutDate).inDays;
-    if (daysSince >= 1) return; // Already inactive? Schedule for day 3
+    final daysSince = DateTime.now().difference(lastWorkoutDate).inDays;
+    if (daysSince > 3) return;
 
     final fire = lastWorkoutDate.add(const Duration(days: 3, hours: 9));
     if (fire.isBefore(DateTime.now())) return;
 
     await _scheduleExact(
       id:      NotifIds.inactivity,
-      title:   '💪 Miss us, $userName?',
-      body:    'You haven\'t trained in a while. '
-               'Your gains are waiting — come back!',
+      title:   'Three days without training.',
+      body:    'Your body is recovered. It\'s waiting, $userName. Come back today.',
       time:    fire,
       payload: 'inactivity',
     );
@@ -155,26 +212,33 @@ class NotificationService {
     final now     = DateTime.now();
     final daysUntilSunday = (7 - now.weekday) % 7;
     final nextSunday = DateTime(
-      now.year, now.month, now.day + (daysUntilSunday == 0 ? 7 : daysUntilSunday),
+      now.year, now.month,
+      now.day + (daysUntilSunday == 0 ? 7 : daysUntilSunday),
       9, 0,
     );
 
+    final String title;
     final String body;
-    if (workoutsThisWeek >= 4) {
-      body = '🔥 Amazing week! $workoutsThisWeek workouts, '
-             '${volumeThisWeek.toStringAsFixed(0)}kg lifted. '
-             'Ready to beat it next week?';
+
+    if (workoutsThisWeek >= 5) {
+      title = 'Elite week.';
+      body  = '$workoutsThisWeek sessions, ${volumeThisWeek.toStringAsFixed(0)}kg lifted. '
+              'Rest up — next week we push further.';
+    } else if (workoutsThisWeek >= 4) {
+      title = 'Strong week.';
+      body  = '$workoutsThisWeek workouts done, ${volumeThisWeek.toStringAsFixed(0)}kg moved. '
+              'Consistency is compounding.';
     } else if (workoutsThisWeek >= 2) {
-      body = '💪 Solid week! $workoutsThisWeek workouts done. '
-             'Next week, aim for ${workoutsThisWeek + 1}!';
+      title = 'Week complete.';
+      body  = '$workoutsThisWeek sessions logged. Next week, aim for ${workoutsThisWeek + 1}.';
     } else {
-      body = '📅 New week, new chance. '
-             'Let\'s aim for 4 workouts this week!';
+      title = 'New week starts now.';
+      body  = 'Four sessions builds the habit. This is the week to do it.';
     }
 
     await _scheduleExact(
       id:      NotifIds.weeklySummary,
-      title:   '📊 Your Week in Review',
+      title:   title,
       body:    body,
       time:    nextSunday,
       payload: 'weekly_summary',
@@ -182,7 +246,7 @@ class NotificationService {
   }
 
   // ─────────────────────────────────────────────────────────
-  // IMMEDIATE NOTIFICATION — for PR celebrations
+  // PR CELEBRATION — immediate on new personal record
   // ─────────────────────────────────────────────────────────
   Future<void> showPRNotification({
     required String exerciseName,
@@ -193,10 +257,251 @@ class NotificationService {
 
     await _plugin.show(
       NotifIds.prCelebration,
-      '🏆 New PR — $exerciseName!',
-      '${weight}kg × $reps reps — stronger than ever!',
+      'New record — $exerciseName.',
+      '${weight}kg × $reps reps. Stronger than ever.',
       _notifDetails(),
     );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // RECOVERY COACH — fires next morning if a muscle < 50%
+  // ─────────────────────────────────────────────────────────
+  Future<void> scheduleRecoveryCoach({
+    required String lowestMuscle,
+    required int    lowestScore,
+    required String userName,
+  }) async {
+    if (!_initialized) return;
+    await _plugin.cancel(NotifIds.recoveryCoach);
+
+    if (lowestScore >= 50) return;
+
+    final now  = DateTime.now();
+    final fire = DateTime(now.year, now.month, now.day + 1, 7, 30);
+
+    final muscle = lowestMuscle.isNotEmpty
+        ? lowestMuscle[0].toUpperCase() + lowestMuscle.substring(1)
+        : 'A muscle group';
+
+    await _scheduleExact(
+      id:      NotifIds.recoveryCoach,
+      title:   '$muscle needs more time.',
+      body:    'At $lowestScore% recovery, $userName — train something fresh today and return tomorrow.',
+      time:    fire,
+      payload: 'recovery_coach',
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // RECOVERY READY — fires morning after full recovery
+  // Use: when readiness score recovers above threshold after low day
+  // ─────────────────────────────────────────────────────────
+  Future<void> scheduleRecoveryReadyNotification({
+    required int    readiness,
+    required String userName,
+  }) async {
+    if (!_initialized) return;
+    await _plugin.cancel(NotifIds.recoveryReady);
+
+    // Only surface when genuinely recovered (top two tiers)
+    if (readiness < 4) return;
+
+    final now  = DateTime.now();
+    // Fire tomorrow 7AM — next morning wake-up
+    final fire = DateTime(now.year, now.month, now.day + 1, 7, 0);
+
+    final String title;
+    final String body;
+
+    if (readiness >= 5) {
+      title = 'Body primed. Today is a PR day.';
+      body  = 'Full recovery, $userName. Push harder than usual — conditions are optimal.';
+    } else {
+      title = 'Recovery complete.';
+      body  = 'You\'re ready to train at full intensity today, $userName.';
+    }
+
+    await _scheduleExact(
+      id:      NotifIds.recoveryReady,
+      title:   title,
+      body:    body,
+      time:    fire,
+      payload: 'recovery_ready',
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // MISSION REMINDER — fires 7AM on planned workout days
+  // Use: schedule after plan is loaded or refreshed, for any
+  // day that has exercises (not a rest day).
+  // ─────────────────────────────────────────────────────────
+  Future<void> scheduleMissionReminder({
+    required String planTitle,
+    required String userName,
+    required DateTime workoutDate,
+  }) async {
+    if (!_initialized) return;
+    await _plugin.cancel(NotifIds.missionReminder);
+
+    final fire = DateTime(
+        workoutDate.year, workoutDate.month, workoutDate.day, 7, 0);
+    if (fire.isBefore(DateTime.now())) return;
+
+    final String title;
+    final String body;
+
+    if (planTitle.isNotEmpty) {
+      title = '$planTitle is on today.';
+      body  = 'Your window is open, $userName. Get it done.';
+    } else {
+      title = 'Training day.';
+      body  = 'Your session is ready, $userName. Let\'s go.';
+    }
+
+    await _scheduleExact(
+      id:      NotifIds.missionReminder,
+      title:   title,
+      body:    body,
+      time:    fire,
+      payload: 'mission_reminder',
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // MOMENTUM PROTECTION — fires mid-afternoon when score is at risk
+  // Use: schedule after app open if daysSinceLastWorkout >= 2
+  // ─────────────────────────────────────────────────────────
+  Future<void> scheduleMomentumProtection({
+    required int    daysMissed,
+    required int    previousStreak,
+    required int    consistencyScore,
+    required String userName,
+  }) async {
+    if (!_initialized) return;
+    await _plugin.cancel(NotifIds.momentumProtect);
+
+    final now  = DateTime.now();
+    final fire = DateTime(now.year, now.month, now.day, 15, 30);
+    if (fire.isBefore(now)) return;
+
+    final String title;
+    final String body;
+
+    if (daysMissed >= 4) {
+      title = 'Inactivity is becoming a pattern.';
+      body  = 'Rebuild before the gap normalizes. Even 20 minutes resets the rhythm.';
+    } else if (previousStreak >= 7 && daysMissed >= 2) {
+      title = 'Momentum dipped — not lost.';
+      body  = 'One session today recovers faster than a full reset. '
+          'Your $previousStreak-day history doesn\'t disappear.';
+    } else if (consistencyScore >= 60) {
+      title = 'You usually train around now.';
+      body  = 'Two missed days is typically where rhythm breaks for you. Get it done today.';
+    } else {
+      title = 'Training window open.';
+      body  = 'Short session beats no session. Consistency matters more than duration.';
+    }
+
+    await _scheduleExact(
+      id:      NotifIds.momentumProtect,
+      title:   title,
+      body:    body,
+      time:    fire,
+      payload: 'momentum_protect',
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // WEEKLY NARRATIVE SUMMARY — fires Sunday evening
+  // Use: schedule once per week at plan load
+  // ─────────────────────────────────────────────────────────
+  Future<void> scheduleWeeklyNarrativeNotification({
+    required String headline,
+    required String userName,
+  }) async {
+    if (!_initialized || headline.isEmpty) return;
+    await _plugin.cancel(NotifIds.weeklyNarrative);
+
+    final now    = DateTime.now();
+    final daysUntilSunday = (7 - now.weekday) % 7;
+    final fire   = DateTime(
+      now.year, now.month,
+      now.day + (daysUntilSunday == 0 ? 7 : daysUntilSunday),
+      19, 0,
+    );
+
+    await _scheduleExact(
+      id:      NotifIds.weeklyNarrative,
+      title:   'Weekly review ready.',
+      body:    headline,
+      time:    fire,
+      payload: 'weekly_narrative',
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // SILENT DAY NOTIFICATIONS — Phase C1
+  // Day 5, 6, 7 of no training. Each fires at 9AM.
+  // Call after every workout save. Cancel when user returns.
+  // ─────────────────────────────────────────────────────────
+  Future<void> scheduleSilentDayNotifications({
+    required DateTime lastWorkoutDate,
+    required String   userName,
+    required int      streak,
+  }) async {
+    if (!_initialized) return;
+
+    await cancelSilentDayNotifications();
+
+    final name = userName.isEmpty ? 'Champion' : userName;
+
+    // Day 5 — first real concern signal
+    final day5 = DateTime(lastWorkoutDate.year, lastWorkoutDate.month,
+        lastWorkoutDate.day + 5, 9, 0);
+    if (day5.isAfter(DateTime.now())) {
+      final String t5, b5;
+      if (streak >= 14) {
+        t5 = 'Five days. Your streak is waiting.';
+        b5 = 'You built $streak days of consistency. Don\'t let this be the gap.';
+      } else {
+        t5 = 'Five days without training.';
+        b5 = 'The hardest part is starting again, $name. One session fixes this.';
+      }
+      await _scheduleExact(id: NotifIds.silentDay5, title: t5, body: b5,
+          time: day5, payload: 'silent_day_5');
+    }
+
+    // Day 6 — elevated urgency
+    final day6 = DateTime(lastWorkoutDate.year, lastWorkoutDate.month,
+        lastWorkoutDate.day + 6, 9, 0);
+    if (day6.isAfter(DateTime.now())) {
+      await _scheduleExact(
+        id:      NotifIds.silentDay6,
+        title:   'Six days. Your body is ready.',
+        body:    'Fully recovered and waiting, $name. Today is the perfect day to come back.',
+        time:    day6,
+        payload: 'silent_day_6',
+      );
+    }
+
+    // Day 7 — one-week mark, calm but direct
+    final day7 = DateTime(lastWorkoutDate.year, lastWorkoutDate.month,
+        lastWorkoutDate.day + 7, 9, 0);
+    if (day7.isAfter(DateTime.now())) {
+      await _scheduleExact(
+        id:      NotifIds.silentDay7,
+        title:   'One week. LiftOn misses you.',
+        body:    'Every comeback starts with one session, $name. Open the app — your plan is ready.',
+        time:    day7,
+        payload: 'silent_day_7',
+      );
+    }
+  }
+
+  Future<void> cancelSilentDayNotifications() async {
+    await _plugin.cancel(NotifIds.silentDay5);
+    await _plugin.cancel(NotifIds.silentDay6);
+    await _plugin.cancel(NotifIds.silentDay7);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -210,37 +515,50 @@ class NotificationService {
     await _plugin.cancel(NotifIds.streakRisk);
   }
 
+  Future<void> cancelInactivityAlert() async {
+    await _plugin.cancel(NotifIds.inactivity);
+  }
+
   // ─────────────────────────────────────────────────────────
   // INTERNAL HELPERS
   // ─────────────────────────────────────────────────────────
   Future<void> _scheduleExact({
-    required int    id,
-    required String title,
-    required String body,
+    required int      id,
+    required String   title,
+    required String   body,
     required DateTime time,
-    String? payload,
+    String?           payload,
   }) async {
+    final tzTime = tz.TZDateTime.from(time, tz.local);
+    final details = _notifDetails();
+    const interp  = UILocalNotificationDateInterpretation.absoluteTime;
     try {
       await _plugin.zonedSchedule(
-        id,
-        title,
-        body,
-        tz.TZDateTime.from(time, tz.local),
-        _notifDetails(),
+        id, title, body, tzTime, details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation: interp,
         payload: payload,
       );
     } catch (e) {
-      debugPrint('_scheduleExact error: $e');
+      // exact_alarms_not_permitted → SCHEDULE_EXACT_ALARM not granted.
+      // Fallback to inexact: fires within a delivery window, not at exact time.
+      if (e.toString().contains('exact_alarms_not_permitted')) {
+        try {
+          await _plugin.zonedSchedule(
+            id, title, body, tzTime, details,
+            androidScheduleMode: AndroidScheduleMode.inexact,
+            uiLocalNotificationDateInterpretation: interp,
+            payload: payload,
+          );
+        } catch (_) {}
+      }
     }
   }
 
   NotificationDetails _notifDetails() => const NotificationDetails(
     android: AndroidNotificationDetails(
-      'gymtracker_main',       // channel ID
-      'GymTracker Pro',        // channel name
+      'gymtracker_main',
+      'LiftOn',
       channelDescription: 'Workout reminders and achievements',
       importance:  Importance.high,
       priority:    Priority.high,

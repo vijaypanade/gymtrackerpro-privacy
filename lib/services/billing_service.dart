@@ -8,8 +8,10 @@
 // 2. Add to AndroidManifest.xml:
 //    <uses-permission android:name="com.android.vending.BILLING"/>
 // 3. Create products in Play Console:
-//    - gymtracker_monthly  (₹199/month)
-//    - gymtracker_yearly   (₹999/year)
+//    - premium_monthly    ₹149/month  (base plan)
+//    - premium_quarterly  ₹349/3mo    (Save 22%)
+//    - premium_yearly     ₹999/year   (Save 44% — RECOMMENDED)
+//    All three with 14-day free trial introductory pricing.
 // ══════════════════════════════════════════════════════════
 
 import 'dart:async';
@@ -23,9 +25,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 // PRODUCT IDs — must match Play Console exactly
 // ─────────────────────────────────────────────────────────
 class BillingProducts {
-  static const monthly = 'premium_monthly'; // ₹199/month
-  static const yearly  = 'premium_yearly';  // ₹999/year
-  static const all     = {monthly, yearly};
+  static const monthly   = 'premium_monthly';   // ₹149/month
+  static const quarterly = 'premium_quarterly'; // ₹349/3 months
+  static const yearly    = 'premium_yearly';    // ₹999/year
+  static const all       = {monthly, quarterly, yearly};
 }
 
 // ─────────────────────────────────────────────────────────
@@ -118,19 +121,24 @@ class BillingService extends ChangeNotifier {
   // ─────────────────────────────────────────────────────────
   Future<void> purchase(String productId) async {
     if (!_available) {
-      _error = 'Billing not available on this device';
-      notifyListeners();
-      return;
+      throw Exception('Payment is not available on this device.');
+    }
+
+    if (_products.isEmpty) {
+      throw Exception(
+        'Subscription products are not configured yet.\n'
+        'Please update the app from the Play Store to access Premium.',
+      );
     }
 
     final product = _products.firstWhere(
       (p) => p.id == productId,
-      orElse: () => throw Exception('Product $productId not found'),
+      orElse: () => throw Exception(
+        'Subscription plan not found. Please update the app.',
+      ),
     );
 
     final param = PurchaseParam(productDetails: product);
-
-    // Subscriptions use buyNonConsumable
     await InAppPurchase.instance.buyNonConsumable(purchaseParam: param);
   }
 
@@ -161,6 +169,8 @@ class BillingService extends ChangeNotifier {
 
         case PurchaseStatus.canceled:
           debugPrint('Purchase cancelled: ${purchase.productID}');
+          _status = BillingStatus.available;
+          notifyListeners();
           break;
 
         case PurchaseStatus.pending:
@@ -194,13 +204,16 @@ class BillingService extends ChangeNotifier {
 
     final productId = purchase.productID;
 
-    if (productId == BillingProducts.monthly ||
+    if (productId == BillingProducts.monthly  ||
+        productId == BillingProducts.quarterly ||
         productId == BillingProducts.yearly) {
       // Calculate expiry
       final now = DateTime.now();
       final expiry = productId == BillingProducts.yearly
           ? now.add(const Duration(days: 365))
-          : now.add(const Duration(days: 32)); // 32 = monthly buffer
+          : productId == BillingProducts.quarterly
+              ? now.add(const Duration(days: 95))  // 3 months + buffer
+              : now.add(const Duration(days: 32));  // monthly + buffer
 
       _isPremium     = true;
       _activeProduct = productId;

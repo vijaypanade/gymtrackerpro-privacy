@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Anterior deltoid caps — rounded teardrop sitting atop each shoulder -->
+  <!-- Left anterior delt -->
+  <path d="M14,28 C15,24 19,23 23,24 C27,25 29,28 29,33 C29,37 27,40 24,41 C21,42 17,41 15,38 C13,35 13,31 14,28 Z"
+        fill="white"/>
+  <!-- Right anterior delt -->
+  <path d="M86,28 C85,24 81,23 77,24 C73,25 71,28 71,33 C71,37 73,40 76,41 C79,42 83,41 85,38 C87,35 87,31 86,28 Z"
+        fill="white"/>
+</svg>

@@ -12,37 +12,32 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../services/storage_service.dart';
+import '../services/training_intent_parser.dart';
 
 import '../providers/app_provider.dart';
 import '../services/api_service.dart';
-import '../services/monetization_service.dart'; // ✅ Paywall
+import '../services/monetization_service.dart';
 import '../utils/app_constants.dart';
 import 'ai_workout_screen.dart';
 
-// ── Keywords that mean user wants a workout PLAN (not just advice) ──────────
-const _planTriggers = [
-  'generate plan', 'make plan', 'create plan', 'new plan', 'workout plan',
-  'weekly plan', 'give me a plan', 'build plan', 'plan banva', 'plan dya',
-  'plan chahiye', 'plan bana', 'suggest plan', 'generate workout',
-  'make workout', 'schedule', 'full week', 'full plan',
-];
-
-bool _wantsPlan(String msg) {
-  final lower = msg.toLowerCase();
-  return _planTriggers.any((t) => lower.contains(t));
-
-}
+// Workout generation removed from AI chat.
+// Planner screen handles structured workout generation only.
 
 class AIChatScreen extends StatefulWidget {
-  const AIChatScreen({super.key});
+  // Optional pre-loaded context injected from home screen AI Verdict card.
+  // When non-null and chat is fresh, replaces the generic greeting so the
+  // coach opens already aware of the user's current recovery state.
+  final String? seedContext;
+
+  const AIChatScreen({super.key, this.seedContext});
 
   // ✅ static on widget class — accessible via AIChatScreen._quickQuestions
   static const quickQuestions = [
-    "Today's workout? 🏋️",
-    "My protein target? 🍗",
-    "Recovery tips 💤",
-    "I feel tired 😴",
-    "Generate plan 📋",
+    "Training guidance",
+    "Recovery analysis",
+    "Protein target",
+    "Fat loss strategy",
+    "Improve consistency",
   ];
 
   @override
@@ -69,13 +64,15 @@ class _AIChatScreenState extends State<AIChatScreen>
       await _loadHistory();
       if (_messages.isEmpty && mounted) {
         final p = context.read<AppProvider>();
+        final isTravel = p.settings.travelMode;
+        final seed = widget.seedContext;
+        final opening = (seed != null && seed.isNotEmpty)
+            ? seed
+            : isTravel
+                ? "Travel mode active.\n\nBodyweight-focused guidance is ready."
+                : "Ready to help with training, recovery, and progress. Ask anything.";
         setState(() {
-          _messages.add({
-            'role': 'ai',
-            'text': "Hey \${p.profile.name}! 💪\n"
-                "I'm your AI coach. Ask me anything about workouts, diet, or recovery.\n\n"
-                "Type \"generate plan\" to get a full weekly plan.",
-          });
+          _messages.add({'role': 'ai', 'text': opening});
         });
         _saveHistory();
       }
@@ -103,6 +100,16 @@ class _AIChatScreenState extends State<AIChatScreen>
     }
   }
 
+  /// Detect if user wants bodyweight-only workout
+  bool _detectBwIntent(String msg) {
+    final t = msg.toLowerCase();
+    return t.contains('bodyweight') ||
+        t.contains('body weight') ||
+        t.contains('no equipment') ||
+        t.contains('home workout') ||
+        t.contains('without gym');
+  }
+
   Future<void> _saveHistory() async {
     try {
       // Keep only last N messages to prevent bloat
@@ -128,9 +135,9 @@ class _AIChatScreenState extends State<AIChatScreen>
     final text = rawText.trim();
     if (text.isEmpty) return;
 
-    // ── PREMIUM GATE — AI usage limit check ───────────────────────
+    // ── PREMIUM GATE — chat message limit check (5/day, separate from workout AI) ──
     final ap = context.read<AppProvider>();
-    if (!ap.canUseAI()) {
+    if (!ap.canUseChat()) {
       HapticFeedback.heavyImpact();
       _showPaywallSheet();
       return;
@@ -149,93 +156,7 @@ class _AIChatScreenState extends State<AIChatScreen>
     final p = context.read<AppProvider>();
 
     // ── ROUTE: Plan generation intent detection ───────────────────
-    final lower = text.toLowerCase();
-    final isPlanRequest = (lower.contains("generate") ||
-                           lower.contains("create") ||
-                           lower.contains("make") ||
-                           lower.contains("build")) &&
-                          (lower.contains("plan") ||
-                           lower.contains("workout") ||
-                           lower.contains("routine") ||
-                           lower.contains("program"));
-
-    if (isPlanRequest) {
-      try {
-        final result = await p.getAIWorkoutPlan();
-        if (!mounted) return;
-
-        final days = result['days'] as List?;
-        if (days == null || days.isEmpty) {
-          setState(() {
-            _isTyping = false;
-            _messages.add({
-              "role": "ai",
-              "text": "❌ Could not generate plan. Try AI Setup from home screen.",
-            });
-          });
-      _saveHistory();
-          return;
-        }
-
-        await p.applyAIWorkout(result);
-
-        if (!mounted) return;
-        final planName = result['workout_name']?.toString() ?? 'Custom Plan';
-
-        // Build dynamic summary from plan
-        final focuses = <String>[];
-        int restCount = 0;
-        for (final d in days) {
-          if (d is Map) {
-            final focus = d['focus']?.toString() ?? '';
-            if (focus.toLowerCase() == 'rest') {
-              restCount++;
-            } else if (focus.isNotEmpty && !focuses.contains(focus)) {
-              focuses.add(focus);
-            }
-          }
-        }
-        final trainingDays = days.length - restCount;
-        final focusStr = focuses.isEmpty ? 'mixed' : focuses.join(' / ');
-
-        // Build context-aware tip based on user state
-        String tip = '';
-        if (p.isFatigued) {
-          tip = '\n\n⚠️ Detected fatigue — volume slightly reduced.';
-        } else if (p.streak.currentStreak >= 7) {
-          tip = '\n\n🔥 ${p.streak.currentStreak}-day streak — keeping momentum!';
-        } else if (p.weakMuscle.isNotEmpty) {
-          tip = '\n\n🎯 Extra focus added for ${p.weakMuscle}.';
-        } else if (p.streak.totalWorkouts < 5) {
-          tip = '\n\n🌱 Beginner-friendly — start strong!';
-        }
-
-        setState(() {
-          _isTyping = false;
-          _messages.add({
-            "role": "ai",
-            "text": "✅ New plan applied!\n\n"
-                "📋 $planName\n"
-                "📅 $trainingDays training days, $restCount rest\n"
-                "💪 Focus: $focusStr$tip\n\n"
-                "Open Planner tab to start 🚀",
-          });
-        });
-        _saveHistory();
-        return;
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _isTyping = false;
-          _messages.add({
-            "role": "ai",
-            "text": "❌ Error generating plan: $e",
-          });
-        });
-      _saveHistory();
-        return;
-      }
-    }
+    final intent = TrainingIntentParser.parse(text);
 
        try {
       // Build history in format ApiService expects
@@ -250,39 +171,270 @@ class _AIChatScreenState extends State<AIChatScreen>
       // Build a context-rich prompt for the secure backend.
       // ApiService.askAI now takes a single String prompt — we fold all
       // the user/profile/history context into it here.
+
+      final lowerText = text.toLowerCase();
+
+      final wantsWorkoutPlan =
+          lowerText.contains('workout') ||
+          lowerText.contains('plan') ||
+          lowerText.contains('back') ||
+          lowerText.contains('chest') ||
+          lowerText.contains('bicep') ||
+          lowerText.contains('tricep') ||
+          lowerText.contains('legs') ||
+          lowerText.contains('shoulder') ||
+          lowerText.contains('push') ||
+          lowerText.contains('pull');
+
       final buf = StringBuffer();
-      buf.writeln('You are a personal fitness coach. Reply in a friendly, '
-          'motivating tone. Reply MAX 3 short sentences. NO long paragraphs. Be direct.');
+
+      final pf = p.profile;
+
+      // ═══════════════════════════════════════════════
+      // LAYER 1: IDENTITY — Indian Elite Trainer
+      // ═══════════════════════════════════════════════
+      buf.writeln('You are LiftOn AI Coach — an elite Indian fitness mentor.');
+      buf.writeln('Personality: Confident, direct, like a senior who trained hundreds. NO fluff, NO lecture.');
+      buf.writeln();
+      buf.writeln('COMMUNICATION STYLE:');
+      buf.writeln('- Sound like a calm, premium Indian fitness coach.');
+      buf.writeln('- Be concise, confident, and practical.');
+      buf.writeln('- Avoid excessive slang, hype, or motivational clichés.');
+      buf.writeln('- Use short, scan-friendly responses.');
+      buf.writeln('- Never sound childish, aggressive, or overly emotional.');
+      buf.writeln('- Prioritize clarity and coaching quality over personality.');
       buf.writeln();
 
-      buf.writeln('USER PROFILE:');
-      buf.writeln('- Goal: ${p.profile.goal}');
-      buf.writeln('- Level: ${p.profile.level}');
-      buf.writeln('- Trainer style: ${p.profile.trainerType}');
-      buf.writeln('- Weight: ${p.profile.weightKg}kg, '
-          'Height: ${p.profile.heightCm}cm');
+      // ═══════════════════════════════════════════════
+      // LAYER 2: KNOWLEDGE & EXPERTISE
+      // ═══════════════════════════════════════════════
+      if (wantsWorkoutPlan) {
+        buf.writeln('EXPERTISE MODE: Workout Planning (COACH VOICE — strict format)');
+        buf.writeln('');
+        buf.writeln('OUTPUT FORMAT (follow EXACTLY):');
+        buf.writeln('Line 1: One-line opener with address + readiness comment (max 12 words).');
+        buf.writeln('Line 2: Blank.');
+        buf.writeln('Then EXACTLY this template for each exercise (no deviations):');
+        buf.writeln('1. [EXERCISE_NAME] — [SETS]x[REPS], RIR [N]');
+        buf.writeln('   [SHORT_TIP under 8 words]');
+        buf.writeln('');
+        buf.writeln('CRITICAL: Exercise name is MANDATORY on every line.');
+        buf.writeln('NEVER output just "3x10, RIR 2" without a name.');
+        buf.writeln('Use real exercise names: Bench Press, Squat, Pull-up, Deadlift, etc.');
+        buf.writeln('');
+        buf.writeln('Real example output:');
+        buf.writeln('1. Goblet Squat — 3x12, RIR 2');
+        buf.writeln('   Knees out, chest tall.');
+        buf.writeln('2. Push-up — 3x10, RIR 2');
+        buf.writeln('   Slow down, fast up.');
+        buf.writeln('3. Dumbbell Row — 3x12 each, RIR 2');
+        buf.writeln('   Squeeze the back.');
+        buf.writeln('');
+        buf.writeln('Final line: One-line closer (max 10 words).');
+        buf.writeln('');
+        buf.writeln('FORMAT RULES (hard limits):');
+        buf.writeln('- NO long "Why" paragraphs. ONE tip per exercise, ≤8 words.');
+        buf.writeln('- NO warm-up/cool-down sections unless explicitly asked.');
+        buf.writeln('- NO "Recovery Note" / "Sleep advice" unless explicitly asked.');
+        buf.writeln('- NO food advice in workout plans.');
+        // Allow more words when user asks for multiple exercises
+        final exCount = RegExp(r'\b(\d+)\s+exercise').firstMatch(text.toLowerCase());
+        final nEx = exCount != null ? int.tryParse(exCount.group(1) ?? '0') ?? 0 : 0;
+        final wordLimit = nEx >= 5 ? 300 : (nEx >= 3 ? 220 : 150);
+        buf.writeln('- Total reply MUST fit in $wordLimit words.');
+        buf.writeln('- Match user level — never overload beginners.');
+        buf.writeln('- Use progressive overload + recovery data for prescription.');
+      } else {
+        buf.writeln('EXPERTISE MODE: Conversational Coaching');
+        buf.writeln('- Reply in MAX 3 short sentences. NO long paragraphs.');
+        buf.writeln('- Coach voice: short, direct, action-first.');
+        buf.writeln('- Use bullets only if listing 3+ items.');
+        buf.writeln('- If you don\'t know, say so — never invent science.');
+      }
+      buf.writeln();
+
+      // ═══════════════════════════════════════════════
+      // EQUIPMENT CONSTRAINT (if user asks for bodyweight)
+      // ═══════════════════════════════════════════════
+      final wantsBW = text.toLowerCase().contains('bodyweight') ||
+          text.toLowerCase().contains('body weight') ||
+          text.toLowerCase().contains('no equipment') ||
+          text.toLowerCase().contains('home workout') ||
+          text.toLowerCase().contains('without gym');
+      if (wantsBW) {
+        buf.writeln('EQUIPMENT CONSTRAINT: BODYWEIGHT ONLY');
+        buf.writeln('- User wants NO EQUIPMENT workout (home/bodyweight).');
+        buf.writeln('- USE ONLY: Push-ups, Pull-ups, Chin-ups, Dips, Squats,');
+        buf.writeln('  Lunges, Planks, Crunches, Burpees, Mountain Climbers,');
+        buf.writeln('  Pike Push-ups, Diamond Push-ups, Jumping Jacks,');
+        buf.writeln('  Glute Bridges, Supermans, Leg Raises, Wall Sit.');
+        buf.writeln('- DO NOT include ANY barbell/dumbbell/machine exercises.');
+        buf.writeln('- Always use proper exercise names (e.g. "Push-up", "Plank").');
+        buf.writeln();
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // TRAINING INTENT — HARD CONSTRAINTS
+      // ═══════════════════════════════════════════════════════════════
+      final constraintBlock = TrainingIntentParser.buildConstraintBlock(intent);
+      if (constraintBlock.isNotEmpty) {
+        buf.writeln(constraintBlock);
+      }
+
+      // ═══════════════════════════════════════════════
+      // LAYER 3: CONSISTENCY PSYCHOLOGY
+      // ═══════════════════════════════════════════════
+      buf.writeln('PSYCHOLOGY RULES (very important):');
+      buf.writeln('- Celebrate small wins (streak milestones, PRs, comeback days).');
+      buf.writeln('- After missed days: NO guilt-tripping. Frame it as "comeback energy".');
+      buf.writeln('- Build identity, not just habits: "You ARE someone who trains hard."');
+      buf.writeln('- Use streak data to fuel momentum talk when streak ≥ 3 days.');
+      buf.writeln('- If user sounds demotivated: acknowledge feelings first, then redirect to one small action.');
+      buf.writeln('- Never shame body type, weight, or starting point.');
+      buf.writeln();
+
+      buf.writeln();
+
+      // Detect profile completeness
+      final hasName = pf.name.isNotEmpty && pf.name != 'Champion';
+      final hasAge = pf.age > 0 && pf.age != 25;
+      final hasWeight = pf.weightKg > 0 && pf.weightKg != 70.0;
+      final hasHeight = pf.heightCm > 0 && pf.heightCm != 170.0;
+      final profileComplete = hasName && hasAge && hasWeight && hasHeight;
+
+      buf.writeln('USER PROFILE (use this to personalize ALL advice):');
+      buf.writeln('- Name: ${pf.name}');
+      buf.writeln('- Age: ${pf.age}, Gender: ${pf.gender}');
+      buf.writeln('- Weight: ${pf.weightKg}kg, Height: ${pf.heightCm}cm');
+      buf.writeln('- BMI: ${pf.bmi.toStringAsFixed(1)} (${pf.bmiCategory})');
+      buf.writeln('- BMR: ${pf.bmr.toStringAsFixed(0)} kcal/day');
+      buf.writeln('- Activity Level: ${pf.activityLevel}');
+      buf.writeln('- Goal: ${pf.goal}');
+      buf.writeln('- Level: ${pf.level}');
+      buf.writeln('- Diet Preference: ${pf.dietPreference} (veg/nonveg/eggetarian)');
+      buf.writeln('- Location: ${pf.state}');
+      debugPrint('SENDING LOCATION TO AI: ${pf.state}');
+      buf.writeln('- Trainer style: ${pf.trainerType}');
       buf.writeln('- Streak: ${p.streak.currentStreak} days');
       buf.writeln('- Total workouts: ${p.streak.totalWorkouts}');
+      buf.writeln();
+
+      if (!profileComplete) {
+        buf.writeln('⚠️ IMPORTANT: User profile is INCOMPLETE.');
+        buf.writeln('If user asks for personalized advice — DO NOT guess. Instead politely ask them '
+            'to update their Profile tab with: age, weight, height, and goal. Keep it friendly, 2 sentences max.');
+        buf.writeln();
+      }
+
+      buf.writeln('IMPORTANT PRODUCT RULE:');
+      buf.writeln('- DO NOT generate full diet plans inside chat.');
+      buf.writeln('- DO NOT generate full workout plans inside chat.');
+      buf.writeln('- If user asks for diet plan, meal plan, calorie plan, bulking diet, or fat loss diet:');
+      buf.writeln('  Give general guidance (macros, food types, timing). Do NOT reference any in-app diet tool.');
+      buf.writeln('  LiftOn does not have a diet planner feature.');
+
+      buf.writeln('- If user asks for workout plan, split, PPL routine, bro split, weekly schedule, or training program:');
+      buf.writeln('  redirect them to Planner or Tools.');
+      buf.writeln('  Tell them the Planner creates more structured and personalized plans than chat.');
+      buf.writeln('  Mention split-based generation like Push Pull Legs, Upper Lower, Bro Split, etc.');
+      buf.writeln('- Keep the reply short, premium, and confident.');
+      buf.writeln('- You MAY still answer general nutrition questions.');
+      buf.writeln();
+      buf.writeln('- User is from India. Suggest Indian foods only.');
+      buf.writeln('- Respect dietPreference: if "veg" → NEVER suggest meat/fish/egg.');
+      buf.writeln('- If "eggetarian" → eggs OK but no meat/fish.');
+      buf.writeln('- If "nonveg" → all foods OK.');
+      buf.writeln('- Use household items: dal, roti, rice, paneer, dahi, sabzi, '
+          'poha, upma, idli, dosa, chicken curry, eggs, etc.');
+      buf.writeln('- AVOID: avocado, salmon, quinoa, expensive western foods.');
       if (p.lastWorkoutNames.isNotEmpty) {
         buf.writeln('- Last workout: ${p.lastWorkoutNames.first}');
       }
       if (p.weakMuscle.isNotEmpty) {
         buf.writeln('- Weakest muscle: ${p.weakMuscle}');
       }
+
+      buf.writeln('- Current fatigue: ${p.isFatigued ? "High" : "Normal"}');
+      buf.writeln('- Needs deload: ${p.needsDeloadByVolume}');
+      buf.writeln('- Recent workouts: ${p.lastWorkoutNames.take(5).join(", ")}');
       buf.writeln();
 
-      if (history.isNotEmpty) {
-        buf.writeln('CONVERSATION SO FAR:');
-        for (final m in history.take(10)) {
-          final role = m['role'] == 'user' ? 'User' : 'Coach';
-          buf.writeln('$role: ${m['text']}');
+      // ═══════════════════════════════════════════════
+      // SPORTS SCIENCE DATA (use to personalize advice)
+      // ═══════════════════════════════════════════════
+      final totalSessions = p.streak.totalWorkouts;
+      final isNewUser = totalSessions < 3;
+
+      if (isNewUser) {
+        buf.writeln('USER STATUS: NEW USER (only \$totalSessions workouts logged).');
+        buf.writeln('CRITICAL: Recovery/readiness scores are NOT reliable yet.');
+        buf.writeln('- DO NOT mention any recovery percentage or readiness score.');
+        buf.writeln('- DO NOT pretend to know fatigue or volume trend.');
+        buf.writeln('- Treat as fresh start: suggest beginner-friendly form-first workout.');
+        buf.writeln('- Encourage them to log workouts so AI learns their body.');
+      } else {
+        buf.writeln('SCIENTIFIC RECOVERY & READINESS DATA:');
+        buf.writeln('- Recovery Score: ${p.recoveryScore.toStringAsFixed(0)}/100');
+        buf.writeln('- Training Readiness: ${p.readinessScore.toStringAsFixed(0)}/100');
+        buf.writeln('  → 85+ = peak (PR attempts OK)');
+        buf.writeln('  → 60-84 = normal training');
+        buf.writeln('  → 30-59 = light/technique day');
+        buf.writeln('  → <30 = deload or rest');
+        buf.writeln('- Volume Trend: ${p.needsDeloadByVolume ? "DROPPING — recommend deload" : "Stable/growing"}');
+
+        // ── Fix 1: Per-muscle recovery ──────────────────
+        final muscleRecoveries = p.muscleRecoveryList;
+        if (muscleRecoveries.isNotEmpty) {
+          buf.writeln('');
+          buf.writeln('MUSCLE-BY-MUSCLE RECOVERY (critical — use for muscle-specific advice):');
+          for (final mr in muscleRecoveries) {
+            buf.writeln('- ${mr.muscle}: ${mr.recoveryScore}% ${mr.emoji} ${mr.status}'
+                ' (last trained ${mr.lastTrainedDate})');
+          }
+          buf.writeln('→ NEVER suggest training a muscle below 40% recovery.');
+          buf.writeln('→ If user asks what to train today → pick highest % muscles.');
         }
-        buf.writeln();
       }
+
+      // ── Fix 2: Exercise weight history ───────────────
+      final exHistory = p.workout.buildExerciseHistory();
+      if (exHistory.isNotEmpty) {
+        buf.writeln('');
+        buf.writeln('EXERCISE HISTORY — last 21 days (use for weight recommendations):');
+        for (final ex in exHistory) {
+          if (ex.unit == 'kg' && ex.bestWeight > 0) {
+            buf.writeln('- ${ex.name}: best ${ex.bestWeight}kg × ${ex.bestReps} reps');
+          } else if (ex.bestReps > 0) {
+            buf.writeln('- ${ex.name}: best ${ex.bestReps} reps (bodyweight)');
+          }
+        }
+        buf.writeln('→ When user asks weight for a listed exercise → suggest best + 2.5kg if recovery ≥ 60%.');
+        buf.writeln('→ If same weight 3+ sessions → tell them they are stagnant, suggest increase or technique change.');
+      }
+      buf.writeln();
+
+      buf.writeln('TRAINER DECISION RULES (apply to all workout advice):');
+      buf.writeln('- If readiness < 30 → STRONGLY suggest rest/walk/mobility only.');
+      buf.writeln('- If readiness 30-59 → suggest 60% intensity, technique focus, RIR 3-4.');
+      buf.writeln('- If readiness 60-84 → normal session, RIR 1-2 on top sets.');
+      buf.writeln('- If readiness 85+ → green light for PR attempt or heavy day.');
+      buf.writeln('- If needsDeload = true → MANDATORY mention deload this week.');
+      buf.writeln('- If weakMuscle is set → prioritize it 2x/week, mention by name.');
+      buf.writeln('- Always reference user data ("Bhai, your recovery is at X today...").');
+      buf.writeln();
+
+      final contextBlock = _compressedConversationContext(history, p, text);
+      if (contextBlock.isNotEmpty) buf.writeln(contextBlock);
 
       buf.writeln('User just asked: "$text"');
 
-      final reply = await ApiService.askAI(buf.toString());
+      final reply = await ApiService.askAI(
+        buf.toString(),
+        timeout: const Duration(seconds: 60),
+      );
+
+      // Record chat message usage (independent from workout AI limit)
+      await MonetizationService.instance.recordChatMessageUse();
 
       if (!mounted) return;
       setState(() {
@@ -290,6 +442,41 @@ class _AIChatScreenState extends State<AIChatScreen>
         _messages.add({'role': 'ai', 'text': reply});
       });
       _saveHistory();
+
+      // ── Auto-generate plan if user requested ──
+      final wantsPlan = lowerText.contains('create') && lowerText.contains('plan') ||
+          lowerText.contains('generate') && lowerText.contains('plan') ||
+          lowerText.contains('make') && lowerText.contains('plan') ||
+          lowerText.contains('bodyweight') && lowerText.contains('workout') ||
+          lowerText.contains('weekly plan');
+
+      if (wantsPlan) {
+        try {
+          final ap = context.read<AppProvider>();
+          // Detect goal
+          String goal = 'Build Muscle';
+          if (lowerText.contains('lose') || lowerText.contains('fat')) goal = 'Lose Fat';
+          if (lowerText.contains('strong') || lowerText.contains('strength')) goal = 'Get Stronger';
+
+          // Detect level
+          String level = 'Beginner';
+          if (lowerText.contains('intermediate')) level = 'Intermediate';
+          if (lowerText.contains('advanced')) level = 'Advanced';
+
+          await ap.workout.generateSmartPlan(goal: goal, level: level, splitOverride: intent.engineSplit);
+
+          if (!mounted) return;
+          setState(() {
+            _messages.add({
+              'role': 'ai',
+              'text': '✅ Done! Your \$goal plan is in the Planner tab. Open Planner to see it!',
+            });
+          });
+          _saveHistory();
+        } catch (e) {
+          debugPrint('Auto plan generation failed: \$e');
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -306,6 +493,84 @@ class _AIChatScreenState extends State<AIChatScreen>
     _scrollToBottom();
   }
 
+  String _compressedConversationContext(
+    List<Map<String, String>> history,
+    AppProvider p,
+    String currentText,
+  ) {
+    if (history.isEmpty) return '';
+    final recent = history.length > 6
+        ? history.sublist(history.length - 6)
+        : history;
+    final older = history.length > 6
+        ? history.sublist(0, history.length - 6)
+        : const <Map<String, String>>[];
+
+    final buf = StringBuffer();
+    if (older.isNotEmpty) {
+      buf.writeln('CONVERSATION SUMMARY:');
+      buf.writeln('- User goal: ${p.profile.goal}; level: ${p.profile.level}; diet: ${p.profile.dietPreference}.');
+      buf.writeln('- Current topic: ${_topicFor(currentText, older)}.');
+      final constraints = _constraintsFromHistory(older);
+      if (constraints.isNotEmpty) {
+        buf.writeln('- Important constraints: $constraints.');
+      }
+    }
+
+    buf.writeln('RECENT CONVERSATION:');
+    for (final m in recent) {
+      final role = m['role'] == 'user' ? 'User' : 'Coach';
+      buf.writeln('$role: ${_clip(m['text'] ?? '', 220)}');
+    }
+    buf.writeln();
+    return buf.toString();
+  }
+
+  String _topicFor(String currentText, List<Map<String, String>> older) {
+    final combined = '$currentText ${older.map((m) => m['text'] ?? '').join(' ')}'
+        .toLowerCase();
+    if (combined.contains('diet') || combined.contains('protein') ||
+        combined.contains('calorie') || combined.contains('meal')) {
+      return 'nutrition';
+    }
+    if (combined.contains('recovery') || combined.contains('sleep') ||
+        combined.contains('sore') || combined.contains('fatigue')) {
+      return 'recovery';
+    }
+    if (combined.contains('plan') || combined.contains('workout') ||
+        combined.contains('split')) {
+      return 'workout planning';
+    }
+    if (combined.contains('motivation') || combined.contains('consistency') ||
+        combined.contains('streak')) {
+      return 'consistency';
+    }
+    return 'general coaching';
+  }
+
+  String _constraintsFromHistory(List<Map<String, String>> older) {
+    final text = older.map((m) => m['text'] ?? '').join(' ').toLowerCase();
+    final constraints = <String>[];
+    if (text.contains('bodyweight') || text.contains('no equipment') ||
+        text.contains('home workout')) {
+      constraints.add('bodyweight/no equipment');
+    }
+    if (text.contains('vegetarian') || text.contains(' veg ')) {
+      constraints.add('vegetarian');
+    }
+    if (text.contains('eggetarian')) constraints.add('eggetarian');
+    if (text.contains('injury') || text.contains('pain')) {
+      constraints.add('avoid aggravating pain/injury');
+    }
+    return constraints.take(4).join(', ');
+  }
+
+  String _clip(String value, int maxChars) {
+    final clean = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (clean.length <= maxChars) return clean;
+    return '${clean.substring(0, maxChars - 3)}...';
+  }
+
   // ── PLAN REQUEST HANDLER ──────────────────────────────────────────────────
   Future<void> _handlePlanRequest(AppProvider p, String text) async {
     // ✅ Check daily AI limit — offer rewarded ad if limit hit
@@ -314,7 +579,7 @@ class _AIChatScreenState extends State<AIChatScreen>
         _isTyping = false;
         _messages.add({
           'role': 'ai',
-          'text': '🔒 Daily AI limit reached.\n\nWatch a short ad to get 1 more free plan, or upgrade to Premium for unlimited! 👑',
+          'text': 'You\'ve used your free AI plan for today.\n\nWatch an ad for 1 more, or upgrade to Premium for unlimited coaching — no daily caps, ever.',
           'showRewardedAd': true,
         });
       });
@@ -325,11 +590,27 @@ class _AIChatScreenState extends State<AIChatScreen>
 
     try {
       setState(() => _isTyping = true);
-      final plan = await p.getAIWorkoutPlan();
+      final plan = await p.getAIWorkoutPlan(bodyweightOnly: _detectBwIntent(text));
       if (!mounted) return;
 
+      final daysList = plan['days'] as List?;
+      // Guard: if plan is empty or has no days, show an error instead of
+      // attaching an unusable planData that renders as "1 day • 0 exercises".
+      if (plan.isEmpty || daysList == null || daysList.isEmpty) {
+        setState(() {
+          _isTyping = false;
+          _messages.add({
+            'role': 'ai',
+            'text': "⚠️ AI is busy right now. Try again in a moment 💪",
+          });
+        });
+        _saveHistory();
+        _scrollToBottom();
+        return;
+      }
+
       final workoutName = plan['workout_name'] as String? ?? 'AI Workout Plan';
-      final days        = (plan['days'] as List?)?.length ?? 0;
+      final days        = daysList.length;
 
       setState(() {
         _isTyping = false;
@@ -369,8 +650,6 @@ class _AIChatScreenState extends State<AIChatScreen>
   // ── UI ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-
     return Scaffold(
       backgroundColor: AppColors.bg,
       resizeToAvoidBottomInset: true,
@@ -413,6 +692,12 @@ class _AIChatScreenState extends State<AIChatScreen>
 
   void _openPlanPreview(Map<String, dynamic> plan) {
     HapticFeedback.mediumImpact();
+    final daysList = plan["days"] as List?;
+    debugPrint("🟡 PREVIEW PLAN KEYS: ${plan.keys.toList()}");
+    debugPrint("🟡 PREVIEW DAYS COUNT: ${daysList?.length}");
+    if (daysList != null && daysList.isNotEmpty) {
+      debugPrint("🟡 PREVIEW FIRST DAY: ${daysList.first}");
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => AIWorkoutScreen(plan: plan)),
@@ -420,103 +705,12 @@ class _AIChatScreenState extends State<AIChatScreen>
   }
 
   void _showPaywallSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.bgModal,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('🔒', style: TextStyle(fontSize: 48)),
-            const SizedBox(height: 12),
-            const Text(
-              'Daily AI Limit Reached',
-              style: TextStyle(
-                fontFamily: 'Rajdhani',
-                color: AppColors.textPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "You've used your free AI chats today. Upgrade for unlimited.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                color: AppColors.textMuted,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  final ap = context.read<AppProvider>();
-                  await ap.upgradeToPremium();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('🔥 Premium unlocked! Unlimited AI.'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.gold,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  '🔥 Go Premium — ₹99/month',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('📺 Ads coming soon!')),
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: BorderSide(color: AppColors.gold.withValues(alpha: 0.4)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(
-                  '📺 Watch Ad for 1 Free Use',
-                  style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Maybe later', style: TextStyle(color: AppColors.textMuted)),
-            ),
-          ],
-        ),
-      ),
+    final ap = context.read<AppProvider>();
+    PaywallSheet.show(
+      context,
+      trigger: PaywallTrigger.aiLimitHit,
+      onUpgrade:    () => ap.refreshMonetization(),
+      onAdComplete: () => ap.refreshMonetization(),
     );
   }
 }
@@ -542,36 +736,30 @@ class _AppBar extends StatelessWidget {
           width: 36, height: 36,
           decoration: const BoxDecoration(
               shape: BoxShape.circle, gradient: AppGradients.gold),
-          child: const Center(child: Text('🤖', style: TextStyle(fontSize: 18))),
+          child: ClipOval(
+            child: Image.asset(
+              'assets/header_logo.png',
+              width: 36,
+              height: 36,
+              fit: BoxFit.cover,
+            ),
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('AI Trainer', style: GoogleFonts.rajdhani(
+            Text('Coach', style: GoogleFonts.rajdhani(
                 color: AppColors.textPrimary,
-                fontSize: 16, fontWeight: FontWeight.w800)),
-            Text('Powered by Gemini', style: GoogleFonts.inter(
-                color: AppColors.textMuted, fontSize: 10)),
+                fontSize: 17, fontWeight: FontWeight.w900,
+                letterSpacing: 0.4)),
+            Text('Adaptive fitness intelligence', style: GoogleFonts.inter(
+                color: AppColors.textMuted.withValues(alpha: 0.72),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w500)),
           ],
         )),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppColors.green.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.green.withValues(alpha: 0.35)),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 6, height: 6,
-                decoration: const BoxDecoration(
-                    color: AppColors.green, shape: BoxShape.circle)),
-            const SizedBox(width: 5),
-            Text('Online', style: GoogleFonts.inter(
-                color: AppColors.green, fontSize: 10, fontWeight: FontWeight.w700)),
-          ]),
-        ),
       ]),
     );
   }
@@ -610,8 +798,14 @@ class _MessageBubble extends StatelessWidget {
               width: 28, height: 28,
               decoration: const BoxDecoration(
                   shape: BoxShape.circle, gradient: AppGradients.gold),
-              child: const Center(
-                  child: Text('🤖', style: TextStyle(fontSize: 13))),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/header_logo.png',
+                  width: 28,
+                  height: 28,
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -623,13 +817,12 @@ class _MessageBubble extends StatelessWidget {
               // Text bubble
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
+                    horizontal: 15, vertical: 11),
                 decoration: BoxDecoration(
-                  gradient: isUser
-                      ? const LinearGradient(
-                          colors: [Color(0xFFFFCC00), Color(0xFFFF9900)])
-                      : null,
-                  color: isUser ? null : AppColors.bgCard,
+                  gradient: null,
+                  color: isUser
+                      ? const Color(0xFFD4AF37)
+                      : const Color(0xFF171717),
                   borderRadius: BorderRadius.only(
                     topLeft:     const Radius.circular(16),
                     topRight:    const Radius.circular(16),
@@ -641,42 +834,21 @@ class _MessageBubble extends StatelessWidget {
                       : Border.all(
                           color: AppColors.divider.withValues(alpha: 0.5)),
                 ),
-                child: Text(
-                  text,
+                child: SelectableText(
+                  text
+                      .replaceAll('•', '\n•')
+                      .replaceAll('1.', '\n1.')
+                      .replaceAll('2.', '\n2.')
+                      .replaceAll('3.', '\n3.'),
                   style: GoogleFonts.inter(
                     color: isUser ? Colors.black : AppColors.textPrimary,
-                    fontSize: 13.5,
-                    height: 1.45,
+                    fontSize: 13.8,
+                    fontWeight: FontWeight.w500,
+                    height: 1.62,
+                    letterSpacing: 0.1,
                   ),
                 ),
               ),
-
-              // Plan preview button
-              if (planData != null && onApplyPlan != null) ...[
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: () => onApplyPlan!(planData!),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                          colors: [Color(0xFFFFCC00), Color(0xFFFF9900)]),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(
-                          color: AppColors.gold.withValues(alpha: 0.3),
-                          blurRadius: 10, offset: const Offset(0, 3))],
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.preview_rounded, color: Colors.black, size: 16),
-                      const SizedBox(width: 6),
-                      Text('Preview & Apply Plan 🚀',
-                          style: GoogleFonts.rajdhani(
-                              color: Colors.black, fontSize: 14,
-                              fontWeight: FontWeight.w800)),
-                    ]),
-                  ),
-                ),
-              ],
               // ✅ Watch Ad button — shown when daily limit hit
               if (showRewardedAd && onAdComplete != null) ...[
                 const SizedBox(height: 8),
@@ -691,11 +863,11 @@ class _MessageBubble extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
                     ),
-                    child: Text('🎁 Get 1 Free AI Plan',
+                    child: Text('Watch an ad for 1 extra plan',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                             color: AppColors.gold, fontSize: 13,
-                            fontWeight: FontWeight.w700)),
+                            fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
@@ -736,11 +908,20 @@ class _TypingIndicatorState extends State<_TypingIndicator>
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
         Container(
-          width: 28, height: 28,
+          width: 28,
+          height: 28,
           decoration: const BoxDecoration(
-              shape: BoxShape.circle, gradient: AppGradients.gold),
-          child: const Center(
-              child: Text('🤖', style: TextStyle(fontSize: 13))),
+            shape: BoxShape.circle,
+            gradient: AppGradients.gold,
+          ),
+          child: ClipOval(
+            child: Image.asset(
+              'assets/header_logo.png',
+              width: 28,
+              height: 28,
+              fit: BoxFit.cover,
+            ),
+          ),
         ),
         const SizedBox(width: 8),
         Container(
@@ -794,7 +975,6 @@ class _QuickChips extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: AIChatScreen.quickQuestions.map((q) {
-          final isPlan = q.toLowerCase().contains('plan');
           return GestureDetector(
             onTap: () {
               HapticFeedback.selectionClick();
@@ -804,18 +984,14 @@ class _QuickChips extends StatelessWidget {
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: isPlan
-                    ? AppColors.gold.withValues(alpha: 0.12)
-                    : AppColors.bgCard,
+                color: AppColors.bgCard,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isPlan
-                      ? AppColors.gold.withValues(alpha: 0.6)
-                      : AppColors.borderSoft,
+                  color: AppColors.borderSoft,
                 ),
               ),
               child: Text(q, style: GoogleFonts.inter(
-                  color: isPlan ? AppColors.gold : AppColors.textSecondary,
+                  color: AppColors.textSecondary,
                   fontSize: 12, fontWeight: FontWeight.w600)),
             ),
           );
@@ -838,9 +1014,11 @@ class _InputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final mq = MediaQuery.of(context);
+    final bottom = mq.viewInsets.bottom;
+    final safeBottom = mq.padding.bottom;
     return Container(
-      padding: EdgeInsets.fromLTRB(12, 8, 12, 12 + bottom),
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 12 + bottom + safeBottom),
       decoration: const BoxDecoration(
         color: AppColors.bgSurface,
         border: Border(top: BorderSide(color: AppColors.divider)),
@@ -854,7 +1032,7 @@ class _InputBar extends StatelessWidget {
             style: GoogleFonts.inter(
                 color: AppColors.textPrimary, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Ask your trainer…',
+              hintText: 'Ask about training, recovery, or nutrition…',
               hintStyle: GoogleFonts.inter(
                   color: AppColors.textMuted, fontSize: 14),
               filled: true,
@@ -883,11 +1061,10 @@ class _InputBar extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             width: 44, height: 44,
             decoration: BoxDecoration(
-              gradient: isTyping
-                  ? null
-                  : const LinearGradient(
-                      colors: [Color(0xFFFFCC00), Color(0xFFFF9900)]),
-              color: isTyping ? AppColors.bgCardLight : null,
+              gradient: null,
+              color: isTyping
+                  ? AppColors.bgCardLight
+                  : const Color(0xFFD4AF37),
               shape: BoxShape.circle,
               boxShadow: isTyping ? [] : [
                 BoxShadow(
@@ -896,7 +1073,7 @@ class _InputBar extends StatelessWidget {
               ],
             ),
             child: Icon(
-              isTyping ? Icons.hourglass_top_rounded : Icons.send_rounded,
+              isTyping ? Icons.more_horiz_rounded : Icons.arrow_upward_rounded,
               color: isTyping ? AppColors.textMuted : Colors.black,
               size: 18,
             ),

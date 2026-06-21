@@ -3,9 +3,13 @@
 // getAllMuscleRecovery / getMuscleRecoveryScore removed from here
 
 import 'dart:math';
+import 'package:flutter/foundation.dart' show debugPrint;
 import '../data/exercise_data.dart';
 import '../models/models.dart';
+import '../models/split_template.dart';
 import '../models/workout_log.dart';
+import 'exercise_intelligence.dart';
+import 'split_recommendation_engine.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // WORKOUT CLASSIFIER — Exercise name → type/muscle auto-detect
@@ -87,6 +91,14 @@ class WorkoutClassifier {
 
     for (final kw in _deadliftLegs) { if (n.contains(kw)) return 'legs'; }
     if (n.contains('deadlift')) return 'back';
+
+    // Tricep priority before generic bench detection
+    if (n.contains('close grip') ||
+        n.contains('tricep') ||
+        n.contains('pushdown') ||
+        n.contains('skull') ||
+        n.contains('kickback') ||
+        n.contains('extension')) return 'arms';
 
     if (n.contains('bench') || n.contains('chest') || n.contains('fly') ||
         n.contains('pec')) return 'chest';
@@ -229,8 +241,13 @@ class RestDayGenerator {
 // ═══════════════════════════════════════════════════════════════
 class WorkoutPlanResult {
   final Map<String, List<String>> plan;
+  final Map<String, String> dayTypes; // day name → split type (e.g. 'Chest + Tricep')
   final String summary;
-  const WorkoutPlanResult({required this.plan, required this.summary});
+  const WorkoutPlanResult({
+    required this.plan,
+    this.dayTypes = const {},
+    required this.summary,
+  });
 }
 
 class ProgressionResult {
@@ -448,17 +465,30 @@ class AIEngine {
     required String level,
     required String type,
     required List<String> history,
-    String weakMuscle = '',
-    bool isBeginner   = false,
+    String weakMuscle     = '',
+    bool isBeginner       = false,
+    bool bodyweightOnly   = false,
+    double weightKg       = 75.0,
+    String activityLevel  = 'Moderate',
+    String gender         = '',
+    int    mesocycleWeek  = 1,
   }) {
     final t = type.toLowerCase().trim();
 
     List<Map<String, dynamic>> base;
     switch (t) {
       case 'push':
-        base = _pushPool(); break;
+        base = ExerciseData.list.where((e) {
+          final m = (e['muscle'] as String? ?? '').toLowerCase();
+          return m == 'chest' || m == 'shoulders' || m == 'triceps';
+        }).toList();
+        break;
       case 'pull':
-        base = _pullPool(); break;
+        base = ExerciseData.list.where((e) {
+          final m = (e['muscle'] as String? ?? '').toLowerCase();
+          return m == 'back' || m == 'biceps';
+        }).toList();
+        break;
       case 'legs':
         base = _legsPool(); break;
       case 'core':
@@ -471,11 +501,147 @@ class AIEngine {
         final co = (_corePool()..shuffle(_rng)).take(1).toList();
         base = [...pp, ...pl, ...lg, ...co];
         break;
+      case 'upper':
+        final pu = (ExerciseData.list.where((e) {
+          final m = (e['muscle'] as String? ?? '').toLowerCase();
+          return m == 'chest' || m == 'shoulders' || m == 'triceps';
+        }).toList()..shuffle(_rng)).take(3).toList();
+        final pl2 = (ExerciseData.list.where((e) {
+          final m = (e['muscle'] as String? ?? '').toLowerCase();
+          return m == 'back' || m == 'biceps';
+        }).toList()..shuffle(_rng)).take(3).toList();
+        base = [...pu, ...pl2];
+        break;
+      case 'lower':
+        final lg2 = (_legsPool()..shuffle(_rng)).take(4).toList();
+        final co2 = (_corePool()..shuffle(_rng)).take(2).toList();
+        base = [...lg2, ...co2];
+        break;
+      case 'chest':
+        base = ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase().contains('chest') ||
+          ((e['type'] as String? ?? '').toLowerCase() == 'push' &&
+           (e['muscle'] as String? ?? '').toLowerCase().contains('chest'))
+        ).toList();
+        if (base.length < 3) base = _pushPool().where((e) => (e['muscle'] as String? ?? '').toLowerCase().contains('chest')).toList();
+        if (base.length < 3) base = _pushPool();
+        break;
+      case 'back':
+        base = ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase().contains('back')
+        ).toList();
+        if (base.length < 3) base = _pullPool();
+        break;
+      case 'shoulders':
+        base = ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase().contains('shoulder') ||
+          (e['muscle'] as String? ?? '').toLowerCase().contains('delt')
+        ).toList();
+        if (base.length < 3) base = _pushPool();
+        break;
+      case 'arms':
+        final bi = ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'biceps'
+        ).take(4).toList();
+        final tri = ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'triceps'
+        ).take(4).toList();
+        base = [...bi, ...tri];
+        if (base.length < 3) base = [..._pushPool().take(3), ..._pullPool().take(3)];
+        break;
+      case 'abs':
+        base = _corePool();
+        break;
+      case 'chestback':
+      case 'chest + back':
+        final ch = (ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'chest'
+        ).toList()..shuffle(_rng)).take(3).toList();
+        final bk = (ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'back'
+        ).toList()..shuffle(_rng)).take(3).toList();
+        base = [...ch, ...bk];
+        break;
+      case 'shouldersarms':
+      case 'shoulders + arms':
+        final sh = (ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'shoulders'
+        ).toList()..shuffle(_rng)).take(3).toList();
+        final ar = (ExerciseData.list.where((e) {
+          final m = (e['muscle'] as String? ?? '').toLowerCase();
+          return m == 'biceps' || m == 'triceps';
+        }).toList()..shuffle(_rng)).take(4).toList();
+        base = [...sh, ...ar];
+        if (base.length < 3) base = [...sh, ..._pullPool().take(2), ..._pushPool().take(2)];
+        break;
+      case 'chest + tricep':
+        final ctChest = (ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'chest'
+        ).toList()..shuffle(_rng)).take(3).toList();
+        final ctTri = (ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'triceps'
+        ).toList()..shuffle(_rng)).take(2).toList();
+        base = [...ctChest, ...ctTri];
+        break;
+      case 'back + bicep':
+        final bbBack = (ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'back'
+        ).toList()..shuffle(_rng)).take(3).toList();
+        final bbBi = (ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'biceps'
+        ).toList()..shuffle(_rng)).take(2).toList();
+        base = [...bbBack, ...bbBi];
+        break;
+      case 'legs + shoulders':
+        final lsLegs = (ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'legs'
+        ).toList()..shuffle(_rng)).take(3).toList();
+        final lsSh = (ExerciseData.list.where((e) =>
+          (e['muscle'] as String? ?? '').toLowerCase() == 'shoulders'
+        ).toList()..shuffle(_rng)).take(2).toList();
+        base = [...lsLegs, ...lsSh];
+        break;
+      case 'squat':
+        base = ExerciseData.list.where((e) {
+          final n = (e['name'] as String? ?? '').toLowerCase();
+          final m = (e['muscle'] as String? ?? '').toLowerCase();
+          return n.contains('squat') || n.contains('lunge') || n.contains('leg press') || m == 'legs';
+        }).toList();
+        if (base.length < 3) base = _legsPool();
+        break;
+      case 'hinge':
+        base = ExerciseData.list.where((e) {
+          final n = (e['name'] as String? ?? '').toLowerCase();
+          return n.contains('deadlift') || n.contains('rdl') || n.contains('hip thrust') || n.contains('romanian');
+        }).toList();
+        if (base.length < 3) base = _legsPool();
+        break;
+      case 'press':
+        base = ExerciseData.list.where((e) {
+          final n = (e['name'] as String? ?? '').toLowerCase();
+          return n.contains('press') || n.contains('bench') || n.contains('overhead');
+        }).toList();
+        if (base.length < 3) base = _pushPool();
+        break;
       default:
         base = _fallback('full');
     }
 
     if (base.length < 3) base = _fallback(t);
+
+    // Hard validation: strip any exercise whose muscle group isn't allowed for
+    // this day type.  Only applies the result if it leaves ≥3 exercises.
+    final validated = _validateForDay(base, t);
+    if (validated.length >= 3) base = validated;
+
+    // ── TRAVEL MODE: bodyweight only ──
+    if (bodyweightOnly) {
+      final filtered = base.where((e) =>
+          e['bodyweight'] == true ||
+          (e['equipment'] as String? ?? '').toLowerCase() == 'bodyweight'
+      ).toList();
+      if (filtered.length >= 3) base = filtered;
+    }
 
     if (weakMuscle.isNotEmpty) {
       final wm = weakMuscle.toLowerCase();
@@ -508,66 +674,300 @@ class AIEngine {
       });
     }).toList();
 
-    final pool = ((fresh.length >= 3 ? fresh : base).toList()..shuffle(_rng));
+    final poolList = (fresh.length >= 3 ? fresh : base).toList();
 
-    if (pool.isEmpty) {
-      return _fallback(t)
-          .take(isBeginner ? 4 : 5)
-          .map((e) => _buildExerciseMap(e, goal, isBeginner))
+    if (poolList.isEmpty) {
+      final fallback = _fallback(t).take(isBeginner ? 4 : 5).toList();
+      return fallback.asMap().entries
+          .map((e) => _buildExerciseMap(e.value, goal, isBeginner, e.key,
+              weightKg: weightKg, level: level, gender: gender,
+              mesocycleWeek: mesocycleWeek))
           .toList();
     }
 
-    final count = isBeginner ? 4 : (level == 'advanced' ? 6 : 5);
-    return pool.take(count).map((e) => _buildExerciseMap(e, goal, isBeginner)).toList();
+    // Beginners: remove high-risk / high-skill exercises from the pool.
+    if (isBeginner) {
+      final safe = poolList.where((e) {
+        final name = (e['name'] as String? ?? '').toLowerCase();
+        return !_beginnerBlockedNames.any((blocked) => name.contains(blocked));
+      }).toList();
+      if (safe.length >= 3) {
+        debugPrint('[SplitEngine] Beginner filter: ${poolList.length} → ${safe.length} safe exercises');
+        final safeCompounds  = safe.where((e) =>
+            (e['movement'] as String? ?? '').toLowerCase() == 'compound').toList()
+          ..shuffle(_rng);
+        final safeIsolations = safe.where((e) =>
+            (e['movement'] as String? ?? '').toLowerCase() != 'compound').toList()
+          ..shuffle(_rng);
+        final safeOrdered = [...safeCompounds, ...safeIsolations];
+        final baseCount = 4;
+        final count = (baseCount + _activityVolumeBonus(activityLevel)).clamp(3, 5);
+        return safeOrdered.take(count).toList().asMap().entries
+            .map((e) => _buildExerciseMap(e.value, goal, isBeginner, e.key,
+                weightKg: weightKg, level: level, gender: gender,
+                mesocycleWeek: mesocycleWeek))
+            .toList();
+      }
+    }
+
+    // Compounds first, then isolations — shuffle within each tier for variety.
+    final compounds  = poolList.where((e) =>
+        (e['movement'] as String? ?? '').toLowerCase() == 'compound').toList()
+      ..shuffle(_rng);
+    final isolations = poolList.where((e) =>
+        (e['movement'] as String? ?? '').toLowerCase() != 'compound').toList()
+      ..shuffle(_rng);
+    final ordered = [...compounds, ...isolations];
+
+    final baseCount = isBeginner ? 4 : (level == 'advanced' ? 6 : 5);
+    final count = (baseCount + _activityVolumeBonus(activityLevel)).clamp(3, 7);
+    return ordered.take(count).toList().asMap().entries
+        .map((e) => _buildExerciseMap(e.value, goal, isBeginner, e.key,
+            weightKg: weightKg, level: level, gender: gender,
+            mesocycleWeek: mesocycleWeek))
+        .toList();
+  }
+
+  // ── Allowed muscle groups per day type ───────────────────────
+  static const Map<String, List<String>> _dayAllowedMuscles = {
+    'push':             ['chest', 'shoulders', 'triceps'],
+    'pull':             ['back', 'biceps'],
+    'legs':             ['legs'],
+    'core':             ['core'],
+    'abs':              ['core'],
+    'upper':            ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
+    'lower':            ['legs', 'core'],
+    'full':             ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'core'],
+    'fullbody':         ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'core'],
+    'chest':            ['chest'],
+    'back':             ['back'],
+    'shoulders':        ['shoulders'],
+    'arms':             ['biceps', 'triceps'],
+    'chestback':        ['chest', 'back'],
+    'chest + back':     ['chest', 'back'],
+    'shouldersarms':    ['shoulders', 'biceps', 'triceps'],
+    'shoulders + arms': ['shoulders', 'biceps', 'triceps'],
+    'chest + tricep':   ['chest', 'triceps'],
+    'back + bicep':     ['back', 'biceps'],
+    'legs + shoulders': ['legs', 'shoulders'],
+    'squat':            ['legs'],
+    'hinge':            ['legs', 'back'],
+    'press':            ['chest', 'shoulders', 'triceps'],
+  };
+
+  static List<Map<String, dynamic>> _validateForDay(
+    List<Map<String, dynamic>> exercises,
+    String dayType,
+  ) {
+    final dt      = dayType.toLowerCase();
+    final allowed = _dayAllowedMuscles[dt];
+    if (allowed == null) return exercises;
+
+    final validated = exercises.where((e) {
+      final m = (e['muscle'] as String? ?? '').toLowerCase();
+      return allowed.contains(m);
+    }).toList();
+
+    debugPrint(
+      '[SplitEngine] Day=$dayType '
+      'Allowed=$allowed '
+      'Before=${exercises.length} After=${validated.length} '
+      'Selected=${validated.map((e) => e['name']).toList()}',
+    );
+
+    return validated.isNotEmpty ? validated : exercises;
   }
 
   static Map<String, dynamic> _buildExerciseMap(
     Map<String, dynamic> ex,
     String goal,
     bool isBeginner,
-  ) {
-    final isBW  = ex['bodyweight'] == true;
-    final baseW = (ex['defaultWeight'] as num? ?? 20.0).toDouble();
+    int position, {  // 0 = primary compound, increases toward finishing isolation
+    double weightKg     = 75.0,
+    String level        = 'intermediate',
+    String gender       = '',
+    int    mesocycleWeek = 1,
+  }) {
+    final isBW      = ex['bodyweight'] == true;
+    final baseW     = (ex['defaultWeight'] as num? ?? 20.0).toDouble();
+    final equipment = (ex['equipment'] as String? ?? 'dumbbell');
+    final movement  = (ex['movement']  as String? ?? 'isolation');
+    final lvl       = isBeginner ? 'beginner' : level;
 
-    int smartReps;
-    switch (goal) {
-      case 'strength':    smartReps = isBeginner ? 6  : 5;  break;
-      case 'muscle_gain': smartReps = isBeginner ? 10 : 8;  break;
-      case 'fat_loss':    smartReps = isBeginner ? 15 : 12; break;
-      default:            smartReps = 10;
+    final range = VolumeAllocator.repRange(
+      position: position, movement: movement, goal: goal, gender: gender,
+    );
+    final baseSets = VolumeAllocator.setsForPosition(
+      position: position, movement: movement, level: lvl, goal: goal,
+    );
+
+    // Mesocycle periodization: week 3 = peak (+1 set), week 4 = deload (-1 set, 60% weight)
+    final sets = mesocycleWeek == 4
+        ? (baseSets - 1).clamp(1, 5)
+        : mesocycleWeek == 3
+            ? (baseSets + 1).clamp(2, 7)
+            : baseSets;
+
+    // Bodyweight-relative scaling: scale defaultWeight by user's body mass.
+    // Reference body: 75 kg (population median). Clamped 50%–200% of reference.
+    // Beginners get an additional 0.75× safety discount.
+    // Deload week (4): reduce to 60% of planned weight for active recovery.
+    double scaledW = 0.0;
+    if (!isBW) {
+      final bwScale     = (weightKg / 75.0).clamp(0.5, 2.0);
+      final lvlScale    = lvl == 'beginner' ? 0.75 : lvl == 'advanced' ? 1.10 : 1.0;
+      final deloadScale = mesocycleWeek == 4 ? 0.60 : 1.0;
+      scaledW = WeightRounder.round(baseW * bwScale * lvlScale * deloadScale, equipment);
     }
 
     return {
-      'name':        ex['name']   ?? 'Exercise',
-      'muscle':      ex['muscle'] ?? '',
-      'emoji':       ex['emoji']  ?? '💪',
-      'type':        ex['type']   ?? 'strength',
-      'unit':        isBW ? 'reps' : (ex['unit'] ?? 'kg'),
-      'bodyweight':  isBW,
-      'smartSets':   isBeginner ? 3 : 4,
-      'smartReps':   smartReps,
-      'smartWeight': isBW ? 0.0 : baseW,
+      'name':          ex['name']   ?? 'Exercise',
+      'muscle':        ex['muscle'] ?? '',
+      'emoji':         ex['emoji']  ?? '💪',
+      'type':          ex['type']   ?? 'strength',
+      'movement':      movement,
+      'equipment':     equipment,
+      'unit':          isBW ? 'reps' : (ex['unit'] as String? ?? 'kg'),
+      'bodyweight':    isBW,
+      'smartSets':     sets,
+      'smartRepMin':   range.min,
+      'smartRepMax':   range.max,
+      'smartReps':     range.mid,
+      'smartWeight':   scaledW,
+      'isDeloadWeek':  mesocycleWeek == 4,
     };
   }
 
   // ── Weekly plan generator ─────────────────────────────────────
-  static String _decideSplit(String level, String goal) {
-    if (level == 'beginner') return 'FullBody';
-    if (level == 'advanced' && goal == 'muscle_gain') return 'PPLPPL';
-    return 'PPL';
+
+  // Blocked exercises for beginners — high axial load, complex technique, or injury risk.
+  static const Set<String> _beginnerBlockedNames = {
+    'barbell back squat',
+    'sumo deadlift',
+    'barbell deadlift',
+    'conventional deadlift',
+    'trap bar deadlift',
+    'barbell overhead press',
+    'behind the neck press',
+    'good morning',
+    'zercher squat',
+    'jefferson squat',
+    'power clean',
+    'hang power clean',
+    'snatch',
+    'clean and jerk',
+    'weighted dip',
+    'weighted dips',
+    'bent-over barbell row',
+    'barbell row',
+  };
+
+  /// Map a [SplitStyle] enum → AIEngine split key, factoring in [gymDays].
+  static String splitStyleToKey(SplitStyle style, int gymDays) {
+    switch (style) {
+      case SplitStyle.fullBody:
+        return gymDays >= 4 ? 'FullBody4' : 'FullBody';
+      case SplitStyle.upperLower:
+        return gymDays >= 4 ? 'UpperLower4' : 'UpperLower2';
+      case SplitStyle.pushPullLegs:
+        return gymDays >= 5 ? 'PPLPPL' : 'PPL';
+      case SplitStyle.antagonistPairs:
+        return gymDays >= 6 ? 'ChestTriBackBi6' : 'ChestTriBackBi';
+      case SplitStyle.broSplit:
+        return gymDays >= 6 ? 'BroSplit6' : 'BroSplit5';
+      case SplitStyle.dailySingleMuscle:
+        return gymDays >= 6 ? 'DailySingleMuscle6' : 'DailySingleMuscle';
+      case SplitStyle.aiAdaptive:
+        return gymDays >= 5 ? 'PPLPPL' : 'PPL';
+      case SplitStyle.myOwnWay:
+        return 'PPL';
+    }
+  }
+
+  /// Activity level → extra exercise count modifier.
+  static int _activityVolumeBonus(String activityLevel) {
+    switch (activityLevel.toLowerCase().trim()) {
+      case 'sedentary': return -1;
+      case 'low':       return 0;
+      case 'moderate':  return 0;
+      case 'high':      return 1;
+      case 'very high': return 1;
+      default:          return 0;
+    }
+  }
+
+  /// Determines the split key from user profile — replaces flat 3-line heuristic.
+  ///
+  /// Priority order:
+  ///   1. [splitOverride] — explicit user or test override
+  ///   2. strength goal → Strength3 (≤4 days) or PPL strength variant
+  ///   3. SplitRecommendationEngine 3-axis lookup (level × gymDays × goal)
+  static String _decideSplit(String level, String goal, {
+    String splitOverride = '',
+    int gymDays = 3,
+  }) {
+    if (splitOverride.isNotEmpty) return splitOverride;
+
+    // Strength athletes need a strength-specific structure
+    if (goal == 'strength') {
+      if (gymDays <= 4) return 'Strength3';
+      return gymDays >= 5 ? 'PPLPPL' : 'PPL';
+    }
+
+    // Map internal level strings to SplitRecommendationEngine casing
+    final lvlStr = level == 'beginner' ? 'Beginner'
+        : level == 'advanced' ? 'Advanced'
+        : 'Intermediate';
+
+    // Map internal goal strings to SplitRecommendationEngine phrasing
+    final goalStr = goal == 'fat_loss'    ? 'Lose Fat'
+        : goal == 'muscle_gain' ? 'Build Muscle'
+        : 'General Fitness';
+
+    final rec = SplitRecommendationEngine.recommend(
+      level:   lvlStr,
+      gymDays: gymDays.clamp(2, 6),
+      goal:    goalStr,
+    );
+
+    debugPrint('[SplitEngine] $lvlStr/${gymDays}d/$goalStr → ${rec.split} → ${splitStyleToKey(rec.split, gymDays)}');
+    return splitStyleToKey(rec.split, gymDays);
   }
 
   static List<String> _generateWeek(String split) {
     switch (split) {
-      case 'FullBody': return ['Full', 'Rest', 'Full', 'Rest', 'Full', 'Rest', 'Rest'];
-      case 'PPLPPL':  return ['Push', 'Pull', 'Legs', 'Push', 'Pull', 'Legs', 'Rest'];
-      default:        return ['Push', 'Pull', 'Legs', 'Rest', 'Push', 'Pull', 'Rest'];
+      case 'FullBody':      return ['Full', 'Rest', 'Full', 'Rest', 'Full', 'Rest', 'Rest'];
+      case 'PPLPPL':        return ['Push', 'Pull', 'Legs', 'Push', 'Pull', 'Legs', 'Rest'];
+      case 'UpperLower4':   return ['Upper', 'Lower', 'Rest', 'Upper', 'Lower', 'Rest', 'Rest'];
+      case 'UpperLower2':   return ['Upper', 'Rest', 'Lower', 'Rest', 'Rest', 'Rest', 'Rest'];
+      case 'BroSplit5':     return ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Rest', 'Rest'];
+      case 'BroSplit6':     return ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Abs', 'Rest'];
+      case 'ChestTriBackBi':  return ['Chest + Tricep', 'Back + Bicep', 'Legs + Shoulders', 'Rest', 'Chest + Tricep', 'Back + Bicep', 'Rest'];
+      case 'ChestTriBackBi6': return ['Chest + Tricep', 'Back + Bicep', 'Legs + Shoulders', 'Chest + Tricep', 'Back + Bicep', 'Legs + Shoulders', 'Rest'];
+      case 'ArnoldSplit':     return ['Chest + Back', 'Shoulders + Arms', 'Legs', 'Chest + Back', 'Shoulders + Arms', 'Legs', 'Rest']; // advanced explicit only
+      case 'FullBody4':     return ['Full', 'Rest', 'Full', 'Rest', 'Full', 'Rest', 'Full'];
+      case 'Strength3':     return ['Squat', 'Hinge', 'Press', 'Rest', 'Squat', 'Rest', 'Rest'];
+      default:              return ['Push', 'Pull', 'Legs', 'Rest', 'Push', 'Pull', 'Rest'];
     }
   }
 
   static const _dayNames = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
   ];
+
+  /// Returns the ordered list of day-types (e.g. ['Chest','Back','Shoulders',…])
+  /// for the chosen split.  Callers use this to drive [generateDayWorkout] so
+  /// that the actual exercises match the requested split rather than defaulting
+  /// to Push/Pull/Legs.
+  static List<String> weekTypesForSplit({
+    required String level,
+    required String goal,
+    String splitOverride = '',
+    int gymDays = 3,
+  }) {
+    final split = _decideSplit(level, goal, splitOverride: splitOverride, gymDays: gymDays);
+    return _generateWeek(split);
+  }
 
   static WorkoutPlanResult generateWeeklyPlan({
     required String goal,
@@ -576,15 +976,24 @@ class AIEngine {
     required String weakMuscle,
     required int recoveryScore,
     required bool fatigued,
+    String splitOverride = '',
+    int gymDays          = 3,
+    double weightKg      = 75.0,
+    String activityLevel = 'Moderate',
+    String gender        = '',
+    int mesocycleWeek    = 1,
   }) {
-    final split = _decideSplit(level, goal);
-    final week  = _generateWeek(split);
-    final plan  = <String, List<String>>{};
+    final split    = _decideSplit(level, goal, splitOverride: splitOverride, gymDays: gymDays);
+    final week     = _generateWeek(split);
+    final plan     = <String, List<String>>{};
+    final dayTypes = <String, String>{};
     int trainingDays = 0;
 
     for (int i = 0; i < 7; i++) {
       final day  = week[i];
       final name = _dayNames[i];
+
+      dayTypes[name] = day;
 
       if (day == 'Rest' || (fatigued && recoveryScore < 40)) {
         plan[name] = ['Rest'];
@@ -602,17 +1011,24 @@ class AIEngine {
            dl == 'full');
 
       final exercises = generateDayWorkout(
-        goal: goal, level: level, type: day,
-        history: logs.map((e) => e.exercise).toList(),
-        weakMuscle: inject ? weakMuscle : '',
+        goal:          goal,
+        level:         level,
+        type:          day,
+        history:       logs.map((e) => e.exercise).toList(),
+        weakMuscle:    inject ? weakMuscle : '',
+        weightKg:      weightKg,
+        activityLevel: activityLevel,
+        gender:        gender,
+        mesocycleWeek: mesocycleWeek,
       );
       plan[name] = exercises.map((e) => e['name'] as String).toList();
       trainingDays++;
     }
 
     return WorkoutPlanResult(
-      plan: plan,
-      summary: _summary(
+      plan:     plan,
+      dayTypes: dayTypes,
+      summary:  _summary(
         split: split, trainingDays: trainingDays, goal: goal,
         weakMuscle: weakMuscle, fatigued: fatigued, recoveryScore: recoveryScore,
       ),

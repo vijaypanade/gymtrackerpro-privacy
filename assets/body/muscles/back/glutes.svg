@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gluteus maximus — rounded mass of posterior hip/buttock -->
+  <!-- Left glute: broad dome shape -->
+  <path d="M30,96 C27,99 26,104 27,110 C28,116 31,121 35,123 C39,125 43,123 46,119 C48,115 48,108 47,103 C46,98 43,95 39,95 C35,95 32,95 30,96 Z"
+        fill="white"/>
+  <!-- Right glute -->
+  <path d="M70,96 C73,99 74,104 73,110 C72,116 69,121 65,123 C61,125 57,123 54,119 C52,115 52,108 53,103 C54,98 57,95 61,95 C65,95 68,95 70,96 Z"
+        fill="white"/>
+</svg>

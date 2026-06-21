@@ -15,116 +15,123 @@ class ProgressChart extends StatelessWidget {
     required this.unit,
   });
 
+  static const _monthAbbr = [
+    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
 
-    final spots = provider.getProgressSpots(exerciseKey, unit);
-
-    if (spots.isEmpty) {
-      return Container(
-        height: 200,
-        alignment: Alignment.center,
-        child: const Text("No data yet 📉"),
-      );
-    }
-
-    // 🔥 logs (sorted + last 5)
+    // Single sorted list — spots and labels share the SAME indices
     final allLogs = provider.logs
         .where((l) => l.exercise == exerciseKey)
         .toList()
       ..sort((a, b) => a.date.compareTo(b.date));
 
-    final logs = allLogs.length > 5
-        ? allLogs.sublist(allLogs.length - 5)
-        : allLogs;
+    final spots = provider.getProgressSpots(exerciseKey, unit);
 
-  final double maxY =
-        spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
+    if (spots.isEmpty || allLogs.isEmpty) {
+      return Container(
+        height: 180,
+        alignment: Alignment.center,
+        child: const Text(
+          'No data yet',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            color: AppColors.textMuted,
+            fontSize: 13,
+          ),
+        ),
+      );
+    }
+
+    final double maxY = spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
+    final double chartMaxY = maxY < 50
+        ? (maxY + 10).toDouble()
+        : maxY < 150
+            ? (maxY + 20).toDouble()
+            : maxY + maxY * 0.18;
+
+    final int n = allLogs.length;
 
     return Container(
-      height: 220,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(6, 12, 12, 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.gold.withValues(alpha: 0.15),
-            Colors.black,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: LineChart(
         LineChartData(
           clipData: FlClipData.none(),
-
           minX: 0,
           maxX: spots.length > 1 ? spots.length - 1 : 1,
           minY: 0,
+          maxY: chartMaxY,
 
-          // ✅ DYNAMIC SCALE FIX
-        maxY: maxY.toDouble() < 50
-    ? (maxY + 10).toDouble()
-    : maxY.toDouble() < 150
-        ? (maxY + 20).toDouble()
-        : (maxY + (maxY * 0.2)).toDouble(),
-          // 🔥 GRID
+          // Grid
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
             horizontalInterval: _getInterval(spots),
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: Colors.white.withValues(alpha: 0.08),
-              strokeWidth: 0.8,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: Colors.white.withValues(alpha: 0.06),
+              strokeWidth: 0.5,
             ),
           ),
 
-          // 🔥 TITLES
+          // Titles
           titlesData: FlTitlesData(
+            // Y-axis left
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 42,
+                reservedSize: 36,
                 interval: _getInterval(spots),
                 getTitlesWidget: (value, meta) {
-                  if (value % _getInterval(spots) != 0) {
-                    return const SizedBox();
-                  }
-
+                  if (value % _getInterval(spots) != 0) return const SizedBox();
                   return Text(
                     value.toInt().toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: Colors.white.withValues(alpha: 0.30),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w400,
                     ),
                   );
                 },
               ),
             ),
 
-            // 🔥 DATE
+            // X-axis bottom — FIXED: same index as spots, show first/mid/last only
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
+                reservedSize: 26,
                 interval: 1,
                 getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= logs.length) {
-                    return const SizedBox();
-                  }
+                  final idx = value.toInt();
+                  if (idx < 0 || idx >= n) return const SizedBox.shrink();
 
-                  final date = logs[value.toInt()].date;
+                  // Show only first, middle, last to prevent overlap
+                  final isFirst = idx == 0;
+                  final isLast  = idx == n - 1;
+                  final isMid   = n > 2 && idx == n ~/ 2;
+                  if (!isFirst && !isLast && !isMid) return const SizedBox.shrink();
+
+                  final date  = allLogs[idx].date;
+                  final label = '${_monthAbbr[date.month]} ${date.day}';
 
                   return Padding(
-                    padding: const EdgeInsets.only(top: 6),
+                    padding: const EdgeInsets.only(top: 5),
                     child: Text(
-                      "${date.day.toString().padLeft(2, '0')}/"
-                      "${date.month.toString().padLeft(2, '0')}",
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey,
+                      label,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        color: Colors.white.withValues(alpha: 0.35),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   );
@@ -132,141 +139,111 @@ class ProgressChart extends StatelessWidget {
               ),
             ),
 
-            rightTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-
-            topTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
+            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles:   AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
 
           borderData: FlBorderData(show: false),
 
-          // 🔥 LINE
+          // Line
           lineBarsData: [
             LineChartBarData(
               spots: spots,
               isCurved: true,
-              curveSmoothness: 0.4,
-              color: AppColors.gold,
-              barWidth: 3,
+              curveSmoothness: 0.35,
+              color: AppColors.goldAmber.withValues(alpha: 0.85),
+              barWidth: 1.8,
               isStrokeCapRound: true,
 
-              // 🔥 DOT LOGIC (FIXED)
+              // Dot logic
               dotData: FlDotData(
                 show: true,
                 getDotPainter: (spot, percent, bar, index) {
-                  final spots = bar.spots;
-
-                  final double maxY = spots
+                  final allSpots = bar.spots;
+                  final double peak = allSpots
                       .map((e) => e.y)
                       .reduce((a, b) => a > b ? a : b);
+                  final isLast = index == allSpots.length - 1;
+                  final isPR   = (spot.y - peak).abs() < 0.1;
 
-                  final isLast = index == spots.length - 1;
-                  final isPR = (spot.y - maxY).abs() < 0.1;
-
-                  // ❌ HIDE duplicate
+                  // Hide if same value as prev
                   if (!isLast &&
                       index > 0 &&
-                      (spot.y - spots[index - 1].y).abs() < 0.1) {
-                    return FlDotCirclePainter(
-                      radius: 0,
-                      color: Colors.transparent,
-                    );
+                      (spot.y - allSpots[index - 1].y).abs() < 0.1) {
+                    return FlDotCirclePainter(radius: 0, color: Colors.transparent);
                   }
 
-                  // 🟣 BOTH
                   if (isPR && isLast) {
                     return FlDotCirclePainter(
-                      radius: 7,
-                      color: Colors.purple,
-                      strokeWidth: 3,
-                      strokeColor: Colors.white,
+                      radius: 5,
+                      color: AppColors.goldAmber,
+                      strokeWidth: 2,
+                      strokeColor: const Color(0xFF0A0A0A),
                     );
                   }
-
-                  // 🟢 PR
                   if (isPR) {
                     return FlDotCirclePainter(
-                      radius: 6,
-                      color: Colors.green,
-                      strokeWidth: 3,
-                      strokeColor: Colors.white,
+                      radius: 4,
+                      color: AppColors.goldAmber.withValues(alpha: 0.80),
+                      strokeWidth: 1.5,
+                      strokeColor: const Color(0xFF0A0A0A),
                     );
                   }
-
-                  // 🟠 TODAY
                   if (isLast) {
                     return FlDotCirclePainter(
-                      radius: 7,
-                      color: Colors.orange,
-                      strokeWidth: 3,
-                      strokeColor: Colors.white,
+                      radius: 4,
+                      color: AppColors.goldAmber.withValues(alpha: 0.75),
+                      strokeWidth: 1.5,
+                      strokeColor: const Color(0xFF0A0A0A),
                     );
                   }
-
-                  // 🔴 DROP
-                  if (index > 0 &&
-                      spot.y < spots[index - 1].y) {
-                    return FlDotCirclePainter(
-                      radius: 5,
-                      color: Colors.red,
-                      strokeWidth: 2,
-                      strokeColor: Colors.black,
-                    );
-                  }
-
-                  // 🟡 NORMAL
                   return FlDotCirclePainter(
-                    radius: 5,
-                    color: AppColors.gold,
-                    strokeWidth: 2,
-                    strokeColor: Colors.black,
+                    radius: 2,
+                    color: AppColors.goldAmber.withValues(alpha: 0.40),
+                    strokeWidth: 0,
+                    strokeColor: Colors.transparent,
                   );
                 },
               ),
 
-              // 🔥 AREA
+              // Premium gradient fill below line
               belowBarData: BarAreaData(
                 show: true,
                 gradient: LinearGradient(
-                  colors: [
-                    AppColors.gold.withValues(alpha: 0.25),
-                    Colors.transparent,
-                  ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.goldAmber.withValues(alpha: 0.18),
+                    AppColors.goldAmber.withValues(alpha: 0.00),
+                  ],
                 ),
               ),
             ),
           ],
 
-          // 🔥 TOOLTIP (FIXED)
+          // Tooltip
           lineTouchData: LineTouchData(
             handleBuiltInTouches: true,
             touchTooltipData: LineTouchTooltipData(
-              tooltipRoundedRadius: 12,
-              getTooltipColor: (_) =>
-                  Colors.black.withValues(alpha: 0.85),
+              tooltipRoundedRadius: 10,
+              getTooltipColor: (_) => const Color(0xFF1A1A1A),
               fitInsideHorizontally: true,
               fitInsideVertically: true,
               getTooltipItems: (touchedSpots) {
                 return touchedSpots.map((e) {
-                  final index = e.x.toInt();
-
-                  if (index >= logs.length) return null;
-
-                  final log = logs[index];
-
+                  final idx = e.x.toInt();
+                  if (idx < 0 || idx >= allLogs.length) return null;
+                  final log  = allLogs[idx];
+                  final date = log.date;
                   return LineTooltipItem(
-                    '${log.weight.toStringAsFixed(0)} kg\n'
-                    '${log.reps} reps\n'
-                    '${log.date.day}/${log.date.month}',
+                    '${log.weight.toStringAsFixed(0)} kg · ${log.reps} reps\n'
+                    '${_monthAbbr[date.month]} ${date.day}',
                     const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Inter',
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
                       fontSize: 12,
+                      height: 1.5,
                     ),
                   );
                 }).toList();
@@ -274,9 +251,6 @@ class ProgressChart extends StatelessWidget {
             ),
           ),
         ),
-
-        // 🔥 SMOOTH ANIMATION
-
       ),
     );
   }
@@ -284,8 +258,7 @@ class ProgressChart extends StatelessWidget {
   double _getInterval(List<FlSpot> spots) {
     final double maxY =
         spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
-
-    if (maxY <= 50) return 10;
+    if (maxY <= 50)  return 10;
     if (maxY <= 100) return 20;
     if (maxY <= 200) return 25;
     return 50;

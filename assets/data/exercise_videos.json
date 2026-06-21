@@ -1,0 +1,1319 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "Premium exercise video database",
+    "trainers_english": [
+      "Jeff Nippard",
+      "Jeremy Ethier",
+      "Athlean-X"
+    ],
+    "trainers_hindi": [
+      "Jeet Selal",
+      "Abhinav Mahajan",
+      "Guru Mann"
+    ]
+  },
+  "bench_press": {
+    "english": {
+      "trainer": "Jeff Nippard",
+      "title": "How To Get A Huge Bench Press",
+      "youtubeId": "vcBig73ojpE",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Jeet Selal",
+      "title": "7 FIX FOR STRENGTH",
+      "youtubeId": "p5cpmOxYnds",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "incline_bench_press": {
+    "english": {
+      "trainer": "Jeff Nippard",
+      "title": "Bigger Upper Chest",
+      "youtubeId": "jPLdzuHckI8",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Jeet Selal",
+      "title": "Inclined Bench Press Mistakes",
+      "youtubeId": "DLg7-VmM1xc",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "decline_bench_press": {
+    "english": {
+      "trainer": "ScottHemanFitness",
+      "title": "barbell   Bench Press",
+      "youtubeId": "LfyQBUKR8SE",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Jeet Selal",
+      "title": "decline bench press mistakes",
+      "youtubeId": "BMJJL7NENfY",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "dumbbell_bench_press": {
+    "english": {
+      "trainer": "JeremyEthier",
+      "title": "Dumbbell Bench Press",
+      "youtubeId": "QsYre__-aro",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Jeet Selal",
+      "title": "Dumbbell Bench Press",
+      "youtubeId": "g55fWNUi9PY",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "incline_dumbbell_press": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Incline Dumbbell Press",
+      "youtubeId": "hChjZQhX1Ls",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Jeet Selal",
+      "title": "incline_dumbbell_press",
+      "youtubeId": "cEWkkajn0Bg",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "decline_dumbbell_press": {
+    "english": {
+      "trainer": "bodybuilding.com",
+      "title": "Decline Dumbbell Press",
+      "youtubeId": "Pf1nDoqx_1A",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Jeet Selal",
+      "title": "Decline Dumbbell Press",
+      "youtubeId": "0uvDycOIej0",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "dumbbell_chest_fly": {
+    "english": {
+      "trainer": "ScottHemanFitness",
+      "title": "Dumbbell Chest Fly",
+      "youtubeId": "eozdVDA78K0",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "incline_dumbbell_fly": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Incline Dumbbell Fly",
+      "youtubeId": "idAvu2HvqSQ",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "chest_fly_machine": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Chest Fly Machine",
+      "youtubeId": "Iwe6AmxVf7o",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Jeet Selal",
+      "title": "Chest Fly Machine",
+      "youtubeId": "S56ZxYRv55w",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "machine_chest_press": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Machine Chest Press",
+      "youtubeId": "xUm0BiZCWlQ",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_crossover": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Cable Crossover",
+      "youtubeId": "Iwe6AmxVf7o",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "push_ups": {
+    "english": {
+      "trainer": "Athlean-X",
+      "title": "Push Up Properly",
+      "youtubeId": "IODxDxX7oi4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Abhinav Mahajan",
+      "title": "Home Workout",
+      "youtubeId": "P_SZpxUx3xw",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "dips": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Tricep Dips",
+      "youtubeId": "c3ZGl4pAwZ4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "deadlift": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Barbell Deadlift",
+      "youtubeId": "7Q_GnXm7LbI",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "romanian_deadlift": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Romanian Deadlift",
+      "youtubeId": "JCXUYuzwNrM",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "barbell_row": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Barbell Row",
+      "youtubeId": "9efgcAjQe7E",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "t_bar_row": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "T-Bar Row",
+      "youtubeId": "j3Igk5nyZE4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "dumbbell_row": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Dumbbell Row",
+      "youtubeId": "6TSP1TRMUzs",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "seated_cable_row": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Seated Cable Row",
+      "youtubeId": "GZbfZ033f74",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "lat_pulldown": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Lat Pulldown",
+      "youtubeId": "X5n55mMqSUs",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "wide_grip_lat_pulldown": {
+    "english": {
+      "trainer": "Nutritioneering",
+      "title": "Wide Grip Lat Pulldown",
+      "youtubeId": "gZr4wiQTfMM",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "pull_ups": {
+    "english": {
+      "trainer": "Calisthenicmovement",
+      "title": "Pull-ups",
+      "youtubeId": "eGo4IYlbE5g",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "chin_ups": {
+    "english": {
+      "trainer": "livestrong",
+      "title": "Chin-ups",
+      "youtubeId": "T78xCiw_R6g",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "face_pulls": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Face Pulls",
+      "youtubeId": "rep-qVOkqgk",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "overhead_press": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Barbell Overhead Press",
+      "youtubeId": "2yjwXTZQDDI",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "dumbbell_shoulder_press": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Dumbbell Shoulder Press",
+      "youtubeId": "qEwKCR5JCog",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "arnold_press": {
+    "english": {
+      "trainer": "Athlean-X",
+      "title": "Arnold Press",
+      "youtubeId": "ris9tKqMwgU",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "lateral_raise": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Lateral Raise",
+      "youtubeId": "3VcKaXpzqRo",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "front_raise": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Front Raise",
+      "youtubeId": "-t7fuZ0KhDA",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "rear_delt_fly": {
+    "english": {
+      "trainer": "Pure gym",
+      "title": "Rear Delt Fly",
+      "youtubeId": "nlkF7_2O_Lw",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "upright_row": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Upright Row",
+      "youtubeId": "IhZLB48kluc",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "barbell_curl": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Barbell Curl",
+      "youtubeId": "QZEqB6wUPxQ",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "dumbbell_curl": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Dumbbell Bicep Curl",
+      "youtubeId": "sAq_ocpRh_I",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "hammer_curl": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Hammer Curl",
+      "youtubeId": "zC3nLlEvin4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "preacher_curl": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Preacher Curl",
+      "youtubeId": "nbcgEmZ0Be4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "incline_dumbbell_curl": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Incline Dumbbell Curl",
+      "youtubeId": "soxrZlIl35U",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "concentration_curl": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Concentration Curl",
+      "youtubeId": "Jvj2wV0vOYU",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_curl": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Cable Bicep Curl",
+      "youtubeId": "AsAVbj7puKo",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "tricep_pushdown": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Tricep Pushdown",
+      "youtubeId": "2-LAMcpzODU",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "rope_pushdown": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Rope Pushdown",
+      "youtubeId": "vB5OHsJ3EME",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "overhead_tricep_extension": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Overhead Tricep Extension",
+      "youtubeId": "-Vyt2QdsR7E",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "skull_crushers": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Skull Crushers",
+      "youtubeId": "d_KZxkY_0cM",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "close_grip_bench_press": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Close Grip Bench Press",
+      "youtubeId": "nEF0bv2FW94",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "dumbbell_kickback": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Dumbbell Kickback",
+      "youtubeId": "6SS6K3lAwZ8",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "squat": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Barbell Back Squat",
+      "youtubeId": "SW_C1A-rejs",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "front_squat": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Front Squat",
+      "youtubeId": "tlfahNdNPPI",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "goblet_squat": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Goblet Squat",
+      "youtubeId": "MeIiIdhvXT4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "leg_press": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Leg Press",
+      "youtubeId": "oujca3_Shgw",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "walking_lunges": {
+    "english": {
+      "trainer": "Buff dudes",
+      "title": "Walking Lunges",
+      "youtubeId": "Pbmj6xPo-Hw",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "bulgarian_split_squat": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Bulgarian Split Squat",
+      "youtubeId": "2C-uNgKwPLE",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "leg_extension": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Leg Extension",
+      "youtubeId": "YyvSfVjQeL0",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "leg_curl": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Leg Curl",
+      "youtubeId": "ELOCsoDSmrg",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "standing_calf_raise": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Standing Calf Raise",
+      "youtubeId": "3UWi44yN-wM",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "seated_calf_raise": {
+    "english": {
+      "trainer": "Pure gym",
+      "title": "Seated Calf Raise",
+      "youtubeId": "3ZRe_QpvRPg",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "hip_thrust": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Hip Thrust",
+      "youtubeId": "SEdqd1n0cvg",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "glute_bridge": {
+    "english": {
+      "trainer": "Redefined Health",
+      "title": "Hip Thrust",
+      "youtubeId": "sh63qy5EV_8",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "hack_squat": {
+    "english": {
+      "trainer": "bodybuilding.com",
+      "title": "Hack Squat",
+      "youtubeId": "0tn5K9NlCfo",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "plank": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Plank",
+      "youtubeId": "pSHjTRCQxIw",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "side_plank": {
+    "english": {
+      "trainer": "Howcast",
+      "title": "Side Plank",
+      "youtubeId": "NXr4Fw8q60o",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "crunches": {
+    "english": {
+      "trainer": "Howcast",
+      "title": "Crunches",
+      "youtubeId": "MKmrqcoCZ-M",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "hanging_leg_raise": {
+    "english": {
+      "trainer": "The movement collection",
+      "title": "Hanging Leg Raise",
+      "youtubeId": "_jLskVdzS4o",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_crunch": {
+    "english": {
+      "trainer": "bodybuilding.com",
+      "title": "Cable Crunch",
+      "youtubeId": "3qjoXDTuyOE",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "ab_wheel_rollout": {
+    "english": {
+      "trainer": "Mindpumptv",
+      "title": "Ab Wheel Rollout",
+      "youtubeId": "rqiTPdK1c_I",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "russian_twist": {
+    "english": {
+      "trainer": "Howcast",
+      "title": "Russian Twist",
+      "youtubeId": "wkD8rjkodUI",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "leg_raises": {
+    "english": {
+      "trainer": "Howcast",
+      "title": "Leg Raises",
+      "youtubeId": "l4kQd9eWclE",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "mountain_climber": {
+    "english": {
+      "trainer": "W10",
+      "title": "Mountain Climber",
+      "youtubeId": "7LmA4zSitc4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "bicycle_crunch": {
+    "english": {
+      "trainer": "UCLA health",
+      "title": "Bicycle Crunch",
+      "youtubeId": "eqg47ZuGZXQ",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "burpees": {
+    "english": {
+      "trainer": "Builtlean",
+      "title": "Burpees",
+      "youtubeId": "G2hv_NYhM-A",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "jump_rope": {
+    "english": {
+      "trainer": "Strength side",
+      "title": "Jump Rope",
+      "youtubeId": "ezqHULlVEMo",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "close_grip_lat_pulldown": {
+    "english": {
+      "trainer": "PureGym",
+      "title": "Close Grip Lat Pulldown",
+      "youtubeId": "IjoFCmLX7z0",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_straight_arm_pulldown": {
+    "english": {
+      "trainer": "Renamesanse",
+      "title": "Cable Straight Arm Pulldown",
+      "youtubeId": "G9uNaXGTJ4w",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "machine_row": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "Machine Row",
+      "youtubeId": "GZbfZ033f74",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_lateral_raise": {
+    "english": {
+      "trainer": "PureGym",
+      "title": "Cable Lateral Raise",
+      "youtubeId": "Z5FA9aq3L6A",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "machine_shoulder_press": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "Machine Shoulder Press",
+      "youtubeId": "Wqq43dKW1TU",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "seated_leg_curl": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "Seated Leg Curl",
+      "youtubeId": "ELOCsoDSmrg",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "ez_bar_curl": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "EZ Bar Curl",
+      "youtubeId": "aEscWJ3dS3w",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_bicep_curl": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "Cable Bicep Curl",
+      "youtubeId": "AsAVbj7puKo",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "machine_tricep_extension": {
+    "english": {
+      "trainer": "Jerai fitness",
+      "title": "Machine Tricep Extension",
+      "youtubeId": "VV1e250gvXY",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "decline_sit_ups": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "Decline Sit-ups",
+      "youtubeId": "QhGU5cmNZds",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "treadmill_run": {
+    "english": {
+      "trainer": "Rehab and Revive",
+      "title": "Treadmill Run",
+      "youtubeId": "EZ7OkjYGhdY",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cycling": {
+    "english": {
+      "trainer": "Zero Healthcare",
+      "title": "Cycling",
+      "youtubeId": "gWosN1CY4bg",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "rowing_machine": {
+    "english": {
+      "trainer": "Sunny Health and fitness",
+      "title": "Rowing Machine",
+      "youtubeId": "uqs9A0B6s9U",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "stair_climber": {
+    "english": {
+      "trainer": "Kev The Trainer",
+      "title": "Stair Climber",
+      "youtubeId": "Zn1O9LcKW9E",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "pec_deck_machine": {
+    "english": {
+      "trainer": "Health by Scott",
+      "title": "Pec Deck Machine",
+      "youtubeId": "ze4JaQCcGLg",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "smith_machine_bench_press": {
+    "english": {
+      "trainer": "JM Gains and Grains",
+      "title": "Smith Machine Bench Press",
+      "youtubeId": "qUqhTW1RxaU",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "landmine_press": {
+    "english": {
+      "trainer": "Sport performance",
+      "title": "Landmine Press",
+      "youtubeId": "U2YPzDzS6dM",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "svend_press": {
+    "english": {
+      "trainer": "Muscle Matrix",
+      "title": "Svend Press",
+      "youtubeId": "_HJO__Wd5HQ",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "floor_press": {
+    "english": {
+      "trainer": "Mike",
+      "title": "Floor Press",
+      "youtubeId": "9vYCwtHkWgI",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "diamond_push_up": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "Diamond Push-Up",
+      "youtubeId": "J0DnG1_S92I",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "archer_push_up": {
+    "english": {
+      "trainer": "Victory Calisthenics",
+      "title": "Archer Push-Up",
+      "youtubeId": "A0r8ploEnZY",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "meadows_row": {
+    "english": {
+      "trainer": "The barbell physio",
+      "title": "Meadows Row",
+      "youtubeId": "w1d_wD0v3gc",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "chest_supported_row": {
+    "english": {
+      "trainer": "Testosterone Nation",
+      "title": "Chest Supported Row",
+      "youtubeId": "nl2MnK1i504",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "single_arm_dumbbell_row": {
+    "english": {
+      "trainer": "Renaissance Périodization",
+      "title": "Single-Arm Dumbbell Row",
+      "youtubeId": "DMo3HJoawrU",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "pendlay_row": {
+    "english": {
+      "trainer": "Jeff Nippard",
+      "title": "Pendlay Row",
+      "youtubeId": "axoeDmW0oAY",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "inverted_row": {
+    "english": {
+      "trainer": "Renaissance Périodization",
+      "title": "Inverted Row",
+      "youtubeId": "KOaCM1HMwU0",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "wide_grip_pull_up": {
+    "english": {
+      "trainer": "CalisthenicMovement",
+      "title": "Wide Grip Pull-Up",
+      "youtubeId": "IaeS1qoa-QA",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "chin_up": {
+    "english": {
+      "trainer": "LIVESTRONG",
+      "title": "Chin-Up",
+      "youtubeId": "T78xCiw_R6g",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "straight_arm_pulldown": {
+    "english": {
+      "trainer": "Renaissance Périodization",
+      "title": "Straight-Arm Pulldown",
+      "youtubeId": "G9uNaXGTJ4w",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "reverse_grip_pulldown": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "Reverse Grip Pulldown",
+      "youtubeId": "apzFTbsm7HU",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "trap_bar_deadlift": {
+    "english": {
+      "trainer": "Mens Health muscle",
+      "title": "Trap Bar Deadlift",
+      "youtubeId": "EsqwERaSTMI",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "rack_pull": {
+    "english": {
+      "trainer": "PureGym",
+      "title": "Rack Pull",
+      "youtubeId": "9vYBWV5OeKg",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "box_squat": {
+    "english": {
+      "trainer": "The Action life",
+      "title": "Box Squat",
+      "youtubeId": "rMEPHwNhQfo",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "pause_squat": {
+    "english": {
+      "trainer": "David Keogh",
+      "title": "Pause Squat",
+      "youtubeId": "i1GLD_-nMLM",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "step_up": {
+    "english": {
+      "trainer": "Bobby Maximus",
+      "title": "Step-Up",
+      "youtubeId": "9ZknEYboBOQ",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "sissy_squat": {
+    "english": {
+      "trainer": "Mind pump TV",
+      "title": "Sissy Squat",
+      "youtubeId": "HW5yUsjKru4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_pull_through": {
+    "english": {
+      "trainer": "Renaissance Périodization",
+      "title": "Cable Pull-Through",
+      "youtubeId": "pv8e6OSyETE",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "stiff_leg_deadlift": {
+    "english": {
+      "trainer": "Renaissance Périodization",
+      "title": "Stiff Leg Deadlift",
+      "youtubeId": "CN_7cz3P-1U",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "good_morning": {
+    "english": {
+      "trainer": "PureGym",
+      "title": "Barbell Good Morning",
+      "youtubeId": "nWyx81AfTos",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "donkey_calf_raise": {
+    "english": {
+      "trainer": "Functional bodybuilder",
+      "title": "Donkey Calf Raise",
+      "youtubeId": "WbBJmFQsIMA",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "push_press": {
+    "english": {
+      "trainer": "PureGym",
+      "title": "Barbell Push Press",
+      "youtubeId": "HKx22sWywxc",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "behind_the_neck_press": {
+    "english": {
+      "trainer": "bodybuilding.com",
+      "title": "Behind-the-Neck Press",
+      "youtubeId": "VA-Z3aFrnEA",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_front_raise": {
+    "english": {
+      "trainer": "PureGym",
+      "title": "Cable Front Raise",
+      "youtubeId": "vtH93qBItdk",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "bent_over_lateral_raise": {
+    "english": {
+      "trainer": "Renaissance Périodization",
+      "title": "Bent-Over Lateral Raise",
+      "youtubeId": "34gVHrkaiz0",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "spider_curl": {
+    "english": {
+      "trainer": "Men’s Health",
+      "title": "Spider Curl",
+      "youtubeId": "nvufDW-MSQk",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "reverse_curl": {
+    "english": {
+      "trainer": "OPEX fitness",
+      "title": "Reverse Curl",
+      "youtubeId": "hUA-fIpM7nA",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "drag_curl": {
+    "english": {
+      "trainer": "My PT hub",
+      "title": "Dumbbell  Drag Curl",
+      "youtubeId": "5PdEraHkF1A",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "skull_crusher": {
+    "english": {
+      "trainer": "Men’s Health",
+      "title": "Skull Crusher",
+      "youtubeId": "NIWKqcmpBug",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_rope_pushdown": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "Cable Rope Pushdown",
+      "youtubeId": "2-LAMcpzODU",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "reverse_grip_pushdown": {
+    "english": {
+      "trainer": "Nutritioneering",
+      "title": "Reverse Grip Pushdown",
+      "youtubeId": "8_5YkuU38s4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "diamond_push_up_triceps": {
+    "english": {
+      "trainer": "Minus the gym",
+      "title": "Diamond Push-Up Triceps",
+      "youtubeId": "kGhDnFwMY3E",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "bench_dip": {
+    "english": {
+      "trainer": "Scott Herman",
+      "title": "Bench Dip",
+      "youtubeId": "c3ZGl4pAwZ4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_overhead_tricep_extension": {
+    "english": {
+      "trainer": "Renaissance Périodization",
+      "title": "Cable Overhead Tricep Extension",
+      "youtubeId": "1u18yJELsh0",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "single_arm_pushdown": {
+    "english": {
+      "trainer": "Renaissance Périodization",
+      "title": "Single-Arm Pushdown",
+      "youtubeId": "Cp_bShvMY4c",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "cable_woodchopper": {
+    "english": {
+      "trainer": "Ekspert Sport",
+      "title": "Cable Woodchopper",
+      "youtubeId": "iWxTGXIViro",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "dragon_flag": {
+    "english": {
+      "trainer": "Coach Myers",
+      "title": "Dragon Flag",
+      "youtubeId": "U5pviWt7sMo",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "l_sit_hold": {
+    "english": {
+      "trainer": "Fitness FAQs",
+      "title": "L-Sit Hold",
+      "youtubeId": "cu0fHp8HCDo",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "v_up": {
+    "english": {
+      "trainer": "The Action life",
+      "title": "V-Up",
+      "youtubeId": "oirraQEz-74",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "stationary_bike": {
+    "english": {
+      "trainer": "Keleigh",
+      "title": "Stationary Bike",
+      "youtubeId": "rEqRmKAQ5xM",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "elliptical": {
+    "english": {
+      "trainer": "Fitnessdy",
+      "title": "Elliptical",
+      "youtubeId": "MAnJG4u5P4Y",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "battle_ropes": {
+    "english": {
+      "trainer": "Testosterone Nation",
+      "title": "Battle Ropes",
+      "youtubeId": "DfuvSn73Up4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "incline_barbell_press": {
+    "english": {
+      "trainer": "Jeff Nippard",
+      "title": "Bigger Upper Chest",
+      "youtubeId": "jPLdzuHckI8",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Jeet Selal",
+      "title": "Inclined Bench Press Mistakes",
+      "youtubeId": "DLg7-VmM1xc",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "decline_barbell_press": {
+    "english": {
+      "trainer": "ScottHemanFitness",
+      "title": "barbell   Bench Press",
+      "youtubeId": "LfyQBUKR8SE",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    },
+    "hindi": {
+      "trainer": "Jeet Selal",
+      "title": "decline bench press mistakes",
+      "youtubeId": "BMJJL7NENfY",
+      "difficulty": "beginner",
+      "why_selected": "Hindi tutorial"
+    }
+  },
+  "bodyweight_lunges": {
+    "english": {
+      "trainer": "Buff dudes",
+      "title": "Walking Lunges",
+      "youtubeId": "Pbmj6xPo-Hw",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "dumbbell_bicep_curl": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Dumbbell Bicep Curl",
+      "youtubeId": "sAq_ocpRh_I",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "barbell_back_squat": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Barbell Back Squat",
+      "youtubeId": "SW_C1A-rejs",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "dumbbell_romanian_deadlift": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Romanian Deadlift",
+      "youtubeId": "JCXUYuzwNrM",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "tricep_dips": {
+    "english": {
+      "trainer": "ScottHermanFitness",
+      "title": "Tricep Dips",
+      "youtubeId": "c3ZGl4pAwZ4",
+      "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  }
+}

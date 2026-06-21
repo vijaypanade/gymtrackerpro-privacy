@@ -8,13 +8,18 @@
 
 import 'package:flutter/foundation.dart';
 import '../services/storage_service.dart';
+import '../models/split_template.dart';
 
 class SettingsProvider extends ChangeNotifier {
   static const Map<String, dynamic> _defaults = {
     'workoutReminderEnabled': false,
-    'waterReminderEnabled':   false,
     'notificationsEnabled':   true,
-    'waterReminderInterval':  60,
+    'travelMode':             false,
+    'travelModeStartedAt':    '',
+    'splitStyle':             'pushPullLegs',
+    'gymDaysPerWeek':         4,
+    'readinessScore':         0,    // 0 = not set today
+    'readinessDate':          '',   // ISO date string — expires each day
   };
 
   Map<String, dynamic> _settings = Map.of(_defaults);
@@ -26,12 +31,46 @@ class SettingsProvider extends ChangeNotifier {
   // ── Typed accessors ──────────────────────────────────────
   bool get workoutReminderEnabled =>
       (_settings['workoutReminderEnabled'] as bool?) ?? false;
-  bool get waterReminderEnabled =>
-      (_settings['waterReminderEnabled'] as bool?) ?? false;
   bool get notificationsEnabled =>
       (_settings['notificationsEnabled'] as bool?) ?? true;
-  int  get waterReminderInterval =>
-      (_settings['waterReminderInterval'] as int?) ?? 60;
+  bool get travelMode =>
+      (_settings['travelMode'] as bool?) ?? false;
+  bool get inactivityAlertEnabled =>
+      (_settings['inactivityAlertEnabled'] as bool?) ?? true;
+  String get travelModeStartedAt =>
+      (_settings['travelModeStartedAt'] as String?) ?? '';
+  SplitStyle get splitStyle =>
+      SplitStyleLabel.fromName((_settings['splitStyle'] as String?) ?? 'pushPullLegs');
+  int get gymDaysPerWeek =>
+      ((_settings['gymDaysPerWeek'] as num?)?.toInt() ?? 4).clamp(2, 6);
+
+  /// Returns today's readiness score (1–5), or 0 if not yet set today.
+  int get todayReadiness {
+    final date = (_settings['readinessDate'] as String?) ?? '';
+    if (date != _todayStr) return 0;
+    return ((_settings['readinessScore'] as num?)?.toInt() ?? 0).clamp(0, 5);
+  }
+
+  Future<void> setTodayReadiness(int score) async {
+    _settings['readinessScore'] = score.clamp(1, 5);
+    _settings['readinessDate']  = _todayStr;
+    notifyListeners();
+    await _persist();
+  }
+
+  /// Clears today's readiness so the selector card re-opens.
+  Future<void> clearTodayReadiness() async {
+    _settings['readinessScore'] = 0;
+    _settings['readinessDate']  = '';
+    notifyListeners();
+    await _persist();
+  }
+
+  String get _todayStr {
+    final n = DateTime.now();
+    return '${n.year}-${n.month.toString().padLeft(2, '0')}-'
+        '${n.day.toString().padLeft(2, '0')}';
+  }
 
   /// Load settings from storage. Idempotent.
   Future<void> load() async {

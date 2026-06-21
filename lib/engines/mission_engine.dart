@@ -101,8 +101,6 @@ class MissionEngine extends ChangeNotifier {
     required int    totalWorkouts,
     required String goal,
     required String weakMuscle,
-    required int    currentWaterMl,
-    required int    waterGoalMl,
   }) async {
     final today = _todayStr;
     final prefs = await SharedPreferences.getInstance();
@@ -128,16 +126,6 @@ class MissionEngine extends ChangeNotifier {
       goal:          goal,
       weakMuscle:    weakMuscle,
     );
-
-    // Pre-fill water progress if already drunk some today
-    final waterMission = _missions.firstWhere(
-        (m) => m.type == MissionType.water, orElse: () => Mission(
-          id: '', title: '', description: '', emoji: '', xpReward: 0,
-          type: MissionType.water, targetValue: 1));
-    if (waterMission.id.isNotEmpty) {
-      waterMission.currentValue = currentWaterMl;
-      if (currentWaterMl >= waterGoalMl) waterMission.isCompleted = true;
-    }
 
     _date    = today;
     _loading = false;
@@ -169,18 +157,7 @@ class MissionEngine extends ChangeNotifier {
       targetValue: 1,
     ));
 
-    // ── Mission 2: Water goal ─────────────────────────────
-    missions.add(Mission(
-      id:          'water_$dayCode',
-      title:       'Hit Water Goal',
-      description: 'Stay hydrated — performance + recovery',
-      emoji:       '💧',
-      xpReward:    XPSystem.xpWaterGoalMet,
-      type:        MissionType.water,
-      targetValue: 1, // completion handled separately
-    ));
-
-    // ── Mission 3: Context-aware third mission ────────────
+    // ── Mission 2: Context-aware mission ─────────────────
     if (weakMuscle.isNotEmpty && weakMuscle != 'other') {
       // User has a weak muscle → encourage training it
       final muscle = weakMuscle[0].toUpperCase() + weakMuscle.substring(1);
@@ -247,25 +224,6 @@ class MissionEngine extends ChangeNotifier {
         (m) => m.type == MissionType.sets && !m.isCompleted)) {
       m.currentValue = totalSetsToday;
       if (m.currentValue >= m.targetValue) {
-        m.isCompleted = true;
-        xp += m.xpReward;
-      }
-    }
-    if (xp > 0) {
-      final prefs = await SharedPreferences.getInstance();
-      await _save(prefs);
-      notifyListeners();
-    }
-    return xp;
-  }
-
-  /// Call when water intake updated
-  Future<int> onWaterUpdated(int totalMl, int goalMl) async {
-    int xp = 0;
-    for (final m in _missions.where(
-        (m) => m.type == MissionType.water && !m.isCompleted)) {
-      m.currentValue = totalMl;
-      if (totalMl >= goalMl) {
         m.isCompleted = true;
         xp += m.xpReward;
       }

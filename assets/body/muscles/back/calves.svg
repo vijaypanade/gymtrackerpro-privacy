@@ -1,0 +1,15 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gastrocnemius — twin-headed calf, diamond-shaped belly -->
+  <!-- Left calf: wider medial + lateral heads at proximal, tapers to Achilles -->
+  <path d="M32,152 C30,155 30,161 31,166 C32,170 35,173 38,173 C41,173 43,170 43,166 C43,161 42,155 40,152 C39,149 37,149 35,150 Z"
+        fill="white"/>
+  <!-- Left soleus peek (slightly wider at mid-section) -->
+  <path d="M31,158 C30,161 31,165 33,167 C32,163 32,159 32,156 Z"
+        fill="white" opacity="0.4"/>
+  <!-- Right calf -->
+  <path d="M68,152 C70,155 70,161 69,166 C68,170 65,173 62,173 C59,173 57,170 57,166 C57,161 58,155 60,152 C61,149 63,149 65,150 Z"
+        fill="white"/>
+  <!-- Right soleus -->
+  <path d="M69,158 C70,161 69,165 67,167 C68,163 68,159 68,156 Z"
+        fill="white" opacity="0.4"/>
+</svg>

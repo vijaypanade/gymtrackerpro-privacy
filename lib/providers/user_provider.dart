@@ -18,6 +18,8 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/models.dart';
 import '../services/storage_service.dart';
@@ -50,11 +52,6 @@ class UserProvider extends ChangeNotifier {
   double get weightKg       => _profile.weightKg;
   double get heightCm       => _profile.heightCm;
   int    get age            => _profile.age;
-
-  double get waterProgress {
-    final g = _profile.dailyWaterGoalMl <= 0 ? 1 : _profile.dailyWaterGoalMl;
-    return (_profile.currentWaterMl / g).clamp(0.0, 1.0);
-  }
 
   // ═════════════════════════════════════════════════════════
   // INIT / LOAD
@@ -97,13 +94,6 @@ class UserProvider extends ChangeNotifier {
         orElse: () => MoodType.normal,
       );
 
-      // Daily water reset
-      final waterDate = await storage.getString(StorageKeys.waterDate) ?? '';
-      if (waterDate != _todayStr) {
-        _profile.currentWaterMl = 0;
-        await storage.setString(StorageKeys.waterDate, _todayStr);
-        await _saveProfile();
-      }
     } catch (e, s) {
       debugPrint('UserProvider.load error: $e\n$s');
     } finally {
@@ -117,30 +107,6 @@ class UserProvider extends ChangeNotifier {
   // ═════════════════════════════════════════════════════════
   Future<void> updateProfile(UserProfile updated) async {
     _profile = updated;
-    notifyListeners();
-    await _saveProfile();
-  }
-
-  // ═════════════════════════════════════════════════════════
-  // WATER
-  // ═════════════════════════════════════════════════════════
-  Future<void> addWater(int ml) async {
-    if (ml <= 0) return;
-    final maxCap = (_profile.dailyWaterGoalMl * 2).clamp(1000, 10000);
-    _profile.currentWaterMl =
-        (_profile.currentWaterMl + ml).clamp(0, maxCap);
-    notifyListeners();
-    await _saveProfile();
-  }
-
-  Future<void> setWaterGoal(int ml) async {
-    _profile.dailyWaterGoalMl = ml.clamp(500, 10000);
-    notifyListeners();
-    await _saveProfile();
-  }
-
-  Future<void> resetWater() async {
-    _profile.currentWaterMl = 0;
     notifyListeners();
     await _saveProfile();
   }
@@ -223,6 +189,58 @@ class UserProvider extends ChangeNotifier {
   Future<void> _saveProfile() async {
     await StorageService.instance
         .setJson(StorageKeys.profile, _profile.toJson());
+
+    // ── Firestore backup (cloud sync) ──
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .set({
+              'profile': _profile.toJson(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('Firestore profile save failed: \$e');
+      // Silent fail - local save already done
+    }
+  }
+
+  /// Fetch profile from Firestore on login.
+  /// Returns true if cloud profile was found and applied.
+  Future<bool> tryRestoreFromCloud() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return false;
+
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get()
+          .timeout(const Duration(seconds: 10));
+
+      if (!doc.exists) return false;
+      final data = doc.data();
+      if (data == null || data['profile'] == null) return false;
+
+      final cloudProfile = UserProfile.fromJson(
+          Map<String, dynamic>.from(data['profile'] as Map));
+      _profile = cloudProfile;
+
+      // Save locally too
+      await StorageService.instance
+          .setJson(StorageKeys.profile, _profile.toJson());
+      await StorageService.instance
+          .setBool(StorageKeys.onboardingDone, true);
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Firestore profile restore failed: \$e');
+      return false;
+    }
   }
 
   Future<void> _saveMeasurements() async {

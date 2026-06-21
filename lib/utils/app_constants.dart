@@ -23,6 +23,12 @@ class AppRadii {
   static const double xl   = 24;
   static const double xxl  = 32;
   static const double pill = 999;
+
+  // semantic usage
+  static const double card = lg;
+  static const double modal = xl;
+  static const double button = md;
+  static const double chip = sm;
 }
 
 // ══════════════════════════════════════════════
@@ -31,14 +37,18 @@ class AppRadii {
 class AppColors {
   // ── Backgrounds (deep blacks with subtle warmth)
   static const Color bg          = Color(0xFF050505); // near-black with warmth
+  static const Color background  = bg;
   static const Color bgSurface   = Color(0xFF080808);
   static const Color bgCard      = Color(0xFF0E0E0E);
   static const Color bgCardLight = Color(0xFF141414);
   static const Color bgElevated  = Color(0xFF1C1C1C);
   static const Color bgModal     = Color(0xFF111111);
 
-  // ── Gold System (rich, warm premium gold)
-  static const Color gold        = Color(0xFFD4AF37);
+  // ── Gold System (3-tier premium hierarchy)
+  static const Color gold        = Color(0xFFD4AF37);   // base gold (legacy)
+  static const Color goldHero    = Color(0xFFFFD54A);   // ONE hero element per section
+  static const Color goldSoft    = Color(0xFFC9A227);   // secondary badges, chips
+  static const Color goldAmber   = Color(0xFF8F6B1F);   // inactive bars, muted labels
   static const Color goldLight   = Color(0xFFFFD700);
   static const Color goldDark    = Color(0xFFA8892C);
   static const Color goldMuted   = Color(0xFF6B5820);
@@ -46,8 +56,8 @@ class AppColors {
 
   // ── Text (clean hierarchy)
   static const Color textPrimary   = Color(0xFFF5F5F5);
-  static const Color textSecondary = Color(0xFF9A9A9A);
-  static const Color textMuted     = Color(0xFF525252);
+  static const Color textSecondary = Color(0xFFB2B2B2);
+  static const Color textMuted     = Color(0xFF8A8A8A);
   static const Color textDisabled  = Color(0xFF2E2E2E);
 
   // ── Borders
@@ -60,8 +70,8 @@ class AppColors {
   static const Color green     = Color(0xFF22C55E);
   static const Color greenDark = Color(0xFF16A34A);
   static const Color greenGlow = Color(0xFF22C55E30);
-  static const Color red       = Color(0xFFEF4444);
-  static const Color redDark   = Color(0xFFDC2626);
+  static const Color red       = Color(0xFFE57373);  // Material Red 300 — muted, luxury-safe
+  static const Color redDark   = Color(0xFFEF5350);  // Material Red 400 — deeper but not aggressive
   static const Color blue      = Color(0xFF3B82F6);
   static const Color blueGlow  = Color(0xFF3B82F630);
   static const Color orange    = Color(0xFFF97316);
@@ -82,13 +92,13 @@ class AppColors {
 
   // ── Day Colors
   static const List<Color> dayColors = [
-    Color(0xFF3B82F6),
-    Color(0xFF8B5CF6),
-    Color(0xFF22C55E),
-    Color(0xFFF97316),
-    Color(0xFFEC4899),
-    Color(0xFF06B6D4),
-    Color(0xFF525252),
+    Color(0xFFD4AF37), // muted gold
+    Color(0xFFB8B8B8), // silver grey
+    Color(0xFF8A8A8A), // soft grey
+    Color(0xFFC6A55B), // warm muted gold
+    Color(0xFF9A9A9A), // neutral grey
+    Color(0xFFE0E0E0), // soft white
+    Color(0xFF5A5A5A), // charcoal
   ];
 
   // ── Goal Colors
@@ -157,7 +167,7 @@ class AppGradients {
     const gradients = [
       [Color(0xFF64748B), Color(0xFF475569)], // recruit - slate
       [Color(0xFF2563EB), Color(0xFF1D4ED8)], // warrior - blue
-      [Color(0xFF7C3AED), Color(0xFF6D28D9)], // gladiator - purple
+      [Color(0xFFD4AF37), Color(0xFF8B6914)], // gladiator - metallic gold
       [Color(0xFFD97706), Color(0xFFB45309)], // champion - amber
       [Color(0xFFD4AF37), Color(0xFFA8892C)], // legend - gold
       [Color(0xFFEF4444), Color(0xFFDC2626)], // beast - red
@@ -171,26 +181,96 @@ class AppGradients {
 // SHADOWS
 // ══════════════════════════════════════════════
 class AppShadows {
+  static List<BoxShadow> get subtle => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.16),
+      blurRadius: 10,
+      offset: const Offset(0, 3),
+    ),
+  ];
+
+  static List<BoxShadow> get medium => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.24),
+      blurRadius: 18,
+      offset: const Offset(0, 6),
+    ),
+  ];
+
+  static List<BoxShadow> get strong => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.34),
+      blurRadius: 28,
+      offset: const Offset(0, 10),
+    ),
+  ];
+
   static List<BoxShadow> cardGlow([Color glow = AppColors.gold]) => [
-    BoxShadow(color: Colors.black.withValues(alpha: 0.7), blurRadius: 24, offset: const Offset(0, 8)),
-    BoxShadow(color: glow.withValues(alpha: 0.07), blurRadius: 32, spreadRadius: 2),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.7),
+      blurRadius: 24,
+      offset: const Offset(0, 8),
+    ),
+    BoxShadow(
+      color: glow.withValues(alpha: 0.07),
+      blurRadius: 32,
+      spreadRadius: 2,
+    ),
   ];
 
   static List<BoxShadow> buttonGlow([Color glow = AppColors.gold]) => [
-    BoxShadow(color: glow.withValues(alpha: 0.35), blurRadius: 20, spreadRadius: 1, offset: const Offset(0, 6)),
+    BoxShadow(
+      color: glow.withValues(alpha: 0.35),
+      blurRadius: 20,
+      spreadRadius: 1,
+      offset: const Offset(0, 6),
+    ),
   ];
 
-  static List<BoxShadow> get card => [
-    BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 20, offset: const Offset(0, 6)),
-  ];
+  static List<BoxShadow> get card => medium;
 
   static List<BoxShadow> colored(Color c) => [
-    BoxShadow(color: c.withValues(alpha: 0.28), blurRadius: 18, offset: const Offset(0, 4)),
+    BoxShadow(
+      color: c.withValues(alpha: 0.28),
+      blurRadius: 18,
+      offset: const Offset(0, 4),
+    ),
   ];
 
   static List<BoxShadow> floating = [
-    BoxShadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 40, offset: const Offset(0, 20)),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.8),
+      blurRadius: 40,
+      offset: const Offset(0, 20),
+    ),
   ];
+}
+
+class AppBorders {
+  static Border subtle = Border.all(
+    color: AppColors.borderSoft,
+    width: 0.6,
+  );
+
+  static Border medium = Border.all(
+    color: AppColors.borderMedium,
+    width: 0.8,
+  );
+
+  static Border strong = Border.all(
+    color: AppColors.borderStrong,
+    width: 1.0,
+  );
+
+  static Border glow([Color color = AppColors.gold]) => Border.all(
+    color: color.withValues(alpha: 0.32),
+    width: 0.9,
+  );
+
+  static Border active([Color color = AppColors.gold]) => Border.all(
+    color: color.withValues(alpha: 0.50),
+    width: 1.0,
+  );
 }
 
 // ══════════════════════════════════════════════
@@ -267,12 +347,32 @@ class AppTextStyles {
 // ANIMATION DURATIONS
 // ══════════════════════════════════════════════
 class AppDurations {
+
+  // Tactile feedback
   static const Duration instant = Duration(milliseconds: 80);
-  static const Duration fast    = Duration(milliseconds: 150);
-  static const Duration normal  = Duration(milliseconds: 250);
-  static const Duration slow    = Duration(milliseconds: 400);
-  static const Duration xslow  = Duration(milliseconds: 600);
-  static const Duration pageTransition = Duration(milliseconds: 300);
+
+  // Chips / toggles / micro interactions
+  static const Duration fast = Duration(milliseconds: 160);
+
+  // Standard UI motion
+  static const Duration normal = Duration(milliseconds: 240);
+
+  // Premium reveals / cards / sheets
+  static const Duration slow = Duration(milliseconds: 420);
+
+  // Cinematic transitions
+  static const Duration xslow = Duration(milliseconds: 620);
+
+  // Navigation
+  static const Duration pageTransition = Duration(milliseconds: 320);
+}
+
+class AppCurves {
+  static const Curve primary = Curves.easeOutCubic;
+  static const Curve smooth = Curves.easeOutQuart;
+  static const Curve entrance = Curves.easeOutExpo;
+  static const Curve exit = Curves.easeInOutCubic;
+  static const Curve emphasis = Curves.easeOutBack;
 }
 
 // ══════════════════════════════════════════════

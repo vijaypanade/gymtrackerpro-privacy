@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hamstrings — biceps femoris + semitendinosus, posterior thigh -->
+  <!-- Left hamstrings: origin at ischial tuberosity, insertion behind knee -->
+  <path d="M30,118 C28,122 28,130 29,138 C30,144 32,149 35,151 C38,153 41,152 43,149 C45,145 45,137 44,130 C43,123 41,117 38,114 C35,113 32,115 30,118 Z"
+        fill="white"/>
+  <!-- Right hamstrings -->
+  <path d="M70,118 C72,122 72,130 71,138 C70,144 68,149 65,151 C62,153 59,152 57,149 C55,145 55,137 56,130 C57,123 59,117 62,114 C65,113 68,115 70,118 Z"
+        fill="white"/>
+</svg>

@@ -89,8 +89,6 @@ class GamificationProvider extends ChangeNotifier {
     required int    totalWorkouts,
     required String goal,
     required String weakMuscle,
-    required int    currentWaterMl,
-    required int    waterGoalMl,
   }) async {
     if (_missions.isNotEmpty) return; // already initialized
     await generateDailyMissions(
@@ -138,34 +136,18 @@ class GamificationProvider extends ChangeNotifier {
     _saveMissions();
   }
 
-  /// Auto-check water + sets missions
-  void checkAutoMissions({required double waterProgress, required int totalSetsDone}) {
-    if (_missions.isEmpty) return;
-
-    if (waterProgress >= 1.0) {
-      final wm = _missions.firstWhere(
-        (m) => m.type == MissionType.water && !m.isCompleted,
-        orElse: () => _missions.first,
-      );
-      if (!wm.isCompleted && wm.type == MissionType.water) completeMission(wm.id);
-    }
-
-    if (totalSetsDone >= 15) {
-      final sm = _missions.firstWhere(
-        (m) => m.type == MissionType.sets && !m.isCompleted,
-        orElse: () => _missions.first,
-      );
-      if (!sm.isCompleted && sm.type == MissionType.sets) completeMission(sm.id);
-    }
-  }
-
   /// Complete workout mission
   void onWorkoutComplete() {
+    if (_missions.isEmpty) return;
+
     final wm = _missions.firstWhere(
       (m) => m.type == MissionType.workout && !m.isCompleted,
       orElse: () => _missions.first,
     );
-    if (!wm.isCompleted && wm.type == MissionType.workout) completeMission(wm.id);
+
+    if (!wm.isCompleted && wm.type == MissionType.workout) {
+      completeMission(wm.id);
+    }
   }
 
   // ── Badge popup (includes XP grant)

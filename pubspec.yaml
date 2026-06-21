@@ -1,7 +1,7 @@
 name: gymtrackerpromaster
-description: GymTracker Pro - Premium AI Fitness App
+description: LiftOn - Premium AI Fitness App
 publish_to: 'none'
-version: 2.0.10+12
+version: 2.3.0+38
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -14,7 +14,7 @@ dependencies:
   firebase_core: ^2.30.0
   firebase_auth: ^4.17.5
   cloud_firestore: ^4.15.0
-  firebase_crashlytics: ^3.5.0
+  firebase_crashlytics: ^3.5.7
   firebase_remote_config: ^4.4.7
 
   # 🔐 Google Sign-In
@@ -53,6 +53,16 @@ dependencies:
   # ── Notifications ───────────────────────────
   flutter_local_notifications: ^17.2.3
   timezone: ^0.9.4
+  firebase_analytics: ^10.10.7
+  screenshot: ^3.0.0
+  share_plus: ^10.0.0
+  url_launcher: ^6.3.2
+  webview_flutter: ^4.9.0
+  flutter_svg: ^2.0.10+1
+  flutter_tts: ^4.2.5
+  path_provider: ^2.1.5
+  flutter_native_splash: ^2.4.7
+  health: ^12.0.0
 
 dev_dependencies:
   flutter_test:
@@ -66,9 +76,14 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icon.png
+    - assets/app_icon.png
+    - assets/header_logo.png
     - assets/splash.png
     - assets/sounds/success.mp3
+    - assets/data/exercise_videos.json
+    - assets/icons/
+    - assets/icons/workouts/
+    - assets/body/
 
   fonts:
     - family: Rajdhani
@@ -94,6 +109,19 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon.png"
+  image_path: "assets/app_icon.png"
   adaptive_icon_background: "#0F0F0F"
-  adaptive_icon_foreground: "assets/icon.png"
+  adaptive_icon_foreground: "assets/app_icon.png"
+  remove_alpha_ios: true
+flutter_native_splash:
+  color: "#000000"
+  image: assets/app_icon.png
+  android: true
+  ios: true
+  web: false
+
+  android_12:
+    color: "#000000"
+    image: assets/app_icon.png
+
+

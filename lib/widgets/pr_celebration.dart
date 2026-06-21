@@ -9,6 +9,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../utils/app_constants.dart';
 import '../engines/pr_engine.dart';
@@ -44,26 +48,26 @@ class _RT {
   }
   static String badge(PRRarity r) {
     switch (r) {
-      case PRRarity.legendary: return '⚡ LEGENDARY PR';
-      case PRRarity.elite:     return '🔥 ELITE PR';
-      case PRRarity.strong:    return '💪 STRONG PR';
-      case PRRarity.normal:    return '🏆 PERSONAL RECORD';
+      case PRRarity.legendary: return 'Elite Performance';
+      case PRRarity.elite:     return 'Performance Peak';
+      case PRRarity.strong:    return 'Strength Milestone';
+      case PRRarity.normal:    return 'Personal Record';
     }
   }
   static String headline(PRRarity r) {
     switch (r) {
-      case PRRarity.legendary: return 'YOU ARE UNSTOPPABLE';
-      case PRRarity.elite:     return 'THIS IS HOW WARRIORS\nARE BUILT';
-      case PRRarity.strong:    return 'YOU ARE GETTING\nSTRONGER';
-      case PRRarity.normal:    return 'YOU JUST LEVELED UP';
+      case PRRarity.legendary: return 'Exceptional Progress';
+      case PRRarity.elite:     return 'Built Through Consistency';
+      case PRRarity.strong:    return 'Strength Is Increasing';
+      case PRRarity.normal:    return 'Progress Recorded';
     }
   }
   static String xpLabel(PRRarity r) {
     switch (r) {
-      case PRRarity.legendary: return '⚡ LEGENDARY BONUS';
-      case PRRarity.elite:     return '🔥 ELITE BONUS';
-      case PRRarity.strong:    return '💪 STRONG BONUS';
-      case PRRarity.normal:    return '🏆 PR BONUS';
+      case PRRarity.legendary: return 'Elite Bonus';
+      case PRRarity.elite:     return 'Performance Bonus';
+      case PRRarity.strong:    return 'Strength Bonus';
+      case PRRarity.normal:    return 'PR Bonus';
     }
   }
   static List<Color> confetti(PRRarity r) {
@@ -455,6 +459,8 @@ class _PRScreen extends StatefulWidget {
 class _PRScreenState extends State<_PRScreen>
     with TickerProviderStateMixin {
 
+  final ScreenshotController _screenshotCtrl = ScreenshotController();
+
   late AnimationController _trophyC, _cardC, _weightC, _shimmerC;
   late Animation<double> _trophy, _card, _weightScale, _shimmer;
 
@@ -603,9 +609,9 @@ class _PRScreenState extends State<_PRScreen>
 
   // Fix 5: getPRType — tiered by % (40/20 thresholds)
   static String _getPRType(double pct) {
-    if (pct >= 40) return '⚡ LEGENDARY PR';
-    if (pct >= 20) return '🔥 ELITE PR';
-    return '🏆 PERSONAL RECORD';
+    if (pct >= 40) return 'Elite Performance';
+    if (pct >= 20) return 'Performance Peak';
+    return 'Personal Record';
   }
 
   // Fix 4: buildSmartMessage — exact spec messages
@@ -662,6 +668,28 @@ class _PRScreenState extends State<_PRScreen>
     return '${widget.prevWeight.toStringAsFixed(1)} × ${widget.prevReps}';
   }
 
+
+  Future<void> _sharePR() async {
+    HapticFeedback.mediumImpact();
+    try {
+      final image = await _screenshotCtrl.capture(
+        delay: const Duration(milliseconds: 100),
+        pixelRatio: 3.0,
+      );
+      if (image == null) return;
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/pr_${DateTime.now().millisecondsSinceEpoch}.png');
+      await file.writeAsBytes(image);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: '🔥 New PR: ${_formatName(widget.exerciseName)} — $_prValue\n'
+              'Powered by LiftOn 💪',
+      );
+    } catch (e) {
+      debugPrint('Share PR error: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -673,7 +701,12 @@ class _PRScreenState extends State<_PRScreen>
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
+              child: Screenshot(
+                controller: _screenshotCtrl,
+                child: Container(
+                  color: Colors.black,
+                  padding: const EdgeInsets.all(14),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
 
                 // ── TROPHY ────────────────────────
                 _Shake(rarity: widget.rarity, child: ScaleTransition(
@@ -695,7 +728,7 @@ class _PRScreenState extends State<_PRScreen>
                       ),
                     ),
                     Container(
-                      width: 110, height: 110,
+                      width: 74, height: 74,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
@@ -705,11 +738,11 @@ class _PRScreenState extends State<_PRScreen>
                         ),
                       ),
                       child: const Center(child: Text('🏆',
-                          style: TextStyle(fontSize: 52))),
+                          style: TextStyle(fontSize: 32))),
                     ),
                   ]),
                 )),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: 10),
 
                 // ── RARITY BADGE + HEADLINE ───────
                 FadeTransition(opacity: _card, child: Column(
@@ -740,25 +773,25 @@ class _PRScreenState extends State<_PRScreen>
                       textAlign: TextAlign.center,
                       style: GoogleFonts.rajdhani(
                           color: AppColors.textPrimary,
-                          fontSize: 26, fontWeight: FontWeight.w900,
+                          fontSize: 19, fontWeight: FontWeight.w800,
                           height: 1.15)),
                 ])),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: 12),
 
                 // ── MAIN CARD ─────────────────────
                 ScaleTransition(
                   scale: _card,
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: const Color(0xFF090700),
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                           color: _c.withValues(alpha: 0.5), width: 1.5),
                       boxShadow: [BoxShadow(
                           color: _c.withValues(alpha: 0.16),
-                          blurRadius: 40, spreadRadius: 2)],
+                          blurRadius: 22, spreadRadius: 0)],
                     ),
                     child: Column(mainAxisSize: MainAxisSize.min,
                         children: [
@@ -789,7 +822,7 @@ class _PRScreenState extends State<_PRScreen>
                             child: Text(_prValue,
                                 style: GoogleFonts.rajdhani(
                                     color: Colors.white,
-                                    fontSize: 48,
+                                    fontSize: 34,
                                     fontWeight: FontWeight.w900)),
                           ),
                         ),
@@ -871,18 +904,18 @@ class _PRScreenState extends State<_PRScreen>
                         ),
                       ],
 
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: 12),
                       Divider(color: _c.withValues(alpha: 0.18)),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: 12),
 
                       // ── XP EXPLOSION ──────────────────
                       _XPExplode(xp: widget.xpEarned, color: AppColors.purple),
 
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: 12),
 
                       // ── AI COACH MESSAGE ──────────────
                       Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: const Color(0xFF080600),
                           borderRadius: BorderRadius.circular(14),
@@ -925,37 +958,77 @@ class _PRScreenState extends State<_PRScreen>
                         ]),
                       ),
 
-                      const SizedBox(height: AppSpacing.xl),
-
-                      // ── CONTINUE LOOP BUTTON ──────────
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.mediumImpact();
-                          Navigator.of(context).pop();
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                                colors: [_c, _c2]),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [BoxShadow(
-                                color: _c.withValues(alpha: 0.45),
-                                blurRadius: 24,
-                                offset: const Offset(0, 4))],
-                          ),
-                          child: Text('Continue Workout 🔥',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.rajdhani(
-                                  color: Colors.black, fontSize: 18,
-                                  fontWeight: FontWeight.w900)),
+                      // ── BRANDING WATERMARK (in screenshot) ──
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.asset(
+                          'assets/app_icon.png',
+                          width: 36, height: 36,
+                          fit: BoxFit.cover,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      Text('LiftOn',
+                          style: GoogleFonts.rajdhani(
+                              color: Colors.white.withValues(alpha: 0.95),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2)),
+                      Text('TRAIN · TRACK · DOMINATE',
+                          style: GoogleFonts.inter(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.8)),
                     ]),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
+
+                // ── CONTINUE LOOP BUTTON ──────────
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    Navigator.of(context).pop();
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [_c, _c2]),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(
+                          color: _c.withValues(alpha: 0.45),
+                          blurRadius: 24,
+                          offset: const Offset(0, 4))],
+                    ),
+                    child: Text('Continue Workout 🔥',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.rajdhani(
+                            color: Colors.black, fontSize: 14,
+                            fontWeight: FontWeight.w900)),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+
+                // Share button
+                ElevatedButton.icon(
+                  onPressed: _sharePR,
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: Text('Share Achievement',
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w800, fontSize: 12)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text('Push Next Target →',
@@ -964,6 +1037,8 @@ class _PRScreenState extends State<_PRScreen>
                           fontSize: 13, fontWeight: FontWeight.w700)),
                 ),
               ]),
+              ),
+              ),
             ),
           ),
         ),

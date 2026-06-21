@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ad-services-config>
+    <ad-manager allowAdManagerAccess="false"/>
+    <attribution reportingEndpoint=""/>
+    <custom-audiences allowCustomAudiencesAccess="false"/>
+    <topics allowTopicsAccess="false"/>
+</ad-services-config>

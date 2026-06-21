@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'utils/premium_scroll_behavior.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -13,24 +14,31 @@ import 'providers/ai_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'providers/app_provider.dart';
 import 'providers/gamification_provider.dart';
+import 'providers/favorites_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/workout_provider.dart';
 
+import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 
 import 'services/ad_service.dart';
 import 'services/billing_service.dart';
+import 'services/connectivity_service.dart';
 import 'services/monetization_service.dart';
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 
 import 'utils/app_constants.dart';
+import 'services/ai_quota_service.dart';
+import 'services/exercise_video_service.dart';
+import 'services/voice_coach_service.dart';
 
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    BindingBase.debugZoneErrorsAreFatal = true;
+    // Debug-only — fatal zone errors crash release builds unnecessarily.
+    if (kDebugMode) BindingBase.debugZoneErrorsAreFatal = true;
 
     // ✅ CRITICAL FIX: keep binding + runApp in SAME ZONE
     await _initHive();
@@ -47,7 +55,7 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.light,
     ));
 
-    runApp(const GymTrackerProApp());
+    runApp(const LiftOnApp());
   }, (error, stack) {
     if (!kDebugMode) {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
@@ -99,6 +107,7 @@ Future<void> _initFirebase() async {
 Future<void> initCoreServices() async {
   await StorageService.instance.init();
   await MonetizationService.instance.init();
+  await AiQuotaService.instance.init(); // quota + kill switch — needed before app.init()
 
   await MobileAds.instance.initialize();
 
@@ -116,6 +125,7 @@ Future<void> initCoreServices() async {
   await Future.wait([
     BillingService.instance.init(),
     NotificationService.instance.init(),
+    ConnectivityService.instance.init(),
   ]);
 }
 
@@ -123,8 +133,8 @@ Future<void> initCoreServices() async {
 // APP ROOT
 // ════════════════════════════════════════════════
 
-class GymTrackerProApp extends StatelessWidget {
-  const GymTrackerProApp({super.key});
+class LiftOnApp extends StatelessWidget {
+  const LiftOnApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +147,7 @@ class GymTrackerProApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AIProvider()),
         ChangeNotifierProvider(create: (_) => WorkoutProvider()),
         ChangeNotifierProvider(create: (_) => GamificationProvider()),
+        ChangeNotifierProvider(create: (_) => FavoritesProvider()),
 
         // 🔹 MAIN ORCHESTRATOR (SAFE INIT)
         ChangeNotifierProxyProvider5<
@@ -177,39 +188,46 @@ class _AppBootstrap extends StatefulWidget {
 }
 
 class _AppBootstrapState extends State<_AppBootstrap> {
-  bool _initialized = false;
+  // Resolves when all providers are ready. SplashScreen awaits this before
+  // navigating so the user never lands on an uninitialized shell.
+  late final Future<void> _readyFuture;
 
   @override
   void initState() {
     super.initState();
+    _readyFuture = _initialize();
+  }
 
-    Future.microtask(() async {
-      final ai  = context.read<AIProvider>();
-      final app = context.read<AppProvider>();
+  Future<void> _initialize() async {
+    final ai   = context.read<AIProvider>();
+    final app  = context.read<AppProvider>();
+    final favs = context.read<FavoritesProvider>();
 
-      // 🔥 PARALLEL BACKGROUND INIT
-      await Future.wait([
-        ai.load(),
-        initCoreServices(),
-      ]);
-
-      await app.init();
-
-      if (mounted) {
-        setState(() => _initialized = true);
-      }
+    // Defer non-critical services so they never block the first rendered frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ExerciseVideoService.init().ignore();
+      VoiceCoachService().init().ignore();
     });
+
+    debugPrint('[Boot] parallel init start');
+    await Future.wait([
+      ai.load(),
+      initCoreServices(),
+      favs.loadFavorites(),
+    ]);
+
+    await app.init();
+    debugPrint('[Boot] app ready');
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AI Trainer',
+      title: 'LiftOn',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const PremiumScrollBehavior(),
       theme: AppTheme.dark,
-      home: _initialized
-          ? const SplashScreen() // will instantly move forward
-          : const SplashScreen(), // same UI → no flicker
+      home: SplashScreen(readyFuture: _readyFuture),
     );
   }
 }

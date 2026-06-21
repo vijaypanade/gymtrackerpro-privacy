@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Triceps brachii — posterior upper arm, horse-shoe shaped belly -->
+  <!-- Left tricep: long head + lateral head visible from back -->
+  <path d="M11,44 C10,47 10,53 11,59 C12,64 14,68 17,70 C19,71 21,70 22,68 C23,64 23,58 22,52 C21,47 19,43 16,42 C14,42 12,43 11,44 Z"
+        fill="white"/>
+  <!-- Right tricep -->
+  <path d="M89,44 C90,47 90,53 89,59 C88,64 86,68 83,70 C81,71 79,70 78,68 C77,64 77,58 78,52 C79,47 81,43 84,42 C86,42 88,43 89,44 Z"
+        fill="white"/>
+</svg>

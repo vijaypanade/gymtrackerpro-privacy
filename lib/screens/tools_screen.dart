@@ -10,15 +10,21 @@
 //   • All spacing uses AppSpacing — zero hardcoded values
 //   • All SizedBox const, all taps have scale feedback
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 
 import 'package:provider/provider.dart';
+import '../models/split_template.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_constants.dart';
 
 import '../widgets/shared_widgets.dart';
+import 'pr_wall_screen.dart';
+import 'body_measurement_screen.dart';
 import '../data/exercise_library.dart';
 import '../services/ai_engine.dart';
+import '../services/monetization_service.dart';
+import '../services/voice_coach_service.dart';
 
 // ════════════════════════════════════════════════
 // HAPTICS — consistent system (Phase 1)
@@ -39,8 +45,10 @@ class H{
 class ToolsScreen extends StatelessWidget {
   const ToolsScreen({super.key});
 
+
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Stack(children: [
@@ -80,40 +88,149 @@ class ToolsScreen extends StatelessWidget {
                   AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 100),
               sliver: SliverList(delegate: SliverChildListDelegate([
 
-                _SLabel(text: 'CALCULATORS'),
+                _SLabel(text: 'RECORDS'),
                 const SizedBox(height: AppSpacing.md),
 
-                _ToolCard(
-                  title: 'BMI Calculator',
-                  subtitle: 'Know your body composition',
-                  emoji: '⚖️',
-                  color: AppColors.blue,
-                  tag: 'Body',
-                  onTap: () => _sheet(context, const _BMISheet()),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _ToolCard(
-                  title: 'Calorie Calculator',
-                  subtitle: 'Find your daily fuel target',
-                  emoji: '🔥',
-                  color: AppColors.orange,
-                  tag: 'Nutrition',
-                  onTap: () => _sheet(context, const _CalorieSheet()),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _ToolCard(
-                  title: 'Water Intake Tracker',
-                  subtitle: 'Stay hydrated, stay strong',
-                  emoji: '💧',
-                  color: const Color(0xFF38BDF8),
-                  tag: 'Hydration',
-                  onTap: () => _sheet(context, const _WaterSheet()),
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      width: 0.6,
+                    ),
+                  ),
+                  child: _ToolCard(
+                    title: 'PR Wall',
+                    subtitle: 'Your all-time personal records',
+                    icon: Icons.emoji_events_rounded,
+                    color: AppColors.gold,
+                    tag: 'Strength',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PRWallScreen(),
+                      ),
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: AppSpacing.xxl),
-                _SLabel(text: 'AI WORKOUT GENERATOR'),
+                _SLabel(text: 'CALCULATORS'),
                 const SizedBox(height: AppSpacing.md),
-                const _AIWorkoutGenerator(),
+
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      width: 0.6,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+
+                      _ToolCard(
+                        title: 'BMI Calculator',
+                        subtitle: 'Know your body composition',
+                        icon: Icons.scale_rounded,
+                        color: AppColors.blue,
+                        tag: 'Body',
+                        onTap: () => _sheet(context, const _BMISheet()),
+                      ),
+
+                      Divider(
+                        height: 1,
+                        thickness: 0.6,
+                        color: Colors.white.withValues(alpha: 0.05),
+                        indent: 82,
+                        endIndent: 18,
+                      ),
+
+                      _ToolCard(
+                        title: 'Calorie Calculator',
+                        subtitle: 'Find your daily fuel target',
+                        icon: Icons.local_fire_department_rounded,
+                        color: AppColors.orange,
+                        tag: 'Nutrition',
+                        onTap: () => _sheet(context, const _CalorieSheet()),
+                      ),
+
+                      Divider(
+                        height: 1,
+                        thickness: 0.6,
+                        color: Colors.white.withValues(alpha: 0.05),
+                        indent: 82,
+                        endIndent: 18,
+                      ),
+
+                      _ToolCard(
+                        title: 'Body Stats',
+                        subtitle: 'Track measurements & physique',
+                        icon: Icons.accessibility_new_rounded,
+                        color: AppColors.blue,
+                        tag: 'Tracking',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const BodyMeasurementScreen(),
+                          ),
+                        ),
+                      ),
+
+                      Divider(
+                        height: 1,
+                        thickness: 0.6,
+                        color: Colors.white.withValues(alpha: 0.05),
+                        indent: 82,
+                        endIndent: 18,
+                      ),
+
+                      _ToolCard(
+                        title: '1RM Calculator',
+                        subtitle: 'Estimate your max strength',
+                        icon: Icons.sports_gymnastics_rounded,
+                        color: AppColors.purple,
+                        tag: 'Strength',
+                        onTap: () => _sheet(context, const _OneRmSheet()),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.xxl),
+                _SLabel(text: 'COACHING'),
+                const SizedBox(height: AppSpacing.md),
+
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      width: 0.6,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+
+                      _ToolCard(
+                        title: 'Voice Coach',
+                        subtitle: 'Multi-language workout coaching',
+                        icon: Icons.mic_none_rounded,
+                        color: AppColors.gold,
+                        tag: 'New',
+                        onTap: () => _sheet(context, const _VoiceCoachSheet()),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.xxl),
+                _SLabel(text: 'WORKOUT SPLIT'),
+                const SizedBox(height: AppSpacing.md),
+                const _SplitStyleCard(),
 
                 const SizedBox(height: AppSpacing.xxl),
                 _SLabel(text: 'SMART REMINDERS'),
@@ -142,28 +259,47 @@ class _SLabel extends StatelessWidget {
   const _SLabel({required this.text});
 
   @override
-  Widget build(BuildContext context) => Row(children: [
-    Container(width: 3, height: 14, decoration: BoxDecoration(
-        gradient: AppGradients.gold,
-        borderRadius: BorderRadius.circular(2))),
-    const SizedBox(width: AppSpacing.sm),
-    Text(text, style: TextStyle(fontFamily: 'Inter',
-        color: AppColors.textPrimary, fontSize: 11,
-        fontWeight: FontWeight.w800, letterSpacing: 1.1)),
-  ]);
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(left: 2),
+    child: Row(children: [
+      Container(
+        width: 3, height: 13,
+        decoration: BoxDecoration(
+          color: AppColors.gold.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(
+        text,
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          color: Color(0xFF8A8A8A),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.4,
+        ),
+      ),
+    ]),
+  );
 }
 
 // ════════════════════════════════════════════════
 // TOOL CARD — premium, no progressionTip
 // ════════════════════════════════════════════════
 class _ToolCard extends StatefulWidget {
-  final String title, subtitle, emoji, tag;
+  final String title, subtitle, tag;
+  final IconData icon;
   final Color color;
   final VoidCallback onTap;
+
   const _ToolCard({
-    required this.title, required this.subtitle,
-    required this.emoji, required this.color,
-    required this.tag,   required this.onTap,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.tag,
+    required this.onTap,
   });
   @override State<_ToolCard> createState() => _ToolCardState();
 }
@@ -184,60 +320,103 @@ class _ToolCardState extends State<_ToolCard>
   }
   @override void dispose() { _c.dispose(); super.dispose(); }
 
+  Color _tagColor(String tag) => switch (tag) {
+    'AI'        => AppColors.gold,
+    'New'       => AppColors.green,
+    'Nutrition' => AppColors.orange,
+    'Strength'  => AppColors.purple,
+    'Body'      => AppColors.blue,
+    'Tracking'  => AppColors.blue,
+    _           => Colors.white.withValues(alpha: 0.40),
+  };
+
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTapDown:   (_) { H.light(); _c.forward(); },
     onTapUp:     (_) { _c.reverse(); widget.onTap(); },
     onTapCancel: () => _c.reverse(),
     child: ScaleTransition(scale: _s, child: Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: 15,
+      ),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(AppSpacing.lg),
-        border: Border.all(
-            color: widget.color.withValues(alpha: 0.22), width: 0.8),
-        boxShadow: [BoxShadow(
-            color: widget.color.withValues(alpha: 0.06),
-            blurRadius: 16, offset: const Offset(0, 4))],
       ),
       child: Row(children: [
         Container(
-          width: 52, height: 52,
+          width: 46,
+          height: 46,
           decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [
-              widget.color.withValues(alpha: 0.22),
-              widget.color.withValues(alpha: 0.07),
-            ], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-                color: widget.color.withValues(alpha: 0.25), width: 0.8),
+            color: widget.color.withValues(alpha: 0.10),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withValues(alpha: 0.08),
+                blurRadius: 14,
+                spreadRadius: 0,
+              ),
+            ],
           ),
-          child: Center(child: Text(widget.emoji,
-              style: const TextStyle(fontSize: 24))),
+          child: Icon(
+            widget.icon,
+            size: 20,
+            color: widget.color,
+          ),
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.title, style: TextStyle(fontFamily: 'Rajdhani',
-              color: AppColors.textPrimary, fontSize: 16,
-              fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
-          Text(widget.subtitle, style: TextStyle(fontFamily: 'Inter',
-              color: AppColors.textMuted, fontSize: 12)),
+          Text(
+            widget.title,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              color: Colors.white.withValues(alpha: 0.92),
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            widget.subtitle,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              color: Colors.white.withValues(alpha: 0.42),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              height: 1.25,
+            ),
+          ),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
             decoration: BoxDecoration(
-              color: widget.color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(6),
+              color: _tagColor(widget.tag).withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: _tagColor(widget.tag).withValues(alpha: 0.22),
+                width: 0.7,
+              ),
             ),
-            child: Text(widget.tag, style: TextStyle(fontFamily: 'Inter',
-                color: widget.color, fontSize: 9,
-                fontWeight: FontWeight.w800)),
+            child: Text(
+              widget.tag,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                color: _tagColor(widget.tag),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Icon(Icons.arrow_forward_ios_rounded, color: widget.color, size: 14),
+          Icon(
+            Icons.arrow_forward_ios_rounded,
+            color: Colors.white.withValues(alpha: 0.28),
+            size: 13,
+          ),
         ]),
       ]),
     )),
@@ -250,10 +429,13 @@ class _ToolCardState extends State<_ToolCard>
 class _SheetWrap extends StatelessWidget {
   final String title, subtitle;
   final Widget child;
-  final String emoji;
+  final IconData icon;
+
   const _SheetWrap({
-    required this.title, required this.subtitle,
-    required this.emoji, required this.child,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.child,
   });
 
   @override
@@ -262,7 +444,7 @@ class _SheetWrap extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.modal)),
         border: Border(top: BorderSide(
             color: AppColors.gold.withValues(alpha: 0.12), width: 1)),
       ),
@@ -279,7 +461,20 @@ class _SheetWrap extends StatelessWidget {
           )),
           const SizedBox(height: AppSpacing.lg),
           Row(children: [
-            Text(emoji, style: const TextStyle(fontSize: 28)),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4AF37)
+                    .withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: const Color(0xFFD4AF37),
+                size: 22,
+              ),
+            ),
             const SizedBox(width: AppSpacing.md),
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -343,7 +538,7 @@ class _BMISheetState extends State<_BMISheet>
 
   @override
   Widget build(BuildContext context) => _SheetWrap(
-    emoji: '⚖️', title: 'BMI Calculator',
+    icon: Icons.monitor_weight_outlined, title: 'BMI Calculator',
     subtitle: 'Understand your body composition',
     child: Column(children: [
       Row(children: [
@@ -404,10 +599,10 @@ class _BMISheetState extends State<_BMISheet>
   );
 
   String _bmiAdvice(double bmi) {
-    if (bmi < 18.5) return "Your body needs more fuel — focus on calorie surplus and strength training to build healthy mass 💪";
-    if (bmi < 25)   return "You're in the healthy zone! Keep consistent with your training and nutrition to stay here 🌟";
-    if (bmi < 30)   return "You're close to optimal — a calorie deficit with strength training will get you there fast 🔥";
-    return "Time to take charge! Combine cardio with resistance training and track your nutrition daily 🎯";
+    if (bmi < 18.5) return "Your body needs more fuel — focus on calorie surplus and strength training to build healthy mass.";
+    if (bmi < 25)   return "You're in the healthy zone. Keep consistent with your training and nutrition to stay here.";
+    if (bmi < 30)   return "You're close to optimal — a calorie deficit with strength training will get you there fast.";
+    return "Time to take charge. Combine cardio with resistance training and track your nutrition daily.";
   }
 }
 
@@ -529,7 +724,7 @@ class _CalorieSheetState extends State<_CalorieSheet>
 
   @override
   Widget build(BuildContext context) => _SheetWrap(
-    emoji: '🔥', title: 'Calorie Calculator',
+    icon: Icons.local_fire_department_outlined, title: 'Calorie Calculator',
     subtitle: 'Find your exact daily fuel target',
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -638,186 +833,8 @@ class _CalorieSheetState extends State<_CalorieSheet>
 // ════════════════════════════════════════════════
 // WATER TRACKER
 // ════════════════════════════════════════════════
-class _WaterSheet extends StatefulWidget {
-  const _WaterSheet();
-  @override State<_WaterSheet> createState() => _WaterSheetState();
-}
 
-class _WaterSheetState extends State<_WaterSheet> {
-  void _customGoal(BuildContext ctx, AppProvider p) {
-    final c = TextEditingController();
-    showDialog(context: ctx, builder: (_) => AlertDialog(
-      backgroundColor: AppColors.bgModal,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text('Custom Daily Goal', style: TextStyle(fontFamily: 'Rajdhani',
-          color: AppColors.textPrimary, fontSize: 18,
-          fontWeight: FontWeight.w700)),
-      content: TextField(controller: c,
-          keyboardType: TextInputType.number,
-          style: TextStyle(fontFamily: 'Inter',color: AppColors.textPrimary),
-          decoration: const InputDecoration(hintText: 'ml, e.g. 3500')),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(fontFamily: 'Inter',
-                color: AppColors.textMuted))),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
-          onPressed: () {
-            final v = int.tryParse(c.text);
-            if (v != null && v > 0) { p.setWaterGoal(v); setState(() {}); }
-            Navigator.pop(ctx);
-          },
-          child: Text('Save', style: TextStyle(fontFamily: 'Inter',
-              color: Colors.black, fontWeight: FontWeight.w700)),
-        ),
-      ],
-    ));
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    final p   = context.watch<AppProvider>();
-    final cur  = p.profile.currentWaterMl;
-    final goal = p.profile.dailyWaterGoalMl;
-    final pct  = p.waterProgress.clamp(0.0, 1.0);
-    final color = pct >= 0.8 ? AppColors.green
-        : pct >= 0.5 ? AppColors.blue : const Color(0xFF38BDF8);
-
-    return _SheetWrap(
-      emoji: '💧', title: 'Water Tracker',
-      subtitle: 'Stay hydrated — stay strong',
-      child: Column(children: [
-        // Ring
-        Center(child: Stack(alignment: Alignment.center, children: [
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: pct),
-            duration: const Duration(milliseconds: 900),
-            curve: Curves.easeOutCubic,
-            builder: (_, v, __) => SizedBox(
-              width: 148, height: 148,
-              child: CircularProgressIndicator(
-                value: v, strokeWidth: 11,
-                backgroundColor: AppColors.bgCardLight,
-                valueColor: AlwaysStoppedAnimation(color),
-                strokeCap: StrokeCap.round,
-              ),
-            ),
-          ),
-          Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('💧', style: const TextStyle(fontSize: 28)),
-            const SizedBox(height: 2),
-            Text('${(pct * 100).round()}%', style: TextStyle(fontFamily: 'Rajdhani',
-                color: color, fontSize: 26, fontWeight: FontWeight.w900)),
-            Text('of goal', style: TextStyle(fontFamily: 'Inter',
-                color: AppColors.textMuted, fontSize: 11)),
-          ]),
-        ])),
-        const SizedBox(height: AppSpacing.md),
-        Text('$cur ml / $goal ml', style: TextStyle(fontFamily: 'Rajdhani',
-            color: AppColors.textPrimary, fontSize: 22,
-            fontWeight: FontWeight.w800)),
-        if (pct >= 1.0) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg, vertical: 7),
-            decoration: BoxDecoration(
-              color: AppColors.green.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.green.withValues(alpha: 0.35)),
-            ),
-            child: Text('Goal reached! You\'re crushing it 🏆',
-                style: TextStyle(fontFamily: 'Inter',
-                    color: AppColors.green, fontSize: 12,
-                    fontWeight: FontWeight.w700)),
-          ),
-        ],
-
-        const SizedBox(height: AppSpacing.xl),
-
-        // Quick-add tiles
-        Row(children: [250, 500, 750, 1000].map((ml) {
-          return Expanded(child: GestureDetector(
-            onTap: () { H.medium(); p.addWater(ml); setState(() {}); },
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: color.withValues(alpha: 0.25), width: 0.8),
-              ),
-              child: Column(children: [
-                Text('💧', style: const TextStyle(fontSize: 16)),
-                const SizedBox(height: 3),
-                Text('+${ml}ml', style: TextStyle(fontFamily: 'Rajdhani',
-                    color: color, fontSize: 13, fontWeight: FontWeight.w800)),
-              ]),
-            ),
-          ));
-        }).toList()),
-
-        const SizedBox(height: AppSpacing.xl),
-
-        // Goal selector
-        Text('Daily Goal', style: TextStyle(fontFamily: 'Inter',
-            color: AppColors.textMuted, fontSize: 12,
-            fontWeight: FontWeight.w600)),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(spacing: AppSpacing.sm, runSpacing: AppSpacing.sm,
-          children: [
-            ...[2000, 2500, 3000, 3500].map((g) {
-              final sel = goal == g;
-              return GestureDetector(
-                onTap: () { p.setWaterGoal(g); setState(() {}); },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: sel ? color.withValues(alpha: 0.14) : AppColors.bgCardLight,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: sel ? color : Colors.transparent),
-                  ),
-                  child: Text('${g}ml', style: TextStyle(fontFamily: 'Inter',
-                      color: sel ? color : AppColors.textMuted,
-                      fontSize: 12,
-                      fontWeight: sel ? FontWeight.w700 : FontWeight.w400)),
-                ),
-              );
-            }),
-            GestureDetector(
-              onTap: () => _customGoal(context, p),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.bgCardLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text('Custom ✏️', style: TextStyle(fontFamily: 'Inter',
-                    color: AppColors.gold, fontSize: 12,
-                    fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        GoldButton(
-          text: 'Reset Today 🔄', width: double.infinity,
-          onTap: () { p.resetWater(); setState(() {}); },
-        ),
-        const SizedBox(height: AppSpacing.sm),
-      ]),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════
-// AI WORKOUT GENERATOR
-// ════════════════════════════════════════════════
 class _AIWorkoutGenerator extends StatefulWidget {
   const _AIWorkoutGenerator();
   @override State<_AIWorkoutGenerator> createState() => _AIWorkoutGeneratorState();
@@ -936,7 +953,7 @@ class _AIWorkoutGeneratorState extends State<_AIWorkoutGenerator> {
 
         const SizedBox(height: AppSpacing.lg),
         GoldButton(
-          text: _loading ? 'Building your plan... ⏳' : 'Generate My Workout 🚀',
+          text: _loading ? 'Building your plan...' : 'Generate My Workout',
           icon: _loading ? null : Icons.auto_awesome_rounded,
           width: double.infinity,
           onTap: _loading ? () {} : _generate,
@@ -955,7 +972,7 @@ class _AIWorkoutGeneratorState extends State<_AIWorkoutGenerator> {
               p.applyAISuggestion(p.todayIndex, e.value);
               setState(() => _applied = true);
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text("🔥 Added to today's plan!",
+                content: Text("Added to today's plan",
                     style: TextStyle(fontFamily: 'Inter',fontWeight: FontWeight.w600)),
                 backgroundColor: AppColors.green,
                 behavior: SnackBarBehavior.floating,
@@ -1034,7 +1051,7 @@ class _GeneratedResult extends StatelessWidget {
                 const Icon(Icons.check_circle_rounded,
                     color: AppColors.green, size: 16),
                 const SizedBox(width: 6),
-                Text('Added to today\'s plan! 🎯', style: TextStyle(fontFamily: 'Inter',
+                Text('Added to today\'s plan', style: TextStyle(fontFamily: 'Inter',
                     color: AppColors.green, fontSize: 13,
                     fontWeight: FontWeight.w600)),
               ])
@@ -1062,60 +1079,333 @@ class _GeneratedResult extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════
+// SPLIT STYLE PICKER
+// ════════════════════════════════════════════════
+class _SplitStyleCard extends StatefulWidget {
+  const _SplitStyleCard();
+  @override
+  State<_SplitStyleCard> createState() => _SplitStyleCardState();
+}
+
+class _SplitStyleCardState extends State<_SplitStyleCard> {
+  WorkoutPlanResult? _result;
+  bool _applied = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<AppProvider, (SplitStyle, int)>(
+      selector: (_, p) => (p.splitStyle, p.gymDaysPerWeek),
+      builder: (context, data, _) {
+        final (current, days) = data;
+        final p = context.read<AppProvider>();
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.04),
+              width: 0.6,
+            ),
+          ),
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4AF37)
+                        .withValues(alpha: 0.06),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.hub_outlined,
+                    size: 18,
+                    color: const Color(0xFFD4AF37),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Workout Split',
+                        style: GoogleFonts.rajdhani(
+                            color: AppColors.textPrimary,
+                            fontSize: 15, fontWeight: FontWeight.w700)),
+                    Text('Affects how AI organises your weekly plan',
+                        style: GoogleFonts.inter(
+                            color: AppColors.textMuted, fontSize: 11)),
+                  ],
+                )),
+              ]),
+              const SizedBox(height: AppSpacing.lg),
+              // Days per week picker
+              _DaysPerWeekRow(
+                current: days,
+                onChanged: (d) => p.updateSetting('gymDaysPerWeek', d),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              // Split style chips — horizontal scroll (no wrap)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: const [
+                    SplitStyle.pushPullLegs,
+                    SplitStyle.upperLower,
+                    SplitStyle.fullBody,
+                    SplitStyle.aiAdaptive,
+                  ].asMap().entries.map((entry) {
+                    final style    = entry.value;
+                    final selected = style == current;
+                    final isLast   = entry.key == 3;
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        p.updateSetting('splitStyle', style.name);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        margin: EdgeInsets.only(right: isLast ? 0 : 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.gold.withValues(alpha: 0.13)
+                              : Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.gold.withValues(alpha: 0.38)
+                                : Colors.white.withValues(alpha: 0.06),
+                            width: selected ? 1 : 0.6,
+                          ),
+                          boxShadow: selected ? [BoxShadow(
+                            color: AppColors.gold.withValues(alpha: 0.10),
+                            blurRadius: 8,
+                          )] : [],
+                        ),
+                        child: Text(style.label,
+                            style: GoogleFonts.rajdhani(
+                                color: selected
+                                    ? AppColors.gold
+                                    : Colors.white.withValues(alpha: 0.65),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              if (current != SplitStyle.pushPullLegs) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  current.description,
+                  style: GoogleFonts.inter(
+                      color: AppColors.textMuted,
+                      fontSize: 11,
+                      height: 1.4),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              GestureDetector(
+                onTap: () {
+                  H.medium();
+                  final splitKey = AIEngine.splitStyleToKey(current, days);
+                  final r = AIEngine.generateWeeklyPlan(
+                    goal:          p.goal,
+                    level:         p.level,
+                    logs:          p.logs,
+                    weakMuscle:    p.weakestMuscle,
+                    recoveryScore: p.recoveryScore.round(),
+                    fatigued:      p.isFatigued,
+                    splitOverride: splitKey,
+                    gymDays:       days,
+                  );
+                  setState(() { _result = r; _applied = false; });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                        colors: [Color(0xFFFFCC00), Color(0xFFFF9900)]),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.auto_awesome_rounded,
+                        color: Colors.black, size: 15),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Generate ${current.label} Plan',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.rajdhani(
+                          color: Colors.black,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800),
+                    ),
+                  ]),
+                ),
+              ),
+              if (_result != null) ...[
+                const SizedBox(height: AppSpacing.lg),
+                _GeneratedResult(
+                  result:  _result!,
+                  applied: _applied,
+                  onApply: () {
+                    p.applyGeneratedPlan(_result!);
+                    setState(() => _applied = true);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('${current.label} plan applied to your week',
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      backgroundColor: AppColors.green,
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ));
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DaysPerWeekRow extends StatelessWidget {
+  final int current;
+  final ValueChanged<int> onChanged;
+  const _DaysPerWeekRow({required this.current, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Gym days / week:',
+            style: GoogleFonts.inter(
+                color: AppColors.textSecondary, fontSize: 12)),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(5, (i) {
+            final days = i + 2; // 2–6
+            final selected = days == current;
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onChanged(days);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                margin: EdgeInsets.only(right: i < 4 ? 6 : 0),
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppColors.gold
+                      : AppColors.bgCardLight,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: selected ? AppColors.gold : AppColors.borderSoft,
+                  ),
+                ),
+                child: Center(
+                  child: Text('$days',
+                      style: GoogleFonts.rajdhani(
+                          color: selected ? Colors.black : AppColors.textMuted,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800)),
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+}
+
+// ════════════════════════════════════════════════
 // REMINDERS
 // ════════════════════════════════════════════════
 class _RemindersCard extends StatelessWidget {
   const _RemindersCard();
 
   @override
-  Widget build(BuildContext context) => Selector<AppProvider, Map<String, dynamic>>(
-   selector: (_, p) => p.settingsMap,
-    builder: (context, s, _) {
-      final p = context.read<AppProvider>();
-      return Container(
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(AppSpacing.lg),
-          border: Border.all(color: AppColors.borderSoft, width: 0.5),
+  Widget build(BuildContext context) =>
+      Selector<AppProvider, ({bool reminder, bool inactivity, bool travel})>(
+        selector: (_, p) => (
+          reminder:   p.workoutReminderEnabled,
+          inactivity: p.inactivityAlertEnabled,
+          travel:     p.travelMode,
         ),
-        child: Column(children: [
-          _RRow(
-            emoji: '🏋️', label: 'Workout Reminder',
-            sub: 'Daily training push',
-            value: s['workoutReminderEnabled'] as bool? ?? false,
-            color: AppColors.gold,
-            onChanged: (v) => p.updateSetting('workoutReminderEnabled', v),
-          ),
-          _Div(),
-          _RRow(
-            emoji: '💧', label: 'Hydration Reminder',
-            sub: 'Every ${s['waterReminderInterval'] ?? 60} minutes',
-            value: s['waterReminderEnabled'] as bool? ?? false,
-            color: const Color(0xFF38BDF8),
-            onChanged: (v) => p.updateSetting('waterReminderEnabled', v),
-          ),
-          _Div(),
-          _RRow(
-            emoji: '🧍', label: 'Stand Reminder',
-            sub: 'Every ${s['standReminderInterval'] ?? 60} minutes',
-            value: s['standReminderEnabled'] as bool? ?? false,
-            color: AppColors.green,
-            onChanged: (v) => p.updateSetting('standReminderEnabled', v),
-          ),
-        ]),
+        builder: (context, s, _) {
+          final p = context.read<AppProvider>();
+          return Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.04), width: 0.6),
+            ),
+            child: Column(children: [
+              _RRow(
+                icon: Icons.local_fire_department_outlined, label: 'Streak Protection',
+                sub: 'Reminder at 8 PM if you miss training',
+                value: s.reminder,
+                color: AppColors.orange,
+                onChanged: (v) => p.updateSetting('workoutReminderEnabled', v),
+              ),
+              _Div(),
+              _RRow(
+                icon: Icons.warning_amber_rounded, label: 'Inactivity Alert',
+                sub: 'Notify after 3 days of no workout',
+                value: s.inactivity,
+                color: const Color(0xFFFF6B35),
+                onChanged: (v) => p.updateSetting('inactivityAlertEnabled', v),
+              ),
+              _Div(),
+              _RRow(
+                icon: Icons.flight_takeoff_rounded, label: 'Travel Mode',
+                sub: 'Freeze streak — gym not available',
+                value: s.travel,
+                color: const Color(0xFF38BDF8),
+                onChanged: (v) async {
+                  await p.updateSetting('travelMode', v);
+                  if (v) {
+                    await p.updateSetting(
+                      'travelModeStartedAt',
+                      DateTime.now().toIso8601String(),
+                    );
+                  }
+                },
+              ),
+            ]),
+          );
+        },
       );
-    },
-  );
 }
 
 class _RRow extends StatelessWidget {
-  final String emoji, label, sub;
+  final IconData icon;
+  final String label, sub;
   final bool value;
   final Color color;
   final ValueChanged<bool> onChanged;
+
   const _RRow({
-    required this.emoji, required this.label, required this.sub,
-    required this.value, required this.color, required this.onChanged,
+    required this.icon,
+    required this.label,
+    required this.sub,
+    required this.value,
+    required this.color,
+    required this.onChanged,
   });
 
   @override
@@ -1124,26 +1414,31 @@ class _RRow extends StatelessWidget {
         horizontal: AppSpacing.lg, vertical: AppSpacing.md),
     child: Row(children: [
       Container(
-        width: 40, height: 40,
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(10),
+          shape: BoxShape.circle,
         ),
-        child: Center(child: Text(emoji,
-            style: const TextStyle(fontSize: 18))),
+        child: Icon(
+          icon,
+          size: 18,
+          color: color,
+        ),
       ),
       const SizedBox(width: AppSpacing.md),
       Expanded(child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: TextStyle(fontFamily: 'Inter',
+        Text(label, style: const TextStyle(fontFamily: 'Inter',
             color: AppColors.textPrimary, fontSize: 13,
             fontWeight: FontWeight.w600)),
-        Text(sub, style: TextStyle(fontFamily: 'Inter',
+        Text(sub, style: const TextStyle(fontFamily: 'Inter',
             color: AppColors.textMuted, fontSize: 11)),
       ])),
       Switch(
         value: value, onChanged: onChanged,
-        activeColor: color, inactiveThumbColor: AppColors.textMuted,
+        activeColor: AppColors.gold,
+        inactiveThumbColor: AppColors.textMuted,
         inactiveTrackColor: AppColors.bgCardLight,
       ),
     ]),
@@ -1202,4 +1497,606 @@ class _LField extends StatelessWidget {
       ),
     ],
   );
+}
+
+
+// ════════════════════════════════════════════════
+// 1RM CALCULATOR SHEET
+// ════════════════════════════════════════════════
+class _OneRmSheet extends StatefulWidget {
+  const _OneRmSheet();
+  @override State<_OneRmSheet> createState() => _OneRmSheetState();
+}
+
+class _OneRmSheetState extends State<_OneRmSheet> {
+  final _wCtrl = TextEditingController();
+  final _rCtrl = TextEditingController();
+  double? _oneRm;
+
+  static const _zones = [
+    {'pct': 100, 'label': '1RM — Max Strength',  'reps': '1',  'color': 0xFFEF4444},
+    {'pct': 95,  'label': '95% — Near Max',       'reps': '2',  'color': 0xFFF97316},
+    {'pct': 90,  'label': '90% — Strength',        'reps': '3',  'color': 0xFFEAB308},
+    {'pct': 85,  'label': '85% — Strength/Hyp',   'reps': '5',  'color': 0xFFD4AF37},
+    {'pct': 80,  'label': '80% — Hypertrophy',    'reps': '8',  'color': 0xFF22C55E},
+    {'pct': 75,  'label': '75% — Hypertrophy',    'reps': '10', 'color': 0xFF3B82F6},
+    {'pct': 70,  'label': '70% — Endurance',      'reps': '12', 'color': 0xFF8B5CF6},
+    {'pct': 65,  'label': '65% — Endurance',      'reps': '15', 'color': 0xFF6B7280},
+  ];
+
+  @override
+  void dispose() { _wCtrl.dispose(); _rCtrl.dispose(); super.dispose(); }
+
+  void _calc() {
+    final w = double.tryParse(_wCtrl.text);
+    final r = int.tryParse(_rCtrl.text);
+    if (w == null || r == null || r <= 0) return;
+    setState(() => _oneRm = w * (1 + r / 30));
+  }
+
+  @override
+  Widget build(BuildContext context) => _SheetWrap(
+    icon: Icons.sports_gymnastics_rounded,
+    title: '1RM Calculator',
+    subtitle: 'Using Epley Formula: weight × (1 + reps/30)',
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: _LField(label: 'Weight (kg)', ctrl: _wCtrl)),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(child: _LField(label: 'Reps done', ctrl: _rCtrl, isInt: true)),
+      ]),
+      const SizedBox(height: AppSpacing.lg),
+      GoldButton(
+        text: 'Calculate 1RM',
+        icon: Icons.calculate_rounded,
+        width: double.infinity,
+        onTap: _calc,
+      ),
+      if (_oneRm != null) ...[
+        const SizedBox(height: AppSpacing.xl),
+        Center(child: Column(children: [
+          Text('Your Estimated 1RM', style: TextStyle(fontFamily: 'Inter',
+              color: AppColors.textMuted, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text('${_oneRm!.toStringAsFixed(1)} kg', style: TextStyle(fontFamily: 'Rajdhani',
+              color: AppColors.purple, fontSize: 48, fontWeight: FontWeight.w800)),
+        ])),
+        const SizedBox(height: AppSpacing.lg),
+        Text('TRAINING ZONES', style: TextStyle(fontFamily: 'Inter',
+            color: AppColors.textMuted, fontSize: 10,
+            fontWeight: FontWeight.w800, letterSpacing: 1.4)),
+        const SizedBox(height: AppSpacing.sm),
+        ..._zones.map((z) {
+          final pct    = z['pct'] as int;
+          final col    = Color(z['color'] as int);
+          final weight = _oneRm! * pct / 100;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.bgCardLight,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: col.withValues(alpha: 0.22), width: 0.5),
+            ),
+            child: Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: col.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(child: Text('$pct%', style: TextStyle(
+                    fontFamily: 'Rajdhani', color: col,
+                    fontSize: 13, fontWeight: FontWeight.w800))),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(z['label'] as String, style: TextStyle(fontFamily: 'Inter',
+                    color: AppColors.textPrimary, fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+                Text('~${z['reps']} reps', style: TextStyle(fontFamily: 'Inter',
+                    color: AppColors.textMuted, fontSize: 10)),
+              ])),
+              Text('${weight.toStringAsFixed(1)} kg', style: TextStyle(
+                  fontFamily: 'Rajdhani', color: AppColors.textPrimary,
+                  fontSize: 15, fontWeight: FontWeight.w700)),
+            ]),
+          );
+        }),
+      ],
+    ]),
+  );
+}
+
+// ════════════════════════════════════════════════
+// VOICE COACH SETTINGS SHEET
+// ════════════════════════════════════════════════
+class _VoiceCoachSheet extends StatefulWidget {
+  const _VoiceCoachSheet();
+
+  @override
+  State<_VoiceCoachSheet> createState() => _VoiceCoachSheetState();
+}
+
+class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
+    with SingleTickerProviderStateMixin {
+  final _vc = VoiceCoachService();
+
+  late AnimationController _waveC;
+  late Animation<double> _waveA;
+
+  static const _languages = [
+    {'code': 'en', 'name': 'English', 'flag': '🇬🇧', 'native': 'English'},
+    {'code': 'hi', 'name': 'Hindi', 'flag': '🇮🇳', 'native': 'हिंदी'},
+    {'code': 'mr', 'name': 'Marathi', 'flag': '🇮🇳', 'native': 'मराठी'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _waveC = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+
+    _waveA = CurvedAnimation(
+      parent: _waveC,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _waveC.dispose();
+    super.dispose();
+  }
+
+
+  Widget _waveBar(double h) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: 3,
+      height: h,
+      decoration: BoxDecoration(
+        color: const Color(0xFFD4AF37),
+        borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bgModal,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.modal)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 44, height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderMedium,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Header
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    width: 0.6,
+                  ),
+                ),
+                child: Row(children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD4AF37)
+                          .withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD4AF37)
+                              .withValues(alpha: 0.10),
+                          blurRadius: 24,
+                        ),
+                      ],
+                    ),
+                    child: AnimatedBuilder(
+                      animation: _waveA,
+                      builder: (_, __) {
+                        final t = _waveA.value;
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _waveBar(12 + (8 * t)),
+                            const SizedBox(width: 3),
+                            _waveBar(22 - (6 * t)),
+                            const SizedBox(width: 3),
+                            _waveBar(10 + (10 * t)),
+                            const SizedBox(width: 3),
+                            _waveBar(18 - (5 * t)),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'LIFTON COACH',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFFD4AF37),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.2,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Real-time coaching during every set',
+                          style: GoogleFonts.inter(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Hear reps, rest timers, and motivation while you train.',
+                          style: GoogleFonts.inter(
+                            color: Colors.white.withValues(alpha: 0.42),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 24),
+
+              // Coach toggles
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    width: 0.6,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    _settingTile(
+                      icon: Icons.power_settings_new_rounded,
+                      title: 'Voice Coach',
+                      subtitle: 'Hear real-time coaching while you train',
+                      trailing: Switch(
+                        value: _vc.enabled,
+                        activeThumbColor: AppColors.gold,
+                        onChanged: (v) async {
+                          await _vc.setEnabled(v);
+                          setState(() {});
+                        },
+                      ),
+                    ),
+
+                    Divider(
+                      height: 1,
+                      thickness: 0.6,
+                      color: Colors.white.withValues(alpha: 0.05),
+                      indent: 78,
+                      endIndent: 18,
+                    ),
+
+                    _settingTile(
+                      icon: Icons.numbers_rounded,
+                      title: 'Auto Rep Counting',
+                      subtitle: 'Hands-free rep tracking during sets',
+                      trailing: Switch(
+                        value: _vc.autoRepCounting,
+                        activeThumbColor: AppColors.gold,
+                        onChanged: _vc.enabled
+                            ? (v) async {
+                          await _vc.setAutoRepCounting(v);
+                          setState(() {});
+                        }
+                      : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Language section
+              Text('LANGUAGE',
+                  style: GoogleFonts.rajdhani(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  )),
+              const SizedBox(height: 10),
+
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    width: 0.6,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    for (int i = 0; i < _languages.length; i++) ...[
+                      _languageTile(_languages[i]),
+
+                      if (i != _languages.length - 1)
+                        Divider(
+                          height: 1,
+                          thickness: 0.6,
+                          color: Colors.white.withValues(alpha: 0.05),
+                          indent: 72,
+                          endIndent: 18,
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Speech rate slider
+              Text('VOICE SPEED',
+                  style: GoogleFonts.rajdhani(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  )),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                decoration: BoxDecoration(
+                  color: AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderSoft),
+                ),
+                child: Column(
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.speed_rounded,
+                          color: AppColors.gold, size: 18),
+                      const SizedBox(width: 8),
+                      Text('${(_vc.speechRate * 100).round()}%',
+                          style: GoogleFonts.rajdhani(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w800,
+                          )),
+                      const Spacer(),
+                      Text(_vc.speechRate < 0.45
+                          ? 'Slow'
+                          : _vc.speechRate < 0.65
+                              ? 'Normal'
+                              : 'Fast',
+                          style: GoogleFonts.rajdhani(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          )),
+                    ]),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: AppColors.gold,
+                        inactiveTrackColor: AppColors.borderMedium,
+                        thumbColor: AppColors.gold,
+                        overlayColor: AppColors.gold.withValues(alpha: 0.2),
+                        trackHeight: 3,
+                      ),
+                      child: Slider(
+                        min: 0.3,
+                        max: 1.0,
+                        value: _vc.speechRate,
+                        onChanged: _vc.enabled
+                            ? (v) async {
+                                await _vc.setSpeechRate(v);
+                                setState(() {});
+                              }
+                            : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Test button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _vc.enabled
+                      ? () async {
+                          H.medium();
+                          await _vc.testVoice();
+                        }
+                      : null,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                  label: Text('Test Voice',
+                      style: GoogleFonts.rajdhani(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        letterSpacing: 1,
+                      )),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.gold,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _settingTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Widget trailing,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Row(children: [
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.gold.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, color: AppColors.gold, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: GoogleFonts.rajdhani(
+                    color: AppColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  )),
+              Text(subtitle,
+                  style: GoogleFonts.rajdhani(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  )),
+            ],
+          ),
+        ),
+        trailing,
+      ]),
+    );
+  }
+
+  Widget _languageTile(Map<String, String> lang) {
+    final isSelected = _vc.language == lang['code'];
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () async {
+        H.selection();
+        await _vc.setLanguage(lang['code']!);
+        await _vc.testVoice();
+        setState(() {});
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFFFD700).withValues(alpha: 0.05)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  lang['native']!.substring(0, 1),
+                  style: GoogleFonts.inter(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 14),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lang['name']!,
+                    style: GoogleFonts.inter(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    lang['native']!,
+                    style: GoogleFonts.inter(
+                      color: Colors.white.withValues(alpha: 0.42),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            if (isSelected)
+              const Icon(
+                Icons.check_rounded,
+                color: Color(0xFFD4AF37),
+                size: 18,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }

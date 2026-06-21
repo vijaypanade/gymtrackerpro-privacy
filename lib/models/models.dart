@@ -1,4 +1,6 @@
 // lib/models/models.dart — v3 ADDICTION ENGINE
+import 'package:flutter/material.dart';
+
 // ══════════════════════════════════════════════
 // EXERCISE SET
 // ══════════════════════════════════════════════
@@ -32,6 +34,9 @@ class PlannedExercise {
   final bool isFavorite;
   final bool bodyweight;
   bool isComplete;
+  // Ghost Copy fields — set by GhostCopyService each new week
+  int    ghostWeekGap;     // 0=no ghost, 1=progressed, 2=skipped, 3+=comeback
+  double previousWeight;   // last logged weight, for display only
 
   bool get isCardio => unit == 'min';
   bool get isBodyweight => bodyweight;
@@ -42,6 +47,7 @@ class PlannedExercise {
     required this.category, required this.emoji, required this.sets,
     this.type = '', this.unit = 'kg', this.isFavorite = false,
     this.bodyweight = false, this.isComplete = false,
+    this.ghostWeekGap = 0, this.previousWeight = 0,
   });
 
   factory PlannedExercise.fromJson(Map<String, dynamic> json) {
@@ -68,6 +74,8 @@ class PlannedExercise {
     isFavorite: json['isFavorite'] ?? false,
     bodyweight: json['bodyweight'] ?? false,
     isComplete: json['isComplete'] ?? false,
+    ghostWeekGap:    (json['ghostWeekGap'] as int?)    ?? 0,
+    previousWeight:  (json['previousWeight'] as num?)?.toDouble() ?? 0,
   );
 }
 
@@ -75,6 +83,7 @@ class PlannedExercise {
     'id': id, 'baseId': baseId, 'name': name, 'type': type, 'unit': unit,
     'category': category, 'emoji': emoji, 'sets': sets.map((e) => e.toJson()).toList(),
     'isFavorite': isFavorite, 'bodyweight': bodyweight, 'isComplete': isComplete,
+    'ghostWeekGap': ghostWeekGap, 'previousWeight': previousWeight,
   };
 
   double get totalVolume {
@@ -96,11 +105,16 @@ class DayPlan {
   List<PlannedExercise> exercises;
   bool isRestDay;
   bool isCompleted;
+  bool isPendingReview;
   int durationMinutes;
+  bool wasEdited;
+  String? completionDate;
 
   DayPlan({
     required this.id, required this.dayIndex, required this.title,
-    required this.exercises, this.isRestDay = false, this.isCompleted = false, this.durationMinutes = 0,
+    required this.exercises, this.isRestDay = false, this.isCompleted = false,
+    this.isPendingReview = false,
+    this.durationMinutes = 0, this.wasEdited = false, this.completionDate,
   });
 
   double get totalVolume => exercises.fold(0.0, (v, e) => v + e.totalVolume);
@@ -109,7 +123,10 @@ class DayPlan {
   Map<String, dynamic> toJson() => {
     'id': id, 'dayIndex': dayIndex, 'title': title,
     'exercises': exercises.map((e) => e.toJson()).toList(),
-    'isRestDay': isRestDay, 'isCompleted': isCompleted, 'durationMinutes': durationMinutes,
+    'isRestDay': isRestDay, 'isCompleted': isCompleted,
+    'isPendingReview': isPendingReview,
+    'durationMinutes': durationMinutes,
+    'wasEdited': wasEdited, 'completionDate': completionDate,
   };
 
   factory DayPlan.fromJson(Map<String, dynamic> j) => DayPlan(
@@ -119,7 +136,10 @@ class DayPlan {
         .map((e) => PlannedExercise.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
     isRestDay: j['isRestDay'] as bool? ?? false,
     isCompleted: j['isCompleted'] as bool? ?? false,
+    isPendingReview: j['isPendingReview'] as bool? ?? false,
     durationMinutes: j['durationMinutes'] as int? ?? 0,
+    wasEdited: j['wasEdited'] as bool? ?? false,
+    completionDate: j['completionDate'] as String?,
   );
 }
 
@@ -135,15 +155,28 @@ class UserProfile {
   String goal;
   String level;
   String gender;
-  int dailyWaterGoalMl;
-  int currentWaterMl;
   String activityLevel;
+  String dietPreference; // 'veg', 'nonveg', 'eggetarian'
+  String location; // e.g. 'Maharashtra', 'Delhi'
+  bool usesWheyProtein; // true if user takes whey supplement
+  bool usesCreatine; // true if user takes creatine
+  String workoutTime; // 'morning' | 'evening'
+  String bodyType; // 'ectomorph', 'mesomorph', 'endomorph'
+  String cuisinePreference; // 'maharashtrian', 'north_indian', 'south_indian', 'mixed'
+  String state; // Indian state for local food preferences
 
   UserProfile({
     this.name = 'Champion', this.age = 25, this.weightKg = 70.0, this.heightCm = 170.0,
     this.goal = 'muscle_gain', this.level = 'beginner', this.gender = 'male',
-    this.dailyWaterGoalMl = 3000, this.currentWaterMl = 0,
     this.trainerType = 'friendly', this.activityLevel = 'Moderate',
+    this.dietPreference = 'veg',
+    this.location = 'India',
+    this.usesWheyProtein = false,
+    this.usesCreatine = false,
+    this.workoutTime = 'evening',
+    this.bodyType = 'mesomorph',
+    this.cuisinePreference = 'mixed',
+    this.state = 'Maharashtra',
   });
 
   double get bmi => weightKg / ((heightCm / 100.0) * (heightCm / 100.0));
@@ -162,14 +195,24 @@ class UserProfile {
 
   UserProfile copyWith({
     String? name, int? age, double? weightKg, double? heightCm,
-    String? goal, String? level, String? gender, int? dailyWaterGoalMl,
-    int? currentWaterMl, String? trainerType, String? activityLevel,
+    String? goal, String? level, String? gender,
+    String? trainerType, String? activityLevel,
+    String? dietPreference, String? location,
+    bool? usesWheyProtein, bool? usesCreatine,
+    String? workoutTime, String? bodyType, String? cuisinePreference,
+    String? state,
   }) => UserProfile(
     name: name ?? this.name, age: age ?? this.age,
     weightKg: weightKg ?? this.weightKg, heightCm: heightCm ?? this.heightCm,
     goal: goal ?? this.goal, level: level ?? this.level, gender: gender ?? this.gender,
-    dailyWaterGoalMl: dailyWaterGoalMl ?? this.dailyWaterGoalMl,
-    currentWaterMl: currentWaterMl ?? this.currentWaterMl,
+    dietPreference: dietPreference ?? this.dietPreference,
+    location: location ?? this.location,
+    usesWheyProtein: usesWheyProtein ?? this.usesWheyProtein,
+    usesCreatine: usesCreatine ?? this.usesCreatine,
+    workoutTime: workoutTime ?? this.workoutTime,
+    bodyType: bodyType ?? this.bodyType,
+    cuisinePreference: cuisinePreference ?? this.cuisinePreference,
+    state: state ?? this.state,
     trainerType: trainerType ?? this.trainerType,
     activityLevel: activityLevel ?? this.activityLevel,
   );
@@ -177,8 +220,13 @@ class UserProfile {
   Map<String, dynamic> toJson() => {
     'name': name, 'age': age, 'weightKg': weightKg, 'heightCm': heightCm,
     'goal': goal, 'level': level, 'gender': gender,
-    'dailyWaterGoalMl': dailyWaterGoalMl, 'currentWaterMl': currentWaterMl,
     'trainerType': trainerType, 'activityLevel': activityLevel,
+    'dietPreference': dietPreference, 'location': location,
+    'usesWheyProtein': usesWheyProtein, 'usesCreatine': usesCreatine,
+    'workoutTime': workoutTime,
+    'bodyType': bodyType,
+    'cuisinePreference': cuisinePreference,
+    'state': state,
   };
 
   factory UserProfile.fromJson(Map<String, dynamic> j) {
@@ -192,12 +240,21 @@ class UserProfile {
       weightKg: (j['weightKg'] as num?)?.toDouble() ?? 70.0,
       heightCm: (j['heightCm'] as num?)?.toDouble() ?? 170.0,
       goal: rawGoal, level: rawLevel, gender: j['gender'] as String? ?? 'male',
-      dailyWaterGoalMl: j['dailyWaterGoalMl'] as int? ?? 3000,
-      currentWaterMl: j['currentWaterMl'] as int? ?? 0,
       trainerType: j['trainerType'] as String? ?? 'friendly',
       activityLevel: j['activityLevel'] as String? ?? 'Moderate',
+      dietPreference: j['dietPreference'] as String? ?? 'veg',
+      location: j['location'] as String? ?? 'India',
+      usesWheyProtein: j['usesWheyProtein'] as bool? ?? false,
+      usesCreatine: j['usesCreatine'] as bool? ?? false,
+      workoutTime: _migrateWorkoutTime(j['workoutTime'] as String? ?? 'evening'),      bodyType: j['bodyType'] as String? ?? 'mesomorph',
+      cuisinePreference: j['cuisinePreference'] as String? ?? 'mixed',
+      state: j['state'] as String? ?? 'Maharashtra',
     );
   }
+
+  // Migrate old 4-option values → 2-option: afternoon/night → evening
+  static String _migrateWorkoutTime(String v) =>
+      (v == 'morning') ? 'morning' : 'evening';
 }
 
 // ══════════════════════════════════════════════
@@ -224,6 +281,17 @@ extension UserRankExt on UserRank {
       case UserRank.champion:  return '🏆';
       case UserRank.legend:    return '👑';
       case UserRank.beast:     return '🔱';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case UserRank.recruit:   return Icons.fitness_center_rounded;
+      case UserRank.warrior:   return Icons.bolt_rounded;
+      case UserRank.gladiator: return Icons.verified_rounded;
+      case UserRank.champion:  return Icons.workspace_premium_rounded;
+      case UserRank.legend:    return Icons.military_tech_rounded;
+      case UserRank.beast:     return Icons.local_fire_department_rounded;
     }
   }
 }
@@ -311,7 +379,6 @@ class XPSystem {
   static const int xpStreakBonus     = 25;
   static const int xpPRBroken        = 150;
   static const int xpMissionComplete = 75;
-  static const int xpWaterGoalMet    = 20;
   static const int xpSetCompleted    = 5;
 
   Map<String, dynamic> toJson() => {
@@ -328,7 +395,7 @@ class XPSystem {
 // ══════════════════════════════════════════════
 // DAILY MISSIONS — HABIT LOOP
 // ══════════════════════════════════════════════
-enum MissionType { workout, water, sets, streak, pr }
+enum MissionType { workout, sets, streak, pr }
 
 class DailyMission {
   final String id;
@@ -377,14 +444,6 @@ class MissionGenerator {
         emoji: '🏋️',
         xpReward: XPSystem.xpWorkoutComplete,
         type: MissionType.workout,
-      ),
-      DailyMission(
-        id: 'water_${date.day}',
-        title: 'Hit Your Water Goal',
-        description: 'Stay hydrated all day',
-        emoji: '💧',
-        xpReward: XPSystem.xpWaterGoalMet,
-        type: MissionType.water,
       ),
       if (streak >= 3)
         DailyMission(
@@ -491,6 +550,23 @@ class AppBadge {
     required this.id, required this.title, required this.description,
     required this.emoji, this.xpReward = 50,
   });
+
+  IconData get icon {
+    switch (id) {
+      case 'first_workout':    return Icons.fitness_center_rounded;
+      case 'week_streak':      return Icons.local_fire_department_rounded;
+      case 'two_week_streak':  return Icons.bolt_rounded;
+      case 'month_streak':     return Icons.military_tech_rounded;
+      case 'ten_workouts':     return Icons.trending_up_rounded;
+      case 'fifty_workouts':   return Icons.workspace_premium_rounded;
+      case 'hundred_workouts': return Icons.emoji_events_rounded;
+      case 'early_bird':       return Icons.bedtime_rounded;
+      case 'volume_king':      return Icons.bar_chart_rounded;
+      case 'consistency':      return Icons.calendar_month_rounded;
+      case 'pr_smasher':       return Icons.trending_up_rounded;
+      default:                 return Icons.star_rounded;
+    }
+  }
 }
 
 class BadgeSystem {

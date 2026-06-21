@@ -16,7 +16,7 @@ if (keyPropertiesFile.exists()) {
 
 android {
    namespace = "com.nidhish.aitrainer"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -40,8 +40,8 @@ android {
 
     defaultConfig {
     applicationId = "com.nidhish.aitrainer"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = 26
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

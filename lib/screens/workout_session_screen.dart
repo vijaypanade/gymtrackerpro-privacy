@@ -100,7 +100,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
           onPressed: () {
             Navigator.pop(context);
           },
-          child: Text("Finish Workout 💪"),
+          child: const Text("Finish Workout"),
         ),
       ),
     );

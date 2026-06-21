@@ -26,7 +26,7 @@ class _AISetupScreenState extends State<AISetupScreen> {
   WorkoutPlanResult? _planResult; // ✅ typed — NOT Map
 
   Future<void> _generatePlan() async {
-    print("🔥 AI ENGINE CALLED");  
+    debugPrint('[AISetup] generatePlan start');
     setState(() => _isGenerating = true);
     final provider = context.read<AppProvider>();
     await Future.delayed(const Duration(milliseconds: 1200));
@@ -57,7 +57,7 @@ class _AISetupScreenState extends State<AISetupScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Plan applied! Check your Weekly Planner.'),
+        const SnackBar(content: Text('Plan applied to your week.'),
             backgroundColor: Colors.green));
       Navigator.pop(context);
     }

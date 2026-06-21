@@ -18,7 +18,10 @@ Future<void> showWorkoutCelebration(
   required int xp,
   required int streak,
   required int duration,
-  List<String> badges = const [],
+  List<String> badges        = const [],
+  String?      coachReaction,
+  bool         hasPR         = false,
+  double       totalVolumeTonnes = 0.0,
 }) async {
   HapticFeedback.heavyImpact();
   await showGeneralDialog(
@@ -31,7 +34,14 @@ Future<void> showWorkoutCelebration(
       child: child,
     ),
     pageBuilder: (ctx, _, __) => _CelebrationScreen(
-      xp: xp, streak: streak, duration: duration, badges: badges),
+      xp:                xp,
+      streak:            streak,
+      duration:          duration,
+      badges:            badges,
+      coachReaction:     coachReaction,
+      hasPR:             hasPR,
+      totalVolumeTonnes: totalVolumeTonnes,
+    ),
   );
 }
 
@@ -191,9 +201,15 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay>
 class _CelebrationScreen extends StatefulWidget {
   final int xp, streak, duration;
   final List<String> badges;
+  final String? coachReaction;
+  final bool hasPR;
+  final double totalVolumeTonnes;
   const _CelebrationScreen({
     required this.xp, required this.streak,
     required this.duration, required this.badges,
+    this.coachReaction,
+    this.hasPR         = false,
+    this.totalVolumeTonnes = 0.0,
   });
   @override State<_CelebrationScreen> createState() =>
       _CelebrationScreenState();
@@ -235,9 +251,10 @@ class _CelebrationScreenState extends State<_CelebrationScreen>
   }
 
   String get _headline {
-    if (widget.duration >= 90) return 'ABSOLUTE BEAST! 🦁';
-    if (widget.duration >= 60) return 'CRUSHED IT! 🔥';
-    if (widget.duration >= 30) return 'WORKOUT DONE! 💪';
+    if (widget.hasPR)           return 'NEW RECORD! 🏆';
+    if (widget.duration >= 90)  return 'ABSOLUTE BEAST! 🦁';
+    if (widget.duration >= 60)  return 'CRUSHED IT! 🔥';
+    if (widget.duration >= 30)  return 'WORKOUT DONE! 💪';
     return 'SESSION COMPLETE!';
   }
 
@@ -386,6 +403,60 @@ class _CelebrationScreenState extends State<_CelebrationScreen>
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700)),
                         ),
+
+                        // Volume stat
+                        if (widget.totalVolumeTonnes > 0) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            '${widget.totalVolumeTonnes.toStringAsFixed(1)} t lifted',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              color: AppColors.textMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+
+                        // AI Coach reaction
+                        if (widget.coachReaction != null &&
+                            widget.coachReaction!.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          FadeTransition(
+                            opacity: _stats,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.sm + 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0D0C0A),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: AppColors.gold
+                                        .withValues(alpha: 0.22),
+                                    width: 0.8),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.hub_rounded,
+                                      color: AppColors.gold, size: 13),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      widget.coachReaction!,
+                                      style: GoogleFonts.inter(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
 
                         const SizedBox(height: AppSpacing.xl),
 

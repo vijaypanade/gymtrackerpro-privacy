@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 175" xmlns="http://www.w3.org/2000/svg">
+  <!-- Biceps brachii — elongated belly shape on anterior upper arm -->
+  <!-- Left bicep: peaks around y:54 (short head + long head combined belly) -->
+  <path d="M12,44 C11,47 10,53 11,59 C12,64 14,68 17,70 C19,71 21,70 22,68 C23,64 23,58 22,52 C21,47 19,43 17,42 C15,42 13,43 12,44 Z"
+        fill="white"/>
+  <!-- Right bicep -->
+  <path d="M88,44 C89,47 90,53 89,59 C88,64 86,68 83,70 C81,71 79,70 78,68 C77,64 77,58 78,52 C79,47 81,43 83,42 C85,42 87,43 88,44 Z"
+        fill="white"/>
+</svg>

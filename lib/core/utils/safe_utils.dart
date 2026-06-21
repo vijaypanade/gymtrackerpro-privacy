@@ -1,3 +1,5 @@
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
 // lib/core/utils/safe_utils.dart
 // ══════════════════════════════════════════════════════════
 // CRASH FIXES for all identified unsafe patterns:
@@ -76,24 +78,24 @@ class WeekPlanGuard {
 // ─────────────────────────────────────────────────────────
 // AUDIO SAFE PLAYER
 // ─────────────────────────────────────────────────────────
-/// Wraps AudioPlayer with safe error handling
-/// Missing asset won't crash the app
-import 'package:audioplayers/audioplayers.dart';
-
+/// Singleton AudioPlayer — one native MediaPlayer, reused for all SFX.
+/// Creating a new AudioPlayer() per call spawns a new native MediaPlayer,
+/// causing "Unable to create media player" / "prepareAsync called in state 1"
+/// when multiple calls race on Android.
 class SafeAudio {
+  static final AudioPlayer _player = AudioPlayer();
+
   static Future<void> playSuccess() async {
     try {
-      await AudioPlayer().play(AssetSource('sounds/success.mp3'));
-    } catch (e) {
-      // Silently ignore — audio is enhancement, not core feature
-    }
+      await _player.stop();
+      await _player.play(AssetSource('sounds/success.mp3'));
+    } catch (_) {}
   }
 
+  // tick.mp3 is not bundled — use a system click sound (no asset file needed)
   static Future<void> playTick() async {
     try {
-      await AudioPlayer().play(AssetSource('sounds/tick.mp3'));
-    } catch (e) {
-      // Silently ignore
-    }
+      await SystemSound.play(SystemSoundType.click);
+    } catch (_) {}
   }
 }

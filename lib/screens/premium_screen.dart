@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../services/monetization_service.dart';
 import '../utils/app_constants.dart';
@@ -42,10 +43,9 @@ class _PremiumScreenState extends State<PremiumScreen>
     ('🔥', 'Streaks & XP',             '✓',          '✓'),
     ('📊', 'Basic Stats',              '✓',          '✓'),
     ('📈', 'Fatigue & Plateau Index',  '—',          '✓'),
-    ('🧠', 'Smart Coaching Insights',  '—',          '✓'),
-    ('🎯', 'Weak Muscle Priority',     '—',          '✓'),
+    ('🧠', 'Scientific AI Coach',      '—',          '✓'),
+    ('🎯', 'Weak Muscle Detection',    '—',          '✓'),
     ('🔄', 'Weekly Memory Coaching',   '—',          '✓'),
-    ('🚫', 'Zero Ads',                 '—',          '✓'),
   ];
 
   @override
@@ -110,7 +110,8 @@ class _PremiumScreenState extends State<PremiumScreen>
                         blurRadius: 24, spreadRadius: 2)],
                   ),
                   child: const Center(
-                      child: Text('👑', style: TextStyle(fontSize: 38))),
+                      child: Icon(Icons.workspace_premium_rounded,
+                          color: Colors.black, size: 38)),
                 ),
               )),
               const SizedBox(height: 20),
@@ -150,13 +151,13 @@ class _PremiumScreenState extends State<PremiumScreen>
                             fontWeight: FontWeight.w800, letterSpacing: 1.2)),
                   ]),
                   const SizedBox(height: 10),
-                  _PreviewRow('📈', 'Next week plan auto-adjusts to your progress'),
+                  _PreviewRow(Icons.trending_up_rounded, 'Next week plan auto-adjusts to your progress'),
                   const SizedBox(height: 6),
-                  _PreviewRow('🧠', 'AI tracks your weak muscles every session'),
+                  _PreviewRow(Icons.psychology_rounded, 'AI tracks your weak muscles every session'),
                   const SizedBox(height: 6),
-                  _PreviewRow('🏆', 'Advanced PR predictions — know before you lift'),
+                  _PreviewRow(Icons.emoji_events_rounded, 'Advanced PR predictions — know before you lift'),
                   const SizedBox(height: 6),
-                  _PreviewRow('🎯', 'Deload auto-detected — never overtrain again'),
+                  _PreviewRow(Icons.track_changes_rounded, 'Deload auto-detected — never overtrain again'),
                 ]),
               ),
               const SizedBox(height: 20),
@@ -164,15 +165,15 @@ class _PremiumScreenState extends State<PremiumScreen>
               // ── STEP 4: Dual pricing — monthly + yearly ────
               Row(children: [
                 Expanded(child: _PlanTile(
-                  price: '₹199', period: '/month',
+                  price: '₹150', period: '/month',
                   badge: '3 days free', badgeColor: AppColors.green,
                   isSelected: _selectedPlan == 'monthly',
                   onTap: () => setState(() => _selectedPlan = 'monthly'),
                 )),
                 const SizedBox(width: 12),
                 Expanded(child: _PlanTile(
-                  price: '₹999', period: '/year',
-                  badge: 'Save 58% 🔥', badgeColor: AppColors.orange,
+                  price: '₹1000', period: '/year',
+                  badge: 'Save 58%', badgeColor: AppColors.orange,
                   isSelected: _selectedPlan == 'yearly',
                   isPopular: true,
                   onTap: () => setState(() => _selectedPlan = 'yearly'),
@@ -277,8 +278,8 @@ class _PremiumScreenState extends State<PremiumScreen>
                         ),
                         child: Text(
                             _selectedPlan == 'yearly'
-                              ? 'Start Free — ₹999/yr 🚀'
-                              : 'Start Free — ₹199/mo 🚀',
+                              ? 'Start Free — ₹1000/yr 🚀'
+                              : 'Start Free — ₹150/mo 🚀',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.rajdhani(
                                 color: Colors.black, fontSize: 20,
@@ -303,6 +304,27 @@ class _PremiumScreenState extends State<PremiumScreen>
                     color: AppColors.textMuted.withValues(alpha: 0.6),
                     fontSize: 10),
               )),
+
+              const SizedBox(height: 10),
+
+              GestureDetector(
+                onTap: () async {
+                  final uri = Uri.parse(
+                    'https://play.google.com/store/account/subscriptions',
+                  );
+                  await launchUrl(uri,
+                      mode: LaunchMode.externalApplication);
+                },
+                child: Text(
+                  'Manage Subscription',
+                  style: GoogleFonts.inter(
+                    color: AppColors.gold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
             ])),
           ),
         ],
@@ -314,13 +336,13 @@ class _PremiumScreenState extends State<PremiumScreen>
     HapticFeedback.heavyImpact();
     setState(() => _loading = true);
     try {
-      await MonetizationService.instance.upgradeToPremium();
-      final p = context.read<AppProvider>();
-      p.notifyListeners();
-      if (mounted) {
+      await MonetizationService.instance.upgradeToPremium(plan: _selectedPlan);
+      if (!mounted) return;
+      context.read<AppProvider>().notifyListeners();
+      {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('👑 Welcome to Premium! Unlimited AI coaching unlocked.',
+          content: Text('Welcome to Premium — unlimited AI coaching unlocked.',
               style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
           backgroundColor: AppColors.gold,
           behavior: SnackBarBehavior.floating,
@@ -369,14 +391,15 @@ class _AlreadyPremiumScreen extends StatelessWidget {
               decoration: const BoxDecoration(
                   shape: BoxShape.circle, gradient: AppGradients.gold),
               child: const Center(
-                  child: Text('👑', style: TextStyle(fontSize: 44))),
+                  child: Icon(Icons.workspace_premium_rounded,
+                      color: Colors.black, size: 44)),
             ),
             const SizedBox(height: 24),
             Text('You\'re Premium!', style: GoogleFonts.rajdhani(
                 color: AppColors.gold, fontSize: 28,
                 fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-            Text('All features unlocked. No ads. Unlimited AI.',
+            Text('All features unlocked. Unlimited AI. Full analytics.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                     color: AppColors.textSecondary, fontSize: 14,
@@ -406,14 +429,15 @@ class _AlreadyPremiumScreen extends StatelessWidget {
 
 // ── Future preview row ─────────────────────────────────────────
 class _PreviewRow extends StatelessWidget {
-  final String emoji, text;
-  const _PreviewRow(this.emoji, this.text);
+  final IconData icon;
+  final String text;
+  const _PreviewRow(this.icon, this.text);
 
   @override
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(emoji, style: const TextStyle(fontSize: 14)),
+      Icon(icon, color: AppColors.gold, size: 14),
       const SizedBox(width: 8),
       Expanded(child: Text(text, style: GoogleFonts.inter(
           color: AppColors.textSecondary, fontSize: 12,
@@ -444,18 +468,37 @@ class _PlanTile extends StatelessWidget {
       onTap: () { HapticFeedback.selectionClick(); onTap(); },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.fromLTRB(
+          14,
+          isPopular ? 18 : 14,
+          14,
+          isPopular ? 18 : 14,
+        ),
         decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.gold.withValues(alpha: 0.14),
+                    AppColors.gold.withValues(alpha: 0.05),
+                  ],
+                )
+              : null,
           color: isSelected
-              ? AppColors.gold.withValues(alpha: 0.08)
+              ? null
               : AppColors.bgCard,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
               color: isSelected ? AppColors.gold : AppColors.borderSoft,
               width: isSelected ? 1.8 : 0.8),
-          boxShadow: isSelected ? [BoxShadow(
-              color: AppColors.gold.withValues(alpha: 0.18),
-              blurRadius: 12)] : null,
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: AppColors.gold.withValues(alpha: 0.22),
+              blurRadius: 18,
+              spreadRadius: 1,
+            ),
+          ] : null,
         ),
         child: Column(children: [
           if (isPopular)
