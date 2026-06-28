@@ -13,12 +13,15 @@ import 'package:percent_indicator/circular_percent_indicator.dart';
 import '../providers/app_provider.dart';
 import '../providers/gamification_provider.dart';
 import '../models/models.dart';
+import '../models/split_template.dart';
 import '../utils/app_constants.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/profile_rank_badge.dart';
+import 'main_shell.dart';
 import 'onboarding_screen.dart';
 import 'premium_screen.dart';
 import '../utils/app_routes.dart';
+import '../widgets/profile/athlete_timeline_card.dart';
 
 class H {
   static void heavy()     => HapticFeedback.heavyImpact();
@@ -80,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ));
     setState(() { _editing = false; _detailsExpanded = false; });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Profile updated!',
+      content: const Text('Profile updated!',
           style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600)),
       backgroundColor: AppColors.green,
       behavior: SnackBarBehavior.floating,
@@ -202,7 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await AuthService.instance.signOut();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => LoginScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
         (_) => false,
       );
     }
@@ -266,7 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Profile', style: TextStyle(fontFamily: 'Inter',
+                      const Text('Profile', style: TextStyle(fontFamily: 'Inter',
                           color: AppColors.textPrimary, fontSize: 20,
                           fontWeight: FontWeight.w600, letterSpacing: -0.3)),
                       Text('Your Lifton Identity', style: TextStyle(fontFamily: 'Inter',
@@ -278,8 +281,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       padding: const EdgeInsets.only(right: AppSpacing.lg),
                       child: GestureDetector(
                         onTap: () {
-                          if (_editing) _save();
-                          else setState(() { _editing = true; _detailsExpanded = true; });
+                          if (_editing) {
+                            _save();
+                          } else {
+                            setState(() { _editing = true; _detailsExpanded = true; });
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -296,7 +302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 color: AppColors.gold, size: 13),
                             const SizedBox(width: AppSpacing.xs),
                             Text(_editing ? 'Save' : 'Edit',
-                                style: TextStyle(fontFamily: 'Inter',
+                                style: const TextStyle(fontFamily: 'Inter',
                                     color: AppColors.gold, fontSize: 12,
                                     fontWeight: FontWeight.w700)),
                           ]),
@@ -322,8 +328,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           lifetimeKg:   d.lifetimeKg)),
                       const SizedBox(height: AppSpacing.lg),
 
+                      // ── P3: ATHLETE TIMELINE ───────────────────────────────
+                      const _FI(delay: 60, child: AthleteTimelineCard()),
+                      const SizedBox(height: AppSpacing.lg),
+
                       // ── P4: PREMIUM BENEFITS ────────────────────────────────
                       _FI(delay: 70, child: _SubscriptionCard(isPremium: d.isPremium)),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // ── P4b: TRAINING STYLE ────────────────────────────────
+                      _FI(delay: 78, child: _TrainingStyleCard(
+                          splitStyle: context.read<AppProvider>().splitStyle)),
                       const SizedBox(height: AppSpacing.lg),
 
                       // ── P5: HEALTH CONNECT ──────────────────────────────────
@@ -504,7 +519,7 @@ class _HeroCard extends StatelessWidget {
           const SizedBox(width: AppSpacing.md),
           Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(p.name, style: TextStyle(fontFamily: 'Rajdhani',
+            Text(p.name, style: const TextStyle(fontFamily: 'Rajdhani',
                 color: AppColors.textPrimary, fontSize: 22,
                 fontWeight: FontWeight.w900)),
             const SizedBox(height: AppSpacing.xs),
@@ -553,7 +568,7 @@ class _HeroCard extends StatelessWidget {
             CircularPercentIndicator(
               radius: 22, lineWidth: 2.5,
               percent: (p.bmi / 40).clamp(0.0, 1.0),
-              center: Text(p.bmi.toStringAsFixed(1), style: TextStyle(
+              center: Text(p.bmi.toStringAsFixed(1), style: const TextStyle(
                   fontFamily: 'Rajdhani', fontSize: 9,
                   fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
               progressColor: p.bmiCategory == 'Normal'    ? const Color(0xFFC8AA6E)
@@ -590,10 +605,10 @@ class _HeroCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('${xp.rank.displayName} → ${xp.nextRankName}',
-              style: TextStyle(fontFamily: 'Inter',
+              style: const TextStyle(fontFamily: 'Inter',
                   color: AppColors.textMuted, fontSize: 11)),
           Text('${(xp.rankProgress * 100).toInt()}%',
-              style: TextStyle(fontFamily: 'Inter',
+              style: const TextStyle(fontFamily: 'Inter',
                   color: AppColors.gold, fontSize: 11,
                   fontWeight: FontWeight.w700)),
         ]),
@@ -654,16 +669,27 @@ class _SubscriptionCard extends StatelessWidget {
         Container(width: 3, height: 14, decoration: BoxDecoration(
           color: AppColors.gold, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 8),
-        Text('Premium', style: TextStyle(
+        const Text('Premium', style: TextStyle(
           fontFamily: 'Inter', color: AppColors.gold,
           fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0)),
-        const Spacer(),
+        const SizedBox(width: 6),
         Icon(Icons.check_circle_rounded,
-            color: AppColors.gold.withValues(alpha: 0.65), size: 13),
-        const SizedBox(width: 5),
-        Text('All features active', style: TextStyle(
-          fontFamily: 'Inter', color: AppColors.textMuted,
-          fontSize: 11, fontWeight: FontWeight.w400)),
+            color: AppColors.gold.withValues(alpha: 0.65), size: 12),
+        const Spacer(),
+        GestureDetector(
+          onTap: () async {
+            final uri = Uri.parse(
+                'https://play.google.com/store/account/subscriptions');
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+          child: const Text('Manage', style: TextStyle(
+            fontFamily: 'Inter',
+            color: AppColors.textMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+            decoration: TextDecoration.underline,
+          )),
+        ),
       ]),
     );
   }
@@ -686,7 +712,7 @@ class _SubscriptionCard extends StatelessWidget {
               gradient: AppGradients.gold,
               borderRadius: BorderRadius.circular(2))),
             const SizedBox(width: 8),
-            Text('Premium', style: TextStyle(
+            const Text('Premium', style: TextStyle(
               fontFamily: 'Inter', color: AppColors.textPrimary,
               fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0)),
             const Spacer(),
@@ -697,7 +723,7 @@ class _SubscriptionCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                     color: AppColors.gold.withValues(alpha: 0.30), width: 0.5)),
-              child: Text('Upgrade', style: TextStyle(
+              child: const Text('Upgrade', style: TextStyle(
                 fontFamily: 'Inter', color: AppColors.gold,
                 fontSize: 11, fontWeight: FontWeight.w700)),
             ),
@@ -734,6 +760,57 @@ class _SubscriptionCard extends StatelessWidget {
 
 
 // ════════════════════════════════════════════════
+// P4b — TRAINING STYLE CARD
+// ════════════════════════════════════════════════
+class _TrainingStyleCard extends StatelessWidget {
+  final SplitStyle splitStyle;
+  const _TrainingStyleCard({required this.splitStyle});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        // Switch to Tools tab (index 3) via MainShell
+        final shell = context.findAncestorStateOfType<MainShellState>();
+        shell?.changeTab(3);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0C0C0C),
+          borderRadius: BorderRadius.circular(AppSpacing.lg),
+          border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.14), width: 0.8),
+        ),
+        child: Row(children: [
+          Container(width: 3, height: 14, decoration: BoxDecoration(
+              color: AppColors.gold, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: 8),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Training style', style: TextStyle(
+                fontFamily: 'Inter', color: AppColors.textMuted,
+                fontSize: 11, fontWeight: FontWeight.w400)),
+              const SizedBox(height: 2),
+              Text(splitStyle.label, style: const TextStyle(
+                fontFamily: 'Inter', color: AppColors.textPrimary,
+                fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          )),
+          const Text('Change', style: TextStyle(
+            fontFamily: 'Inter', color: AppColors.gold,
+            fontSize: 11, fontWeight: FontWeight.w500)),
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right_rounded,
+              color: AppColors.gold.withValues(alpha: 0.60), size: 16),
+        ]),
+      ),
+    );
+  }
+}
+
 // P5 — HEALTH CONNECT (upgraded)
 // ════════════════════════════════════════════════
 class _HealthConnectCard extends StatefulWidget {
@@ -781,7 +858,7 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
             color: const Color(0xFF66BB6A).withValues(alpha: 0.70),
             borderRadius: BorderRadius.circular(2))),
           const SizedBox(width: 7),
-          Text('Health connect', style: TextStyle(
+          const Text('Health connect', style: TextStyle(
             fontFamily: 'Inter', color: AppColors.textPrimary,
             fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0)),
           const Spacer(),
@@ -800,7 +877,7 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
         ]),
         const SizedBox(height: AppSpacing.md),
         if (!hasSleep && !hasSteps)
-          Text('No recent health data',
+          const Text('No recent health data',
               style: TextStyle(fontFamily: 'Inter',
                   color: AppColors.textMuted, fontSize: 12))
         else
@@ -851,12 +928,12 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
             child: Icon(Icons.favorite_border_rounded,
                 color: AppColors.gold.withValues(alpha: 0.65), size: 16)),
           const SizedBox(width: 12),
-          Expanded(child: Column(
+          const Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Health Connect', style: TextStyle(
               fontFamily: 'Inter', color: AppColors.textSecondary,
               fontSize: 13, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 2),
+            SizedBox(height: 2),
             Text('Connect to unlock sleep + recovery intelligence',
               style: TextStyle(
                 fontFamily: 'Inter', color: AppColors.textMuted,
@@ -1014,7 +1091,7 @@ class _EditForm extends StatelessWidget {
   Widget build(BuildContext context) => Column(
       crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-    _FSec('Body & physical'),
+    _fSec('Body & physical'),
     const SizedBox(height: AppSpacing.sm),
     _TF(ctrl: name, label: 'Name', cap: TextCapitalization.words),
     const SizedBox(height: AppSpacing.sm),
@@ -1027,38 +1104,38 @@ class _EditForm extends StatelessWidget {
     ]),
     const SizedBox(height: AppSpacing.sm),
     _DD(label: 'Gender', value: gender,
-        items: ['male', 'female'],
-        labels: {'male': 'Male', 'female': 'Female'},
+        items: const ['male', 'female'],
+        labels: const {'male': 'Male', 'female': 'Female'},
         onChanged: onGender),
     const SizedBox(height: AppSpacing.sm),
     _DD(label: 'Body Type', value: bodyType,
-        items: ['ectomorph', 'mesomorph', 'endomorph'],
-        labels: {'ectomorph': 'Ectomorph (slim)',
+        items: const ['ectomorph', 'mesomorph', 'endomorph'],
+        labels: const {'ectomorph': 'Ectomorph (slim)',
           'mesomorph': 'Mesomorph (athletic)',
           'endomorph': 'Endomorph (heavy)'},
         onChanged: onBodyType),
 
     const SizedBox(height: AppSpacing.md),
-    _FSec('Training & goals'),
+    _fSec('Training & goals'),
     const SizedBox(height: AppSpacing.sm),
     _DD(label: 'Goal', value: goal,
-        items: ['muscle_gain', 'fat_loss', 'strength'],
-        labels: {'muscle_gain': 'Muscle Gain',
+        items: const ['muscle_gain', 'fat_loss', 'strength'],
+        labels: const {'muscle_gain': 'Muscle Gain',
           'fat_loss': 'Fat Loss', 'strength': 'Strength'},
         onChanged: onGoal),
     const SizedBox(height: AppSpacing.sm),
     _DD(label: 'Training Level', value: level,
-        items: ['beginner', 'intermediate', 'advanced'],
+        items: const ['beginner', 'intermediate', 'advanced'],
         onChanged: onLevel),
     const SizedBox(height: AppSpacing.sm),
     _DD(label: 'AI Trainer Style', value: trainer,
-        items: ['friendly', 'strict', 'military', 'motivational'],
-        labels: {'friendly': 'Friendly', 'strict': 'Strict',
+        items: const ['friendly', 'strict', 'military', 'motivational'],
+        labels: const {'friendly': 'Friendly', 'strict': 'Strict',
           'military': 'Military', 'motivational': 'Hype'},
         onChanged: onTrainer),
     const SizedBox(height: AppSpacing.sm),
     _DD(label: 'Activity Level', value: activity,
-        items: ['Sedentary', 'Light', 'Moderate', 'High', 'Very High'],
+        items: const ['Sedentary', 'Light', 'Moderate', 'High', 'Very High'],
         onChanged: onActivity),
 
     const SizedBox(height: AppSpacing.lg),
@@ -1071,7 +1148,7 @@ class _EditForm extends StatelessWidget {
 // HELPERS
 // ════════════════════════════════════════════════
 
-Widget _FSec(String title) => Row(children: [
+Widget _fSec(String title) => Row(children: [
   Container(width: 2, height: 10,
     decoration: BoxDecoration(
       color: AppColors.gold.withValues(alpha: 0.50),
@@ -1130,7 +1207,7 @@ class _TF extends StatelessWidget {
     keyboardType: isDecimal
         ? const TextInputType.numberWithOptions(decimal: true)
         : isNumber ? TextInputType.number : TextInputType.text,
-    style: TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 14),
+    style: const TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 14),
     decoration: InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
@@ -1164,9 +1241,9 @@ class _DD extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<String>(
-    value: value, onChanged: onChanged,
+    initialValue: value, onChanged: onChanged,
     dropdownColor: AppColors.bgModal,
-    style: TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 14),
+    style: const TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 14),
     iconEnabledColor: Colors.white.withValues(alpha: 0.72),
     decoration: InputDecoration(
       labelText: label,

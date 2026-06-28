@@ -32,6 +32,7 @@ import '../models/readiness.dart';
 import '../models/split_template.dart';
 import '../models/workout_log.dart';
 import '../services/ai_engine.dart';
+import '../services/billing_service.dart';
 import '../services/monetization_service.dart';
 import '../services/notification_service.dart';
 import '../services/storage_service.dart';
@@ -42,7 +43,6 @@ import 'analytics_provider.dart';
 import 'settings_provider.dart';
 import 'user_provider.dart';
 import 'workout_provider.dart';
-import '../services/progression_service.dart';
 import '../models/coach_context.dart';
 import '../models/athlete_memory.dart';
 import '../services/coach_message_service.dart';
@@ -64,6 +64,10 @@ import '../services/predictive_performance_service.dart';
 import '../services/adaptive_programming_service.dart';
 import '../services/exercise_intelligence_service.dart';
 import '../services/athlete_memory_service.dart';
+import '../brain/services/athlete_brain_service.dart';
+import '../brain/models/decision_context.dart';
+import '../brain/models/environment_context.dart';
+import '../brain/models/workout_context.dart';
 import '../services/progression_timeline_service.dart';
 import '../services/weekly_evolution_service.dart';
 import '../services/onboarding_intelligence_service.dart';
@@ -75,6 +79,21 @@ import '../services/narrative_orchestrator.dart';
 import '../models/weekly_review_data.dart';
 import '../models/unified_coach_insight.dart';
 import '../services/coach_insight_orchestrator.dart';
+import '../memory/athlete_memory.dart' as evo;
+import '../memory/services/athlete_memory_service.dart' as evo_svc;
+import '../memory/snapshots/athlete_memory_snapshot.dart' as evo_snap;
+import '../memory/events/workout_completed_event.dart';
+import '../brain/policy/mission_selection_engine.dart';
+import '../brain/confidence/decision_confidence_engine.dart';
+import '../brain/explainability/explainability_engine.dart';
+import '../brain/models/brain_card_data.dart';
+import '../coach/coach.dart';
+import '../review/models/weekly_review.dart';
+import '../review/services/weekly_review_engine.dart';
+import '../timeline/models/timeline_snapshot.dart';
+import '../timeline/services/athlete_timeline_engine.dart';
+import '../ai/models/ai_coach_context.dart';
+import '../ai/services/gemini_coach_service.dart';
 
 /// Drives which adaptive surface the planner shows for today's session.
 enum PlannerAdaptiveState {
@@ -107,6 +126,8 @@ class AppProvider extends ChangeNotifier {
     analytics.addListener(_onChildChanged);
     ai.addListener(_onChildChanged);
     settings.addListener(_onChildChanged);
+    // Rebuild UI when billing status changes (purchase/restore)
+    BillingService.instance.addListener(_onChildChanged);
   }
 
   bool _loading = true;
@@ -148,8 +169,21 @@ class AppProvider extends ChangeNotifier {
   AdaptiveWorkoutDecision? _cachedAdaptive;
   DateTime?                _adaptiveComputedAt;
 
+  // ── BrainCardData cache — same TTL as adaptiveDecision ────────────────
+  BrainCardData?  _cachedBrainCardData;
+  DateTime?       _brainCardComputedAt;
+
+  // ── BrainCoachMessage cache — same TTL as adaptiveDecision ───────────
+  BrainCoachMessage? _cachedCoachMessage;
+  DateTime?          _coachMessageComputedAt;
+
   // ── AthleteMemory — rebuilt after workout, persisted daily ──
   AthleteMemory? _athleteMemory;
+
+  // ── EvoAthleteMemory — EMA-evolved on each workout completion ──────────
+  // Distinct from _athleteMemory (full history rebuild). This field holds
+  // the lightweight lib/memory layer model updated via AthleteMemoryService.
+  evo.AthleteMemory? _evoAthleteMemory;
 
   // ── AthleteMemorySnapshot cache — rebuilt every 5 minutes ─────────────
   AthleteMemorySnapshot? _cachedMemorySnapshot;
@@ -174,6 +208,14 @@ class AppProvider extends ChangeNotifier {
   // ── WeeklyReviewData cache — rebuilt on workout completion / invalidation ─
   WeeklyReviewData? _cachedWeeklyReview;
   DateTime?         _weeklyReviewCachedAt;
+
+  // ── WeeklyReview (rich engine output) — 5-minute TTL ─────────────────────
+  WeeklyReview?  _cachedWeeklyReviewResult;
+  DateTime?      _weeklyReviewResultComputedAt;
+
+  // ── TimelineSnapshot — 5-minute TTL ──────────────────────────────────────
+  TimelineSnapshot? _cachedTimelineSnapshot;
+  DateTime?         _timelineSnapshotComputedAt;
 
   // ── HealthSnapshot — fetched once on init, refreshed every 30 minutes ───
   HealthSnapshot _latestHealthSnapshot = HealthSnapshot.empty;
@@ -491,6 +533,8 @@ class AppProvider extends ChangeNotifier {
     // Rebuild athlete memory with fresh data after each completed workout.
     // Runs sync-then-async: _athleteMemory is set before the next frame renders.
     _rebuildAndSaveAthleteMemory().ignore();
+    // Apply EMA evolution to the lightweight memory layer for this session.
+    _applyEvoAfterWorkout(result, durationMin);
     debugPrint('[Momentum] after memory rebuild (new values): score=${momentumState.score} '
         'consistency=${athleteMemory.consistencyScore} '
         'missed=${athleteMemory.missedWorkoutsLast30}');
@@ -631,6 +675,33 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
+  /// Builds an AthleteMemorySnapshot from the current EMA memory state.
+  /// Falls back to defaults when no workout has been completed yet.
+  evo_snap.AthleteMemorySnapshot get _evoMemorySnapshot {
+    if (_evoAthleteMemory == null) return evo_snap.AthleteMemorySnapshot.defaults();
+    return const evo_svc.AthleteMemoryService().snapshot(_evoAthleteMemory!);
+  }
+
+  DecisionContext _buildDecisionContext() {
+    return DecisionContext(
+      recoveryState:         recoveryState,
+      analyticsSnapshot:     analytics.snapshot,
+      predictiveSnapshot:    predictiveSnapshot,
+      athleteTrend:          athleteTrend,
+      adherenceProfile:      adherenceProfile,
+      trainingAdjustment:    trainingAdjustment,
+      workoutContext: WorkoutContext(
+        daysSinceLastWorkout:    workout.daysSinceLastWorkout,
+        totalWorkouts:           workout.streak.totalWorkouts,
+        goal:                    user.goal,
+        todayExerciseNames:      workout.todayPlan.exercises.map((e) => e.name).toList(),
+        todayExerciseCategories: workout.todayPlan.exercises.map((e) => e.category).toList(),
+      ),
+      environmentContext:    EnvironmentContext(now: DateTime.now()),
+      athleteMemorySnapshot: _evoMemorySnapshot,
+    );
+  }
+
   // ═════════════════════════════════════════════════════════
   // RECOVERY STATE — single authoritative source
   // ═════════════════════════════════════════════════════════
@@ -695,6 +766,10 @@ class AppProvider extends ChangeNotifier {
     _predictiveComputedAt = null;
     _cachedAdaptive              = null;
     _adaptiveComputedAt          = null;
+    _cachedBrainCardData         = null;
+    _brainCardComputedAt         = null;
+    _cachedCoachMessage          = null;
+    _coachMessageComputedAt      = null;
     _cachedMemorySnapshot        = null;
     _memorySnapshotComputedAt    = null;
     _cachedWeeklyEvolution       = null;
@@ -707,6 +782,10 @@ class AppProvider extends ChangeNotifier {
     _behavioralPatternComputedAt   = null;
     _cachedWeeklyReview            = null;
     _weeklyReviewCachedAt          = null;
+    _cachedWeeklyReviewResult      = null;
+    _weeklyReviewResultComputedAt  = null;
+    _cachedTimelineSnapshot        = null;
+    _timelineSnapshotComputedAt    = null;
     notifyListeners();
   }
 
@@ -822,7 +901,7 @@ class AppProvider extends ChangeNotifier {
   Future<void> _refreshHealthSnapshot() async {
     final now = DateTime.now();
     if (_healthSnapshotComputedAt != null &&
-        now.difference(_healthSnapshotComputedAt!).inMinutes < 30) return;
+        now.difference(_healthSnapshotComputedAt!).inMinutes < 30) { return; }
     try {
       _latestHealthSnapshot = await HealthConnectService.instance.fetchSnapshot();
       _healthSnapshotComputedAt = now;
@@ -830,6 +909,8 @@ class AppProvider extends ChangeNotifier {
       _latestHealthSnapshot = HealthSnapshot.empty;
     }
   }
+
+  final AthleteBrainService _athleteBrain = const AthleteBrainService();
 
   AthleteTrendSnapshot get athleteTrend {
     final now = DateTime.now();
@@ -1016,39 +1097,8 @@ class AppProvider extends ChangeNotifier {
         now.difference(_adaptiveComputedAt!).inSeconds < 300) {
       return _cachedAdaptive!;
     }
-    final trend      = athleteTrend;
-    final adherence  = adherenceProfile;
-    final predictive = predictiveSnapshot;
-    final adjustment = trainingAdjustment;
-    _cachedAdaptive = AdaptiveProgrammingService.compute(
-      AdaptiveInput(
-        recoveryScore:             recoveryState.overallScore,
-        highFatigue:               recoveryState.highFatigue,
-        needsDeload:               recoveryState.needsDeload,
-        recoveryTrend:             analytics.recoveryTrend,
-        suppressedMuscles:         adjustment.suppressedMuscles,
-        shouldReduceAxialLoad:     adjustment.shouldReduceAxialLoad,
-        recommendedFocusMuscles:   adjustment.recommendedFocusMuscles,
-        momentumLevel:             trend.momentumState.index,
-        overreachingRiskLevel:     trend.overreachingRisk.index,
-        plateauRiskLevel:          trend.plateauRisk.index,
-        fatigueTrendLevel:         trend.fatigueTrend.index,
-        overloadReadinessLevel:    predictive.overloadReadiness.index,
-        recoveryCollapseRiskLevel: predictive.recoveryCollapseRisk.index,
-        burnoutRiskLevel:          adherence.burnoutRisk.index,
-        intimidationRiskLevel:     adherence.intimidationRisk.index,
-        comebackProbability:       adherence.comebackProbability,
-        disciplineScore:           adherence.disciplineScore,
-        weeklyImprovementPct:      analytics.weeklyImprovementPct,
-        isOnPlateau:               analytics.isOnPlateau,
-        daysSinceLastWorkout:      workout.daysSinceLastWorkout,
-        totalWorkouts:             workout.streak.totalWorkouts,
-        goal:                      user.goal,
-        todayExerciseNames:        workout.todayPlan.exercises.map((e) => e.name).toList(),
-        todayExerciseCategories:   workout.todayPlan.exercises.map((e) => e.category).toList(),
-        now:                       now,
-      ),
-    );
+    final context = _buildDecisionContext();
+    _cachedAdaptive = _athleteBrain.computeDecision(context);
     _adaptiveComputedAt = now;
     return _cachedAdaptive!;
   }
@@ -1056,6 +1106,205 @@ class AppProvider extends ChangeNotifier {
   // ── Adaptive display getters — consumed by home and planner Selectors ─────
   String get adaptiveFocusLabel     => adaptiveDecision.focus.label;
   String get adaptiveAthleteMessage => adaptiveDecision.athleteFacingMessage;
+
+  // ── AthleteBrain Home Card data — 5-minute TTL ───────────────────────────
+  /// Runs MissionSelectionEngine → DecisionConfidenceEngine →
+  /// ExplainabilityEngine and packages the output for the AthleteBrainCard.
+  /// All engines are pure/deterministic; no side effects.
+  BrainCardData get brainCardData {
+    if (workout.streak.totalWorkouts == 0) return BrainCardData.onboarding;
+
+    final now = DateTime.now();
+    if (_cachedBrainCardData != null &&
+        _brainCardComputedAt  != null &&
+        now.difference(_brainCardComputedAt!).inSeconds < 300) {
+      return _cachedBrainCardData!;
+    }
+
+    final ctx     = _buildDecisionContext();
+    final memSnap = _evoMemorySnapshot;
+
+    final missionType = const MissionSelectionEngine().selectMission(
+      recoveryState:         ctx.recoveryState,
+      analyticsSnapshot:     ctx.analyticsSnapshot,
+      athleteMemorySnapshot: memSnap,
+      predictiveSnapshot:    ctx.predictiveSnapshot,
+      adherenceProfile:      ctx.adherenceProfile,
+      trainingAdjustment:    ctx.trainingAdjustment,
+      workoutContext:        ctx.workoutContext,
+    );
+
+    final confidence = const DecisionConfidenceEngine().score(
+      decisionContext:       ctx,
+      missionType:           missionType,
+      recoveryState:         ctx.recoveryState,
+      analyticsSnapshot:     ctx.analyticsSnapshot,
+      athleteMemorySnapshot: memSnap,
+      predictiveSnapshot:    ctx.predictiveSnapshot,
+      adherenceProfile:      ctx.adherenceProfile,
+    );
+
+    final explanation = const ExplainabilityEngine().explain(
+      missionType:           missionType,
+      decisionConfidence:    confidence,
+      decisionContext:       ctx,
+      athleteMemorySnapshot: memSnap,
+    );
+
+    _cachedBrainCardData = BrainCardData(
+      missionType:              missionType,
+      missionLabel:             missionType.label,
+      confidencePct:            (confidence.overallConfidence * 100).round(),
+      recommendation:           explanation.recommendation,
+      confidenceNarrative:      explanation.confidenceNarrative,
+      dominantSignals:          explanation.dominantSignals,
+      identityLabel:            identityStage.label,
+      preferredDurationMinutes: (_evoAthleteMemory?.preferredSessionDuration ??
+                                 const Duration(minutes: 60)).inMinutes,
+      recoveryLabel:            recoveryState.readiness.label,
+      recoveryScore:            recoveryState.overallScore.round(),
+    );
+    _brainCardComputedAt = now;
+    return _cachedBrainCardData!;
+  }
+
+  // ── CoachBrain — 5-minute TTL ─────────────────────────────────────────────
+
+  CoachBrainContext _buildCoachContext() {
+    final bd  = brainCardData;           // uses cache — no recomputation
+    final ctx = _buildDecisionContext(); // uses cached sub-getters
+
+    // DecisionConfidence is recomputed here; all engines are O(1) deterministic.
+    final confidence = const DecisionConfidenceEngine().score(
+      decisionContext:       ctx,
+      missionType:           bd.missionType,
+      recoveryState:         ctx.recoveryState,
+      analyticsSnapshot:     ctx.analyticsSnapshot,
+      athleteMemorySnapshot: _evoMemorySnapshot,
+      predictiveSnapshot:    ctx.predictiveSnapshot,
+      adherenceProfile:      ctx.adherenceProfile,
+    );
+
+    return CoachBrainContext(
+      athleteMemorySnapshot: _evoMemorySnapshot,
+      adaptiveDecision:      adaptiveDecision,
+      recoveryState:         recoveryState,
+      decisionConfidence:    confidence,
+    );
+  }
+
+  /// Deterministic coaching message for today. Cached 5 minutes.
+  /// Only CoachBrainService produces this; no other service is involved.
+  BrainCoachMessage get coachMessage {
+    if (workout.streak.totalWorkouts == 0) return BrainCoachMessage.onboarding;
+
+    final now = DateTime.now();
+    if (_cachedCoachMessage  != null &&
+        _coachMessageComputedAt != null &&
+        now.difference(_coachMessageComputedAt!).inSeconds < 300) {
+      return _cachedCoachMessage!;
+    }
+    _cachedCoachMessage     = const CoachBrainService().generate(_buildCoachContext());
+    _coachMessageComputedAt = now;
+    return _cachedCoachMessage!;
+  }
+  // ── WeeklyReview (rich engine output) — 5-minute TTL ─────────────────────
+
+  /// Full WeeklyReview from WeeklyReviewEngine. Cached 5 minutes.
+  WeeklyReview get weeklyReview {
+    final now = DateTime.now();
+    if (_cachedWeeklyReviewResult != null &&
+        _weeklyReviewResultComputedAt != null &&
+        now.difference(_weeklyReviewResultComputedAt!).inSeconds < 300) {
+      return _cachedWeeklyReviewResult!;
+    }
+    final ctx        = _buildDecisionContext();
+    final memSnap    = _evoMemorySnapshot;
+    final confidence = const DecisionConfidenceEngine().score(
+      decisionContext:       ctx,
+      missionType:           brainCardData.missionType,
+      recoveryState:         ctx.recoveryState,
+      analyticsSnapshot:     ctx.analyticsSnapshot,
+      athleteMemorySnapshot: memSnap,
+      predictiveSnapshot:    ctx.predictiveSnapshot,
+      adherenceProfile:      ctx.adherenceProfile,
+    );
+    _cachedWeeklyReviewResult = const WeeklyReviewEngine().generate(
+      reviewData:            weeklyReviewData,
+      athleteMemorySnapshot: memSnap,
+      brainCardData:         brainCardData,
+      coachMessage:          coachMessage,
+      analyticsSnapshot:     analytics.snapshot,
+      decisionConfidence:    confidence,
+    );
+    _weeklyReviewResultComputedAt = now;
+    return _cachedWeeklyReviewResult!;
+  }
+
+  // ── TimelineSnapshot — 5-minute TTL ──────────────────────────────────────
+
+  /// Full athlete timeline. Cached 5 minutes.
+  TimelineSnapshot get timelineSnapshot {
+    final now = DateTime.now();
+    if (_cachedTimelineSnapshot != null &&
+        _timelineSnapshotComputedAt != null &&
+        now.difference(_timelineSnapshotComputedAt!).inSeconds < 300) {
+      return _cachedTimelineSnapshot!;
+    }
+    _cachedTimelineSnapshot = const AthleteTimelineEngine().generate(
+      mem:           _evoMemorySnapshot,
+      workoutLogs:   workout.logs,
+      prEvents:      workout.recentPRs,
+      currentStreak: workout.streak.currentStreak,
+      longestStreak: workout.streak.longestStreak,
+      totalWorkouts: workout.streak.totalWorkouts,
+    );
+    _timelineSnapshotComputedAt = now;
+    return _cachedTimelineSnapshot!;
+  }
+
+  // ── Gemini Coach Verdict — async, falls back to CoachMessage ─────────────
+
+  /// Assembles the full [AICoachContext] from current app state.
+  ///
+  /// All inputs are read from cached getters — no re-computation.
+  AICoachContext _buildAICoachContext() {
+    final ctx        = _buildDecisionContext();
+    final memSnap    = _evoMemorySnapshot;
+    final confidence = const DecisionConfidenceEngine().score(
+      decisionContext:       ctx,
+      missionType:           brainCardData.missionType,
+      recoveryState:         ctx.recoveryState,
+      analyticsSnapshot:     ctx.analyticsSnapshot,
+      athleteMemorySnapshot: memSnap,
+      predictiveSnapshot:    ctx.predictiveSnapshot,
+      adherenceProfile:      ctx.adherenceProfile,
+    );
+    return AICoachContext(
+      coachMessage:          coachMessage,
+      coachBrainContext:     _buildCoachContext(),
+      athleteMemorySnapshot: memSnap,
+      adaptiveDecision:      adaptiveDecision,
+      brainCardData:         brainCardData,
+      decisionConfidence:    confidence,
+    );
+  }
+
+  /// Returns a Gemini-generated coach verdict for today.
+  ///
+  /// Falls back to [coachMessage.subtitle] when Gemini is unavailable,
+  /// rate-limited, or the kill-switch is active.
+  /// Never throws. Quota and cooldown are owned by [ApiService].
+  Future<String> fetchGeminiVerdictAsync({bool isPremium = false}) async {
+    final context  = _buildAICoachContext();
+    final fallback = coachMessage.subtitle;
+    return const GeminiCoachService().fetchVerdict(
+      context:   context,
+      fallback:  fallback,
+      isPremium: isPremium,
+    );
+  }
+
   bool   get isAdaptiveModified     => adaptiveDecision.shouldModifyWorkout;
   int    get adaptiveFocusIndex     => adaptiveDecision.focus.index;
   List<ExerciseSwap> get adaptiveSwaps => adaptiveDecision.swaps;
@@ -2007,6 +2256,42 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// Applies EMA-based evolution to the lightweight lib/memory AthleteMemory
+  /// after a workout is completed.
+  ///
+  /// This is separate from _rebuildAndSaveAthleteMemory, which performs a full
+  /// history rebuild. This method applies only the incremental EMA signal for
+  /// the just-completed session and stores the result in _evoAthleteMemory.
+  /// No persistence — no Firebase — no Provider notification.
+  void _applyEvoAfterWorkout(DayCompletionResult result, int durationMin) {
+    final completedDay = result.completedDay;
+    if (completedDay == null) return;
+
+    // Compute total tonnage (kg) for the completed session from logged sets.
+    final volumeKg = completedDay.exercises.fold<int>(
+      0,
+      (sum, ex) => sum +
+          ex.sets.fold<int>(
+            0,
+            (s, set) => s + (set.weight * set.reps).round(),
+          ),
+    );
+
+    final event = WorkoutCompletedEvent(
+      durationMinutes:   durationMin,
+      wasSuccessful:     true,
+      completedVolumeKg: volumeKg,
+      completedAt:       DateTime.now(),
+    );
+
+    _evoAthleteMemory = const evo_svc.AthleteMemoryService().updateAfterWorkout(
+      memory:                _evoAthleteMemory ?? evo.AthleteMemory.defaults(),
+      workoutDurationMinutes: event.durationMinutes,
+      wasSuccessful:          event.wasSuccessful,
+      completedVolumeKg:      event.completedVolumeKg,
+    );
+  }
+
   /// Records that a coach topic was shown and saves the updated cooldown.
   Future<void> recordCoachTopic(String topic) async {
     if (topic.isEmpty) return;
@@ -2134,6 +2419,9 @@ class AppProvider extends ChangeNotifier {
   /// Generate a smart plan from local AIEngine.
   /// Respects gymDaysPerWeek, splitStyle, user body weight, and activity level.
   void generateSmartPlan() {
+    // My Own Way — user builds their own plan, never auto-generate
+    if (settings.splitStyle == SplitStyle.myOwnWay) return;
+
     // If the user has picked an explicit split (not AI adaptive), honour it.
     final splitOverride = settings.splitStyle == SplitStyle.aiAdaptive
         ? ''
@@ -2467,6 +2755,17 @@ class AppProvider extends ChangeNotifier {
         emoji:       emoji,
         isBodyweight: isBodyweight,
       );
+  void deleteCustomExercise(String id) => workout.deleteCustomExercise(id);
+  void editCustomExercise({
+    required String id,
+    required String name,
+    required String category,
+    required String emoji,
+    required bool isBodyweight,
+  }) => workout.editCustomExercise(
+        id: id, name: name, category: category, emoji: emoji, isBodyweight: isBodyweight,
+      );
+
   void addSet(int dayIndex, String exId) => workout.addSet(dayIndex, exId);
   void removeSet(int dayIndex, String exId, String setId) =>
       workout.removeSet(dayIndex, exId, setId);
@@ -2643,7 +2942,7 @@ class AppProvider extends ChangeNotifier {
       }
 
       if (cur >= 3) {
-        return '${cur}-day training streak. Rhythm maintained.';
+        return '$cur-day training streak. Rhythm maintained.';
       }
 
       return 'Stay consistent — your body adapts best with regular training.';
@@ -2687,10 +2986,10 @@ class AppProvider extends ChangeNotifier {
 
     // ── PRIORITY 4: Severe inactivity ──
     if (daysSince >= 7 && total > 0) {
-      return '${daysSince} days since your last session. Starting light today is the right call — rhythm before intensity.';
+      return '$daysSince days since your last session. Starting light today is the right call — rhythm before intensity.';
     }
     if (daysSince >= 4 && total > 0) {
-      return '${daysSince} days since your last session. Keep it controlled today to get back into your groove.';
+      return '$daysSince days since your last session. Keep it controlled today to get back into your groove.';
     }
 
     // ── PRIORITY 5: Skipped muscle (training balance) ──
