@@ -78,6 +78,11 @@ class RecoveryEngineInput {
   final double? sleepHours;     // last night's sleep duration in hours
   final int?    todayStepCount; // total steps logged today
 
+  // Nutrition signal — today's protein intake as % of goal.
+  // Null = no data → no influence. One lightweight modifier among many;
+  // never allowed to dominate the training-derived score.
+  final double? proteinAdherencePct;
+
   const RecoveryEngineInput({
     required this.lastMuscleTrained,
     required this.weeklyMuscleVolume,
@@ -89,6 +94,7 @@ class RecoveryEngineInput {
     required this.now,
     this.sleepHours,
     this.todayStepCount,
+    this.proteinAdherencePct,
   });
 }
 
@@ -121,6 +127,7 @@ class RecoveryEngine {
     // Health Connect modifiers — small contextual nudges, never override training signal.
     overall += _sleepModifier(input.sleepHours);
     overall += _stepsModifier(input.todayStepCount, overall);
+    overall += _proteinModifier(input.proteinAdherencePct);
     final overallClamped = _clampScore(overall, _kOverallScoreFloor, _kOverallScoreCeil);
 
     // Step 4 — Derived signals.
@@ -304,6 +311,21 @@ class RecoveryEngine {
     if (sleepHours < 7.0) return -2.0;
     if (sleepHours >= 8.0) return  3.0;
     return 0.0;
+  }
+
+  // Protein adherence nudges overall recovery by at most ±3 points.
+  // Bounds are deliberately tight — protein explains a likely limiter,
+  // it never punishes. Null = no data = no effect.
+  //   ≥95%  → +2   (small positive contribution)
+  //   80–94 →  0   (neutral)
+  //   60–79 → -2   (small negative contribution)
+  //   <60   → -3   (limiter — UI shows one explanatory insight)
+  static double _proteinModifier(double? adherencePct) {
+    if (adherencePct == null) return 0.0;
+    if (adherencePct >= 95.0) return  2.0;
+    if (adherencePct >= 80.0) return  0.0;
+    if (adherencePct >= 60.0) return -2.0;
+    return -3.0;
   }
 
   // Very high step count under already-suppressed recovery adds modest pressure.

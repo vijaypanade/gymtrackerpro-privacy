@@ -57,8 +57,9 @@ class MomentumState {
     // ── Volume trend (0–10 pts) ───────────────────────────
     if (ctx.previousWeeklyVolume > 0) {
       final delta = ctx.weeklyVolume / ctx.previousWeeklyVolume;
-      if (delta >= 1.05 && delta <= 1.25) raw += 10; // healthy growth
-      else if (delta >= 0.85)             raw += 5;  // stable
+      if (delta >= 1.05 && delta <= 1.25) {
+        raw += 10; // healthy growth
+      } else if (delta >= 0.85)             raw += 5;  // stable
     }
 
     // ── Penalties ─────────────────────────────────────────

@@ -86,9 +86,13 @@ abstract final class ExerciseAIBadgeHelper {
     if (movement == 'compound') {
       final day = dayTitle.toLowerCase();
       if ((day.contains('push') || day.contains('chest')) &&
-          (muscle == 'chest' || muscle == 'shoulders')) return 'AI Pick';
+          (muscle == 'chest' || muscle == 'shoulders')) {
+        return 'AI Pick';
+      }
       if ((day.contains('pull') || day.contains('back')) &&
-          muscle == 'back') return 'AI Pick';
+          muscle == 'back') {
+        return 'AI Pick';
+      }
       if (day.contains('legs') && muscle == 'legs') return 'AI Pick';
       if (day.contains('full') || day.contains('total')) return 'AI Pick';
       return 'Athletic Transfer';

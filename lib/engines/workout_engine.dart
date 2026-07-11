@@ -852,16 +852,6 @@ static double _rotationScore(
 
   return score;
 }
-  static bool _patternOversaturated(
-    _ExerciseTemplate tpl,
-    _VolumeReport report,
-  ) {
-    for (final p in tpl.patterns) {
-      if (report.pattern(p) >= 6) return true;
-    }
-    return false;
-  }
-
   // ───────────────────────────────────────────────────
   // PLAN BUILDERS
   // ───────────────────────────────────────────────────
@@ -955,7 +945,6 @@ const eliteCap = 2;                          // ← ADD
     for (var idx = 0; idx < muscles.length; idx++) {
       final muscle = muscles[idx];
       final isPrimary = idx == 0;
-      final isWeak = _normalize(muscle) == _normalize(weakMuscle);
 
       final selected = _selectExercises(
         muscle: muscle,
@@ -1091,9 +1080,7 @@ if (!highFatigue && i.isOdd) {
     required List<WorkoutLog> logs,
     required String weakMuscle,
     required UserProfile profile,              // ← ADD
-  SessionFocus focus = SessionFocus.hypertrophy,  // ← ADD
-  PerformanceTrend trend = PerformanceTrend.stagnant,  // ← ADD
-  String reason = '', 
+  String reason = '',
   }) {
     final muscles = _musclesForSplit(split);
     final exercises = <PlannedExercise>[];
@@ -1172,11 +1159,6 @@ if (pool.isEmpty) {
         .toSet();
 
    pool.sort((a, b) {
-  final aKey =
-      a.name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-  final bKey =
-      b.name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-
   double aScore = _rotationScore(a, overusedKeys, report);
   double bScore = _rotationScore(b, overusedKeys, report);
 

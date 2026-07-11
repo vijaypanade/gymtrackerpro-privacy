@@ -33,25 +33,29 @@ class _XPToastSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Positioned MUST stay a direct child of the OverlayLayer Stack.
+    // AnimatedSwitcher wraps its child in Fade/ScaleTransition render
+    // objects — a Positioned inside it gets a non-Stack render parent and
+    // crashes with "ParentData is not a subtype of StackParentData".
     return Selector<GamificationProvider, ({bool show, int xp})>(
       selector: (_, gp) => (show: gp.showXPPopup, xp: gp.lastXPGained),
-      builder: (_, s, __) => AnimatedSwitcher(
-        duration: const Duration(milliseconds: 320),
-        switchOutCurve: Curves.easeInBack,
-        transitionBuilder: (child, anim) => FadeTransition(
-          opacity: anim,
-          child: ScaleTransition(scale: anim, child: child),
-        ),
-        child: s.show
-            ? Positioned(
-                top: 60,
-                right: AppSpacing.lg,
-                child: _XPToast(
+      builder: (_, s, __) => Positioned(
+        top: 60,
+        right: AppSpacing.lg,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 320),
+          switchOutCurve: Curves.easeInBack,
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: ScaleTransition(scale: anim, child: child),
+          ),
+          child: s.show
+              ? _XPToast(
                   key: const ValueKey('xp_toast'),
                   xp: s.xp,
-                ),
-              )
-            : const SizedBox.shrink(key: ValueKey('xp_empty')),
+                )
+              : const SizedBox.shrink(key: ValueKey('xp_empty')),
+        ),
       ),
     );
   }
@@ -358,7 +362,7 @@ class _StreakToast extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.local_fire_department_rounded,
+                const Icon(Icons.local_fire_department_rounded,
                     size: 30, color: AppColors.orange),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -368,7 +372,7 @@ class _StreakToast extends StatelessWidget {
                       Text('$streak-Day Streak',
                           style: _titleStyle),
                       const Text(
-                        'You\'re unstoppable. Never break the chain.',
+                        'Streak intact. Keep it going.',
                         style: _subStyle,
                       ),
                     ],

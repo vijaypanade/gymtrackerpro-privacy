@@ -287,6 +287,14 @@ class ExerciseData {
       "bodyweight": false, "defaultWeight": 30.0, "defaultReps": 12,
       "emoji": "🚣",
     },
+    {
+      "id": "pull_shoulders_dumbbell_shrugs",
+      "name": "Dumbbell Shrugs", "youtubeId": "qvvJUKq7_sU",
+      "type": "pull", "muscle": "Shoulders",
+      "equipment": "dumbbell", "movement": "isolation",
+      "bodyweight": false, "defaultWeight": 20.0, "defaultReps": 15,
+      "emoji": "🤷",
+    },
 
     // ═══════════════════════════════════════
     // LEGS — 14 exercises
@@ -686,7 +694,7 @@ class ExerciseData {
     {"id": "legs_legs_smith_machine_hip_thrust",
       "name": "Smith Machine Hip Thrust", "youtubeId": "rW5JX5gWhqo", "type": "legs", "muscle": "Legs", "equipment": "machine", "movement": "compound", "bodyweight": false, "defaultWeight": 50.0, "defaultReps": 10, "emoji": "🏗️"},
     {"id": "push_chest_landmine_press",
-      "name": "Landmine Press", "youtubeId": "kKYsTGn0a_w", "type": "push", "muscle": "Chest", "equipment": "barbell", "movement": "compound", "bodyweight": false, "defaultWeight": 25.0, "defaultReps": 10, "emoji": "💣"},
+      "name": "Landmine Press", "youtubeIds": ["kKYsTGn0a_w", "U2YPzDzS6dM"], "type": "push", "muscle": "Chest", "equipment": "barbell", "movement": "compound", "bodyweight": false, "defaultWeight": 25.0, "defaultReps": 10, "emoji": "💣"},
     {"id": "push_chest_svend_press",
       "name": "Svend Press", "youtubeId": "YH-RdoLEBPM", "type": "push", "muscle": "Chest", "equipment": "dumbbell", "movement": "isolation", "bodyweight": false, "defaultWeight": 10.0, "defaultReps": 12, "emoji": "💪"},
     {"id": "push_chest_floor_press",

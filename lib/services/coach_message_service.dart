@@ -187,11 +187,11 @@ class CoachMessageService {
         return '$name PR — ${pr.display}. Build volume at this load before chasing higher singles.';
       case CoachTone.scientific:
         final tip = v == 0
-            ? 'Two to three sets at this load before progressing.'
-            : 'Consolidate before advancing — strength requires exposure, not just peaks.';
+            ? 'A few sets at this load before moving up.'
+            : 'Stay at this weight a little longer.';
         return '$name PR — ${pr.display}. $tip';
       case CoachTone.supportive:
-        return '$name PR — ${pr.display}. That\'s a measurable improvement. Build on it next session.';
+        return '$name PR — ${pr.display}. Good lift. Build on it.';
       case CoachTone.disciplined:
         return isFavorite
             ? 'PR on $name — ${pr.display}. Consistent showing up made this happen.'
@@ -203,22 +203,22 @@ class CoachMessageService {
     int pct, CoachTone tone, AthleteMemory? memory, int v,
   ) {
     final fatigueNote = memory?.fatiguePattern == AthleteMemory.patternFatiguesAfter3Days
-        ? 'Your pattern shows fatigue after high-volume clusters.'
-        : 'Recovery becomes the bottleneck now, not motivation.';
+        ? 'You tend to fade after big weeks.'
+        : 'Recovery matters more than motivation now.';
 
     switch (tone) {
       case CoachTone.aggressive:
-        return 'Volume up $pct% this week. $fatigueNote Protect sleep and protein intake.';
+        return 'Volume up $pct%. Protect sleep and protein.';
       case CoachTone.elite:
-        return 'Weekly volume jumped $pct%. $fatigueNote';
+        return 'Volume up $pct%. $fatigueNote';
       case CoachTone.scientific:
-        return 'Volume increase of $pct% detected. ACWR elevation suggests recovery priority — reduce intensity by 15–20% today.';
+        return 'Volume up $pct%. Ease off a little today.';
       case CoachTone.supportive:
-        return 'Training volume jumped $pct% this week. Good progress — match it with extra recovery today.';
+        return 'Volume up $pct%. Match it with extra recovery.';
       case CoachTone.disciplined:
         return v == 0
-            ? 'Volume spiked $pct%. More isn\'t always better — manage it.'
-            : 'Volume up $pct% — quality over quantity from here.';
+            ? 'Volume up $pct%. More isn\'t always better.'
+            : 'Volume up $pct%. Quality over quantity from here.';
     }
   }
 
@@ -233,23 +233,22 @@ class CoachMessageService {
         memory.weakestMuscle.toLowerCase() == muscle.toLowerCase();
 
     if (isKnownWeak) {
-      return '${_cap(muscle)} is your least-trained group and hasn\'t been hit in $daysStr. '
-          'Address it early in today\'s session before fatigue sets in.';
+      return '${_cap(muscle)} hasn\'t been trained in $daysStr. Hit it early today.';
     }
 
     switch (tone) {
       case CoachTone.aggressive:
-        return '${_cap(muscle)} untrained $daysStr. Hit $hint today — no excuses.';
+        return '${_cap(muscle)} untrained $daysStr. Hit $hint today.';
       case CoachTone.elite:
-        return '${_cap(muscle)} neglected $daysStr. Imbalance limits total output — prioritise $hint.';
+        return '${_cap(muscle)} skipped $daysStr. Start with $hint today.';
       case CoachTone.scientific:
-        return '${_cap(muscle)} hasn\'t been trained in $daysStr. Schoenfeld recommends 2×/week minimum — fit it in today.';
+        return '${_cap(muscle)} hasn\'t been trained in $daysStr. Twice a week keeps it growing.';
       case CoachTone.supportive:
-        return '${_cap(muscle)} hasn\'t been trained in $daysStr. Adding $hint today keeps your plan balanced.';
+        return '${_cap(muscle)} hasn\'t been trained in $daysStr. $hint keeps things balanced.';
       case CoachTone.disciplined:
         return v == 0
-            ? '${_cap(muscle)} untrained $daysStr. It doesn\'t improve without work.'
-            : '${_cap(muscle)} skipped $daysStr. Add $hint before it compounds further.';
+            ? '${_cap(muscle)} untrained $daysStr. It won\'t improve without work.'
+            : '${_cap(muscle)} skipped $daysStr. Add $hint today.';
     }
   }
 
@@ -259,43 +258,42 @@ class CoachMessageService {
     final isStreakDriven = memory?.motivationalTriggers.contains(AthleteMemory.triggerStreaks) ?? false;
 
     if (isStreakDriven) {
-      return '$streak-day streak at risk — your data shows consistency is what drives your progress. Even 20 minutes keeps it alive.';
+      return '$streak-day streak at risk. Twenty minutes keeps it alive.';
     }
 
     switch (tone) {
       case CoachTone.aggressive:
         return '$streak-day streak. Don\'t let one off-day erase it.';
       case CoachTone.elite:
-        return '$streak-day streak at risk. Even a short session protects the adaptation momentum.';
+        return '$streak-day streak at risk. A short session keeps it alive.';
       case CoachTone.scientific:
-        return '$streak-day streak at risk. Neural adaptations accumulate with frequency — short sessions count.';
+        return '$streak-day streak at risk. Short sessions count.';
       case CoachTone.supportive:
-        return '$streak-day streak — you\'re building a real habit. A short workout today keeps it intact.';
+        return '$streak-day streak. A short workout keeps it intact.';
       case CoachTone.disciplined:
         return v == 0
-            ? '$streak days of consistency at risk. Do something — anything.'
-            : '$streak-day streak. Protect it. Even 15 minutes matters.';
+            ? '$streak days at risk. Do something today.'
+            : '$streak-day streak. Even 15 minutes matters.';
     }
   }
 
   static String _deloadMessage(CoachTone tone, AthleteMemory? memory, int v) {
     final fatigues = memory?.fatiguePattern == AthleteMemory.patternFatiguesAfter3Days;
     if (fatigues) {
-      return 'Volume dropped this week — your pattern shows you need this. '
-          'Nervous system recovery is catching up. Extend the deload by one more day.';
+      return 'Volume dropped this week. Your body needs it. Take one more easy day.';
     }
 
     switch (tone) {
       case CoachTone.aggressive:
         return v == 0
-            ? 'Deload week. Drop to 40% volume — come back sharper next week.'
-            : 'Four-week mesocycle complete. Deload, then push harder.';
+            ? 'Deload week. Come back sharper next week.'
+            : 'Four hard weeks done. Deload, then push again.';
       case CoachTone.elite:
-        return 'Mesocycle complete — deload this week (40% volume) for full neural recovery before the next progression block.';
+        return 'Deload week. Drop the volume, keep the habit.';
       case CoachTone.scientific:
-        return 'Zourdos protocol: week four is deload week. Reduce volume 40%, maintain intensity. Supercompensation peaks in 5–7 days.';
+        return 'Deload week. Lighter loads now, stronger next week.';
       case CoachTone.supportive:
-        return 'Your body is ready for a recovery week. Drop the volume — it\'s part of the process, not a step back.';
+        return 'Your body earned a lighter week. It\'s part of the process.';
       case CoachTone.disciplined:
         return 'Deload week. Lower the volume, keep showing up.';
     }
@@ -313,23 +311,23 @@ class CoachMessageService {
     final altMuscle = ready != null && ready.key != fatigued.key
         ? _cap(ready.key)
         : null;
-    final alt = altMuscle != null ? 'Target ${altMuscle.toLowerCase()} instead.' : 'Use today as active recovery.';
+    final alt = altMuscle != null ? 'Train ${altMuscle.toLowerCase()} instead.' : 'Take it easy today.';
 
-    final readiness = score >= 65 ? 'still elevated'
-        : score >= 45 ? 'suppressed'
-        : 'depleted';
+    final readiness = score >= 65 ? 'nearly ready'
+        : score >= 45 ? 'still recovering'
+        : 'worn out';
     switch (tone) {
       case CoachTone.aggressive:
-        return '$muscle is $readiness — loading it limits adaptation. $alt';
+        return '$muscle is $readiness. $alt';
       case CoachTone.elite:
-        return '$muscle recovery not complete — loading it now trades adaptation for injury risk. $alt';
+        return '$muscle needs more time. $alt';
       case CoachTone.scientific:
-        return '$muscle repair is incomplete — below the threshold for safe heavy loading. $alt';
+        return '$muscle isn\'t ready for heavy work. $alt';
       case CoachTone.supportive:
-        return '$muscle needs more time. $alt Training smart means knowing when to pull back.';
+        return '$muscle needs more time. $alt';
       case CoachTone.disciplined:
         return v == 0
-            ? '$muscle is $readiness. Train what\'s ready — not what feels good.'
+            ? '$muscle is $readiness. Train what\'s ready.'
             : '$muscle is $readiness. $alt';
     }
   }
@@ -339,41 +337,33 @@ class CoachMessageService {
   ) {
     // Pattern: user misses workouts repeatedly
     if (memory.missedWorkoutsLast30 >= 4 && ctx.daysSinceLastWorkout >= 2) {
-      final pattern = memory.fatiguePattern == AthleteMemory.patternFatiguesAfter3Days
-          ? 'You tend to lose momentum after high-volume clusters. '
-          : '';
-      return '${pattern}Short workout today beats the perfect workout tomorrow. '
-          'Your consistency score is ${memory.consistencyScore}% — bring it up.';
+      return 'A short workout today beats a perfect one tomorrow.';
     }
 
     // Pattern: user responds well to PRs
     if (memory.motivationalTriggers.contains(AthleteMemory.triggerPR) &&
         memory.favoriteLift.isNotEmpty) {
       final lift = _fmtExercise(memory.favoriteLift);
-      return 'Your ${lift.isNotEmpty ? lift : "compound"} numbers are driving your consistency. '
-          'Lean into heavy compounds this week to keep momentum.';
+      return '${_cap(lift.isNotEmpty ? lift : "compounds")} keeps you consistent. Lean into it this week.';
     }
 
     // Pattern: user trains aggressively when motivated
     if (memory.fatiguePattern == AthleteMemory.patternFatiguesAfter3Days &&
         ctx.weeklyVolume > memory.avgWeeklyVolume * 1.2) {
-      return 'You push volume hard when motivated — recovery is now the growth limiter. '
-          'Throttle back 10–15% today to protect next week\'s output.';
+      return 'Big volume lately. Pull back a little today.';
     }
 
     // Pattern: beginner phase
     if (ctx.totalWorkouts < 20) {
-      return 'Consistency matters more than intensity right now. '
-          'Your nervous system is still adapting — show up, not just when motivated.';
+      return 'Consistency beats intensity right now. Just keep showing up.';
     }
 
     // Pattern: high volume tolerance — acknowledge it
     if (memory.fatiguePattern == AthleteMemory.patternHighVolumeTolerant &&
         ctx.currentStreak >= 7) {
       return v == 0
-          ? 'You respond well to moderate-to-high volume and frequent exposure. Keep the frequency — vary the intensity.'
-          : 'Your training pattern shows high tolerance for consecutive sessions. '
-              'Use that — but monitor sleep and appetite as early fatigue signals.';
+          ? 'Frequent training suits you. Keep the frequency, vary the effort.'
+          : 'Back-to-back sessions suit you. Watch sleep and appetite.';
     }
 
     return '';
@@ -383,26 +373,20 @@ class CoachMessageService {
     CoachContext ctx, AthleteMemory memory, CoachTone tone, int v,
   ) {
     final daysMissed = ctx.daysSinceLastWorkout;
-    final consistency = memory.consistencyScore;
 
     if (daysMissed >= 5) {
-      return 'Momentum dipped — rebuild rhythm quickly before inactivity normalizes. '
-          'Start with a short session today. No load targets.';
+      return 'Been a few days. Start with a short session today.';
     }
     if (memory.fatiguePattern == AthleteMemory.patternFatiguesAfter3Days) {
-      return 'Your pattern: high output, then a gap. Recovery window reset. '
-          'Rebuild gradually — don\'t rush back to peak volume.';
+      return 'You\'re rested now. Ease back in — no need to rush.';
     }
     switch (v) {
       case 0:
-        return 'Two missed days is the inflection point. '
-            'One session today prevents the rhythm from resetting.';
+        return 'Two days off. One session today keeps the rhythm.';
       case 1:
-        return 'Consistency at $consistency% — don\'t let the gap widen. '
-            'Short session now costs less than a full reset later.';
+        return 'Don\'t let the gap widen. A short session today is enough.';
       default:
-        return 'Recovery window has opened. Return gradually — '
-            'intensity follows consistency, not the other way.';
+        return 'You\'re rested. Ease back in today.';
     }
   }
 
@@ -413,19 +397,16 @@ class CoachMessageService {
     final longest = memory.longestConsistencyPhase;
 
     if (streak >= longest && longest >= 10) {
-      return 'Longest consistency phase on record. '
-          'Your training discipline is becoming structural — protect it.';
+      return 'Your longest run yet. Protect it.';
     }
     if (memory.bestMomentumScore > 70 && streak >= 7) {
       return switch (v) {
-        0 => 'Current consistency is your strongest performance adaptation right now.',
-        1 => 'Momentum has been climbing for $streak consecutive days. '
-            'This is when adaptation compounds fastest.',
-        _ => '$streak days of discipline. Your body is in the optimal adaptation window.',
+        0 => '$streak days straight. This is where it counts.',
+        1 => '$streak days in a row. The work is compounding.',
+        _ => '$streak days of showing up. Keep the rhythm.',
       };
     }
-    return 'Consistency phase is stabilizing. '
-        'The training discipline is becoming reliable.';
+    return 'You\'re settling into a rhythm. Keep it going.';
   }
 
   // ── Post-workout reflective messages ─────────────────────
@@ -447,8 +428,7 @@ class CoachMessageService {
     if (pr != null && DateTime.now().difference(pr.date).inHours < 2) {
       final name = _fmtExercise(pr.exercise);
       return (
-        message: '$name PR is locked in. Recovery starts now — protein and sleep '
-            'will consolidate the adaptation.',
+        message: '$name PR locked in. Nothing more to prove today.',
         topic: topic,
       );
     }
@@ -458,8 +438,7 @@ class CoachMessageService {
     if (fatigued != null && fatigued.value < 45) {
       final muscle = _cap(fatigued.key);
       return (
-        message: '$muscle loading stayed within session limits today. '
-            'Recovery should stabilize within 24–36h.',
+        message: '$muscle worked hard today. Give it a day or two.',
         topic: topic,
       );
     }
@@ -467,8 +446,7 @@ class CoachMessageService {
     // ── Volume notable this week ──────────────────────────────────────────
     if (ctx.hasVolumeSpike) {
       return (
-        message: 'Volume is accumulating well this week. '
-            'Protein synthesis peaks in the next 24–48h — recovery is the work now.',
+        message: 'Big week so far. Recovery is the work now.',
         topic: topic,
       );
     }
@@ -476,8 +454,7 @@ class CoachMessageService {
     // ── Deload week complete ──────────────────────────────────────────────
     if (ctx.isDeloadWeek) {
       return (
-        message: 'Deload session complete. '
-            'Full adaptation should peak in the next 3–5 days.',
+        message: 'Deload session done. You\'ll feel it pay off soon.',
         topic: topic,
       );
     }
@@ -486,33 +463,33 @@ class CoachMessageService {
     switch (tone) {
       case CoachTone.aggressive:
         return (
-          message: 'Session logged. Now execute recovery — eat, sleep, repeat.',
+          message: 'Session logged. Tomorrow builds on it.',
           topic: topic,
         );
       case CoachTone.elite:
         return (
           message: v == 0
-              ? 'Good session. The adaptation window is open — protect it with quality sleep tonight.'
-              : 'Session complete. What happens in the next 24h determines how this converts to strength.',
+              ? 'Good session. Nothing more needed today.'
+              : 'Session done. The next 24 hours matter.',
           topic: topic,
         );
       case CoachTone.scientific:
         return (
           message: v == 0
-              ? 'Session logged. Muscle protein synthesis is elevated for the next 24–48h — match it with adequate protein intake.'
-              : 'Training stimulus applied. Recovery is now the rate-limiting factor for adaptation.',
+              ? 'Session logged. The work is done.'
+              : 'Good work. The rest happens on its own.',
           topic: topic,
         );
       case CoachTone.supportive:
         return (
           message: v == 0
-              ? 'Good session today. Rest, eat well, and the work you just did compounds overnight.'
-              : 'Training done — that\'s one more session in the pattern. Recovery carries it forward.',
+              ? 'Good session. The work compounds.'
+              : 'One more session done. It adds up.',
           topic: topic,
         );
       case CoachTone.disciplined:
         return (
-          message: 'Session complete. Recovery is part of the discipline — treat it the same way.',
+          message: 'Session done. Recovery is part of the discipline.',
           topic: topic,
         );
     }

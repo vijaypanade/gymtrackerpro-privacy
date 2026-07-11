@@ -52,7 +52,7 @@ class AppColors {
   static const Color goldLight   = Color(0xFFFFD700);
   static const Color goldDark    = Color(0xFFA8892C);
   static const Color goldMuted   = Color(0xFF6B5820);
-  static const Color goldGlow    = Color(0xFFD4AF3740); // with alpha
+  static const Color goldGlow    = Color(0xffd4af3740); // with alpha
 
   // ── Text (clean hierarchy)
   static const Color textPrimary   = Color(0xFFF5F5F5);
@@ -69,14 +69,14 @@ class AppColors {
   // ── Semantic (vivid, saturated)
   static const Color green     = Color(0xFF22C55E);
   static const Color greenDark = Color(0xFF16A34A);
-  static const Color greenGlow = Color(0xFF22C55E30);
+  static const Color greenGlow = Color(0xff22c55e30);
   static const Color red       = Color(0xFFE57373);  // Material Red 300 — muted, luxury-safe
   static const Color redDark   = Color(0xFFEF5350);  // Material Red 400 — deeper but not aggressive
   static const Color blue      = Color(0xFF3B82F6);
-  static const Color blueGlow  = Color(0xFF3B82F630);
+  static const Color blueGlow  = Color(0xff3b82f630);
   static const Color orange    = Color(0xFFF97316);
   static const Color purple    = Color(0xFF8B5CF6);
-  static const Color purpleGlow= Color(0xFF8B5CF630);
+  static const Color purpleGlow= Color(0xff8b5cf630);
   static const Color cyan      = Color(0xFF06B6D4);
   static const Color yellow    = Color(0xFFEAB308);
   static const Color pink      = Color(0xFFEC4899);
@@ -153,7 +153,7 @@ class AppGradients {
   );
 
   static LinearGradient muscleGain = LinearGradient(
-    colors: [AppColors.blue.withValues(alpha: 0.7), AppColors.purple.withValues(alpha: 0.5)],
+    colors: [AppColors.gold.withValues(alpha: 0.7), AppColors.goldSoft.withValues(alpha: 0.5)],
     begin: Alignment.topLeft, end: Alignment.bottomRight,
   );
 
@@ -278,67 +278,67 @@ class AppBorders {
 // ══════════════════════════════════════════════
 class AppTextStyles {
   // Display
-  static TextStyle get display => TextStyle(fontFamily: 'Rajdhani',
+  static TextStyle get display => const TextStyle(fontFamily: 'Rajdhani',
     fontSize: 42, fontWeight: FontWeight.w900,
     color: AppColors.textPrimary, letterSpacing: 1,
     height: 1.0,
   );
 
   // Headings
-  static TextStyle get h1 => TextStyle(fontFamily: 'Rajdhani',
+  static TextStyle get h1 => const TextStyle(fontFamily: 'Rajdhani',
     fontSize: 30, fontWeight: FontWeight.w800,
     color: AppColors.textPrimary, letterSpacing: 0.5,
   );
-  static TextStyle get h2 => TextStyle(fontFamily: 'Rajdhani',
+  static TextStyle get h2 => const TextStyle(fontFamily: 'Rajdhani',
     fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
   );
-  static TextStyle get h3 => TextStyle(fontFamily: 'Rajdhani',
+  static TextStyle get h3 => const TextStyle(fontFamily: 'Rajdhani',
     fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
   );
-  static TextStyle get h4 => TextStyle(fontFamily: 'Rajdhani',
+  static TextStyle get h4 => const TextStyle(fontFamily: 'Rajdhani',
     fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
   );
 
   // Body
-  static TextStyle get body => TextStyle(fontFamily: 'Inter',
+  static TextStyle get body => const TextStyle(fontFamily: 'Inter',
     fontSize: 14, color: AppColors.textPrimary, height: 1.5,
   );
-  static TextStyle get bodySmall => TextStyle(fontFamily: 'Inter',
+  static TextStyle get bodySmall => const TextStyle(fontFamily: 'Inter',
     fontSize: 12, color: AppColors.textSecondary, height: 1.4,
   );
-  static TextStyle get caption => TextStyle(fontFamily: 'Inter',
+  static TextStyle get caption => const TextStyle(fontFamily: 'Inter',
     fontSize: 10, color: AppColors.textMuted, letterSpacing: 0.4,
   );
-  static TextStyle get label => TextStyle(fontFamily: 'Inter',
+  static TextStyle get label => const TextStyle(fontFamily: 'Inter',
     fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary,
   );
 
   // Special
-  static TextStyle get number => TextStyle(fontFamily: 'Rajdhani',
+  static TextStyle get number => const TextStyle(fontFamily: 'Rajdhani',
     fontSize: 28, fontWeight: FontWeight.w800,
     color: AppColors.textPrimary, letterSpacing: 1,
   );
-  static TextStyle get bigNumber => TextStyle(fontFamily: 'Rajdhani',
+  static TextStyle get bigNumber => const TextStyle(fontFamily: 'Rajdhani',
     fontSize: 40, fontWeight: FontWeight.w900,
     color: AppColors.textPrimary, letterSpacing: 1,
   );
-  static TextStyle get sectionTitle => TextStyle(fontFamily: 'Inter',
+  static TextStyle get sectionTitle => const TextStyle(fontFamily: 'Inter',
     fontSize: 11, fontWeight: FontWeight.w700,
     color: AppColors.textMuted, letterSpacing: 1.8,
   );
-  static TextStyle get gold => TextStyle(fontFamily: 'Rajdhani',
+  static TextStyle get gold => const TextStyle(fontFamily: 'Rajdhani',
     fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.gold,
   );
-  static TextStyle get goldSmall => TextStyle(fontFamily: 'Inter',
+  static TextStyle get goldSmall => const TextStyle(fontFamily: 'Inter',
     fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.gold,
   );
 
   // Button
-  static TextStyle get button => TextStyle(fontFamily: 'Inter',
+  static TextStyle get button => const TextStyle(fontFamily: 'Inter',
     fontSize: 15, fontWeight: FontWeight.w800,
     color: Colors.black, letterSpacing: 0.3,
   );
-  static TextStyle get buttonSmall => TextStyle(fontFamily: 'Inter',
+  static TextStyle get buttonSmall => const TextStyle(fontFamily: 'Inter',
     fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black,
   );
 }
@@ -389,7 +389,7 @@ class AppTheme {
       surface: AppColors.bgCard,
       error: AppColors.red,
     ),
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.bg,
       elevation: 0,
       centerTitle: false,
@@ -397,7 +397,7 @@ class AppTheme {
         color: AppColors.textPrimary, fontSize: 20,
         fontWeight: FontWeight.w800, letterSpacing: 0.5,
       ),
-      iconTheme: const IconThemeData(color: AppColors.textPrimary),
+      iconTheme: IconThemeData(color: AppColors.textPrimary),
       scrolledUnderElevation: 0,
     ),
     textTheme: ThemeData.dark().textTheme.apply(
@@ -421,7 +421,7 @@ class AppTheme {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: AppColors.bgElevated,
-      contentTextStyle: TextStyle(fontFamily: 'Inter',color: AppColors.textPrimary, fontSize: 13),
+      contentTextStyle: const TextStyle(fontFamily: 'Inter',color: AppColors.textPrimary, fontSize: 13),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       behavior: SnackBarBehavior.floating,
     ),
@@ -445,14 +445,14 @@ class AppTheme {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.gold, width: 1),
       ),
-      labelStyle: TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 13),
-      hintStyle: TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 13),
+      labelStyle: const TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 13),
+      hintStyle: const TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 13),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: AppColors.bgCard,
       selectedColor: AppColors.gold.withValues(alpha: 0.18),
-      labelStyle: TextStyle(fontFamily: 'Inter',fontSize: 12, color: AppColors.textPrimary),
+      labelStyle: const TextStyle(fontFamily: 'Inter',fontSize: 12, color: AppColors.textPrimary),
       side: const BorderSide(color: AppColors.borderSoft, width: 0.5),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.pill)),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

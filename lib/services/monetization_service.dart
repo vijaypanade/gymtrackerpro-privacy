@@ -33,6 +33,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ad_service.dart';
+import 'auth_service.dart';
 import 'billing_service.dart';
 import '../utils/app_constants.dart';
 
@@ -97,7 +98,13 @@ class MonetizationService {
   MonetizationService._();
   static final MonetizationService instance = MonetizationService._();
 
-  static const String _keyPremium         = 'is_premium_v1';
+  static const String _keyPremium         = 'is_premium_v2';
+
+  // UID-scoped key — prevents one account's premium leaking to another on same device
+  String get _premiumKey {
+    final uid = AuthService.instance.currentUser?.uid;
+    return uid != null ? '${_keyPremium}_$uid' : _keyPremium;
+  }
   static const String _keyAiUsageDate     = 'ai_usage_date_v1';
   static const String _keyAiUsageCount    = 'ai_usage_count_v1';
   static const String _keyRewardedExtras  = 'rewarded_extras_v1';
@@ -115,7 +122,7 @@ class MonetizationService {
 
   // Debug builds: always premium so testers can access all features.
   // dart.vm.product = false in debug, true in release — zero production impact.
-  bool get isPremium    => !bool.fromEnvironment('dart.vm.product') || _isPremium;
+  bool get isPremium    => !const bool.fromEnvironment('dart.vm.product') || _isPremium;
   int  get aiUsageToday => _aiUsageToday;
   int  get freeAiLimit  => _freeAiLimit;
 
@@ -149,7 +156,7 @@ class MonetizationService {
   Future<void> init() async {
     try {
       final prefs   = await SharedPreferences.getInstance();
-      _isPremium      = prefs.getBool(_keyPremium) ?? false;
+      _isPremium      = prefs.getBool(_premiumKey) ?? false;
       _resetDailyCountsIfNeeded(prefs);
       _aiUsageToday   = prefs.getInt(_keyAiUsageCount)   ?? 0;
       _rewardedExtras = prefs.getInt(_keyRewardedExtras) ?? 0;
@@ -228,21 +235,26 @@ class MonetizationService {
   Future<void> setPremium(bool value) async {
     _isPremium = value;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyPremium, value);
+    await prefs.setBool(_premiumKey, value);
     AdService.instance.setPremium(value);
     debugPrint('✅ Premium: $value');
   }
 
-  // Called by BillingService after successful purchase
+  // Called by BillingService after successful purchase or restore
   void markPremiumFromBilling() {
     _isPremium = true;
+    AdService.instance.setPremium(true);
+    // Persist so reinstall restores premium before billing stream fires next time
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool(_premiumKey, true);
+    });
     debugPrint('✅ Premium granted via BillingService');
   }
 
   Future<void> revokePremium() async {
     _isPremium = false;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyPremium, false);
+    await prefs.setBool(_premiumKey, false);
     AdService.instance.setPremium(false);
   }
 
@@ -438,13 +450,13 @@ class _PaywallSheetState extends State<PaywallSheet> {
                           fontWeight: FontWeight.w800, letterSpacing: 1.2)),
                 ]),
                 const SizedBox(height: 10),
-                _FuturePreviewRow(Icons.trending_up_rounded, 'Next week plan auto-adjusts to your progress'),
+                const _FuturePreviewRow(Icons.trending_up_rounded, 'Next week plan auto-adjusts to your progress'),
                 const SizedBox(height: 6),
-                _FuturePreviewRow(Icons.psychology_rounded, 'AI tracks your weak muscles every session'),
+                const _FuturePreviewRow(Icons.psychology_rounded, 'AI tracks your weak muscles every session'),
                 const SizedBox(height: 6),
-                _FuturePreviewRow(Icons.emoji_events_rounded, 'Advanced PR predictions — know before you lift'),
+                const _FuturePreviewRow(Icons.emoji_events_rounded, 'Advanced PR predictions — know before you lift'),
                 const SizedBox(height: 6),
-                _FuturePreviewRow(Icons.track_changes_rounded, 'Deload auto-detected — never overtrain again'),
+                const _FuturePreviewRow(Icons.track_changes_rounded, 'Deload auto-detected — never overtrain again'),
               ]),
             ),
             const SizedBox(height: 20),
@@ -490,11 +502,11 @@ class _PaywallSheetState extends State<PaywallSheet> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.green.withValues(alpha: 0.12),
+                          color: AppColors.gold.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4)),
                         child: Text('FREE',
                             style: GoogleFonts.inter(
-                                color: AppColors.green, fontSize: 9,
+                                color: AppColors.gold, fontSize: 9,
                                 fontWeight: FontWeight.w800)),
                       ),
                   ]),
@@ -656,7 +668,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('+1 AI plan unlocked. Go ahead!',
               style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-          backgroundColor: AppColors.green,
+          backgroundColor: AppColors.gold,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -770,7 +782,7 @@ class _FuturePreviewRow extends StatelessWidget {
           color: AppColors.textSecondary, fontSize: 12,
           fontWeight: FontWeight.w500, height: 1.4))),
       const Icon(Icons.check_circle_rounded,
-          color: AppColors.green, size: 14),
+          color: AppColors.gold, size: 14),
     ],
   );
 }
@@ -817,12 +829,12 @@ class _PricePill extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
               color: isHighlighted
-                  ? AppColors.green.withValues(alpha: 0.15)
+                  ? AppColors.gold.withValues(alpha: 0.15)
                   : AppColors.gold.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(badge, style: GoogleFonts.inter(
-                color: isHighlighted ? AppColors.green : AppColors.gold,
+                color: isHighlighted ? AppColors.gold : AppColors.gold,
                 fontSize: 9, fontWeight: FontWeight.w800)),
           ),
           const SizedBox(height: 6),

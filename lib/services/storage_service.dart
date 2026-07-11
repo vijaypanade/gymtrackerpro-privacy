@@ -57,6 +57,7 @@ class StorageKeys {
   static const String athleteMemory     = 'athlete_memory_v1';
   static const String dailyMission      = 'daily_mission_v1';
   static const String weeklyNarrative   = 'weekly_narrative_v1';
+  static const String weeklyStoryViewed = 'weekly_story_viewed_v1';
 
   // Hive box names
   static const String hiveWorkoutBox  = 'workoutBox';
@@ -210,8 +211,9 @@ class StorageService {
       final out = <T>[];
       for (final item in d) {
         try {
-          if (item is Map<String, dynamic>) out.add(fromJson(item));
-          else if (item is Map) out.add(fromJson(Map<String, dynamic>.from(item)));
+          if (item is Map<String, dynamic>) {
+            out.add(fromJson(item));
+          } else if (item is Map) out.add(fromJson(Map<String, dynamic>.from(item)));
         } catch (e) {
           debugPrint('decodeList item skipped: $e');
         }

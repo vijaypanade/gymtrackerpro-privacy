@@ -287,18 +287,30 @@ class AthleteProfileService {
   static String _muscleFromExercise(String exercise) {
     final ex = exercise.toLowerCase();
     if (ex.contains('chest') || ex.contains('bench') || ex.contains('fly') ||
-        ex.contains('push_up') || ex.contains('pec'))        return 'chest';
+        ex.contains('push_up') || ex.contains('pec')) {
+      return 'chest';
+    }
     if (ex.contains('back')   || ex.contains('row')    ||
-        ex.contains('pulldown') || ex.contains('pull_up'))   return 'back';
+        ex.contains('pulldown') || ex.contains('pull_up')) {
+      return 'back';
+    }
     if (ex.contains('squat')  || ex.contains('leg')    ||
-        ex.contains('lunge')  || ex.contains('deadlift'))    return 'legs';
+        ex.contains('lunge')  || ex.contains('deadlift')) {
+      return 'legs';
+    }
     if (ex.contains('shoulder') || ex.contains('delt') ||
-        ex.contains('press') && ex.contains('overhead'))     return 'shoulders';
+        ex.contains('press') && ex.contains('overhead')) {
+      return 'shoulders';
+    }
     if (ex.contains('bicep')  || ex.contains('curl'))        return 'biceps';
     if (ex.contains('tricep') || ex.contains('dip') ||
-        ex.contains('pushdown') || ex.contains('extension')) return 'triceps';
+        ex.contains('pushdown') || ex.contains('extension')) {
+      return 'triceps';
+    }
     if (ex.contains('core')   || ex.contains('plank') ||
-        ex.contains('crunch') || ex.contains('ab'))          return 'core';
+        ex.contains('crunch') || ex.contains('ab')) {
+      return 'core';
+    }
     if (ex.contains('calf')   || ex.contains('calve'))       return 'calves';
     return '';
   }

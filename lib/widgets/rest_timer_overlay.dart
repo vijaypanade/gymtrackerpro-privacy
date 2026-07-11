@@ -105,35 +105,46 @@ class _RestTimerBannerState extends State<RestTimerBanner> {
               ),
             ] else
               const Spacer(),
-            // +30s
+            // +30s — visuals unchanged; outer padding grows the hit area
+            // to ~44px for sweaty mid-workout thumbs.
             GestureDetector(
               onTap: () => _timer.addTime(30),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '+30s',
-                  style: GoogleFonts.inter(
-                    color: AppColors.gold,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '+30s',
+                    style: GoogleFonts.inter(
+                      color: AppColors.gold,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            // Skip
+            // Skip — same treatment; this is tapped after every set.
             GestureDetector(
               onTap: () => _timer.skip(),
-              child: Text(
-                'Skip',
-                style: GoogleFonts.inter(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 14),
+                child: Text(
+                  'Skip',
+                  style: GoogleFonts.inter(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -341,7 +352,7 @@ class _RestTimerOverlayState extends State<RestTimerOverlay> {
                   ),
                 ),
                 child: Row(children: [
-                  Icon(Icons.arrow_forward_rounded,
+                  const Icon(Icons.arrow_forward_rounded,
                       color: AppColors.textMuted, size: 11),
                   const SizedBox(width: 6),
                   Text('NEXT',

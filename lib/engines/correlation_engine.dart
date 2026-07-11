@@ -42,18 +42,18 @@ class CorrelationEngine {
     final sorted = List<WorkoutLog>.from(logs)
       ..sort((a, b) => a.date.compareTo(b.date));
 
-    double vol1 = 0, vol1_n = 0;
-    double vol2 = 0, vol2_n = 0;
+    double vol1 = 0, vol1N = 0;
+    double vol2 = 0, vol2N = 0;
 
     for (int i = 1; i < sorted.length; i++) {
       final gap = sorted[i].date.difference(sorted[i - 1].date).inDays;
-      if (gap == 1) { vol1 += sorted[i].volume; vol1_n++; }
-      if (gap == 2) { vol2 += sorted[i].volume; vol2_n++; }
+      if (gap == 1) { vol1 += sorted[i].volume; vol1N++; }
+      if (gap == 2) { vol2 += sorted[i].volume; vol2N++; }
     }
-    if (vol1_n < 2 || vol2_n < 2) return null;
+    if (vol1N < 2 || vol2N < 2) return null;
 
-    final avg1 = vol1 / vol1_n;
-    final avg2 = vol2 / vol2_n;
+    final avg1 = vol1 / vol1N;
+    final avg2 = vol2 / vol2N;
 
     if (avg2 > avg1 * 1.1) {
       return 'Best sessions follow a 2-day gap. '
@@ -72,7 +72,7 @@ class CorrelationEngine {
   }) {
     if (currentReadiness <= 0 || logs.length < 5) return null;
     // If this week has high volume AND readiness is low, surface the correlation
-    final avgVol = logs.length > 0
+    final avgVol = logs.isNotEmpty
         ? logs.fold(0.0, (s, l) => s + l.volume) / logs.length
         : 0.0;
     if (weeklyVolumeKg > avgVol * 1.3 && currentReadiness <= 2) {

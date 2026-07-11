@@ -25,6 +25,12 @@ class WorkoutSessionService extends ChangeNotifier {
   int? _dayIndex;
   Timer? _ticker;
 
+  // ── Session Intent ──────────────────────────────────────────────────────────
+  // Lightweight in-memory flag — set when user taps "Today's Plan" on Home,
+  // cleared when first set is logged (converts to real session) or when user
+  // leaves Planner without training. Never persisted to disk.
+  bool _pendingIntent = false;
+
   // Session volume tracking
   double _sessionVolumeKg = 0.0;
   int    _sessionSets     = 0;
@@ -35,10 +41,28 @@ class WorkoutSessionService extends ChangeNotifier {
   static const _volumeMilestones = [500, 1000, 2500, 5000, 10000];
 
   // Idle thresholds
-  static const _idleReminderMin = 90; // 90 min → notify
   static const _autoEndMin = 180;     // 3 hr → auto-end
 
-  bool get isActive => _startTime != null;
+  bool get isActive   => _startTime != null;
+
+  /// True only between Home card tap and first set completion.
+  /// Never true at the same time as [isActive].
+  bool get hasIntent  => _pendingIntent && !isActive;
+
+  /// Signal that the user intends to train — called from Home card tap.
+  void setIntent(int dayIndex) {
+    if (isActive) return;
+    _pendingIntent = true;
+    _dayIndex = dayIndex;
+    notifyListeners();
+  }
+
+  /// Discard intent without starting a session — called when user leaves Planner.
+  void clearIntent() {
+    if (!_pendingIntent) return;
+    _pendingIntent = false;
+    notifyListeners();
+  }
   double get sessionVolumeKg => _sessionVolumeKg;
   int    get sessionSets     => _sessionSets;
 
@@ -85,7 +109,7 @@ class WorkoutSessionService extends ChangeNotifier {
       final mm = m % 60;
       return '${h}h ${mm}m';
     }
-    return '${m}:${s.toString().padLeft(2, '0')}';
+    return '$m:${s.toString().padLeft(2, '0')}';
   }
 
   Duration get idleDuration {
@@ -116,7 +140,7 @@ class WorkoutSessionService extends ChangeNotifier {
       }
 
       _startTicker();
-      debugPrint('✅ Session restored - elapsed ${elapsedFormatted}');
+      debugPrint('✅ Session restored - elapsed $elapsedFormatted');
       notifyListeners();
     } catch (e) {
       debugPrint('Session restore failed: $e');
@@ -130,6 +154,7 @@ class WorkoutSessionService extends ChangeNotifier {
       await touchActivity();
       return;
     }
+    _pendingIntent = false; // intent converts to real session
     _startTime = DateTime.now();
     _lastActivity = _startTime;
     _dayIndex = dayIndex;
@@ -155,6 +180,7 @@ class WorkoutSessionService extends ChangeNotifier {
   /// End current session and clear state.
   Future<Duration> endSession() async {
     final dur = elapsed;
+    _pendingIntent = false;
     _startTime = null;
     _lastActivity = null;
     _dayIndex = null;

@@ -18,7 +18,6 @@ import '../services/monetization_service.dart'; // ✅ Paywall triggers
 import 'dart:math' as math;
 import '../widgets/home/muscle_command_sheet.dart';
 import '../services/progression_timeline_service.dart';
-import '../models/unified_coach_insight.dart';
 import '../models/weekly_review_data.dart';
 import '../utils/app_routes.dart';
 import 'ai_chat_screen.dart';
@@ -127,50 +126,41 @@ class _OverviewTab extends StatelessWidget {
     return ListView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg, AppSpacing.xxl, AppSpacing.lg, 56),
+          AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 56),
       children: [
 
-        // ── READINESS ORB ──────────────────────────────
-        const _FI(child: _OrbSection()),
-        const SizedBox(height: AppSpacing.xxl),
+        // ── HERO: ORB + WEEKLY STATS + COACH INSIGHT ──
+        _FI(child: _StatsHeroSection(ap: ap)),
+        const SizedBox(height: AppSpacing.lg),
 
-        // ── WEEKLY REVIEW ─────────────────────────────
-        _FI(delay: 35, child: const _WeeklyReviewCard()),
-        const SizedBox(height: AppSpacing.xxl),
-
-        // ── AI COACH ──────────────────────────────────
-        _FI(delay: 55, child: const _StatsCoachCard()),
-        const SizedBox(height: AppSpacing.xxl),
-
+        // ── RECOVERY ──────────────────────────────────
         const _Label(text: 'Recovery'),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.sm),
         _FI(delay: 130, child: _StatsRecoveryRail(ap: ap)),
-        const SizedBox(height: AppSpacing.xxl),
-
-        // ── EXERCISE MASTERY ───────────────────────────
-        const _Label(text: 'Exercise Mastery'),
-        const SizedBox(height: AppSpacing.md),
-        _FI(delay: 155, child: _MovementMasterySection(ap: ap)),
-        const SizedBox(height: AppSpacing.xxl),
+        const SizedBox(height: AppSpacing.lg),
 
         // ── WEEKLY BREAKDOWN ───────────────────────────
         const _Label(text: 'Weekly Breakdown'),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.sm),
         _FI(delay: 160, child: _FatigueProgressionCard(ap: ap)),
-        const SizedBox(height: AppSpacing.xxl),
+        const SizedBox(height: AppSpacing.lg),
 
         if (!ap.onboardingComplete && ap.onboardingNarrative.isNotEmpty) ...[
           const _Label(text: 'Adapting To You'),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
           _FI(delay: 180, child: _OnboardingEvolutionSection(ap: ap)),
-          const SizedBox(height: AppSpacing.xxl),
+          const SizedBox(height: AppSpacing.lg),
         ],
 
-        // ── ACHIEVEMENTS ──────────────────────────────
+        // ── PREDICTIVE FORWARD INTELLIGENCE ──────────
+        _FI(delay: 175, child: _PredictiveForwardCard(ap: ap)),
+        const SizedBox(height: AppSpacing.lg),
+
+        // ── ACHIEVEMENTS (horizontal scroll) ──────────
         const _Label(text: 'Achievements'),
-        const SizedBox(height: AppSpacing.md),
-        _FI(delay: 200, child: _BadgesGrid(ap: ap)),
-        const SizedBox(height: AppSpacing.xxl),
+        const SizedBox(height: AppSpacing.sm),
+        _FI(delay: 200, child: _BadgesHScroll(ap: ap)),
+        const SizedBox(height: AppSpacing.lg),
 
         _FI(delay: 220, child: _LockedAdvancedStats(ap: ap)),
         const SizedBox(height: 56),
@@ -182,371 +172,205 @@ class _OverviewTab extends StatelessWidget {
 
 
 // ════════════════════════════════════════════════
-// STATS AI COACH CARD
-// Interpretation layer: translates raw signals into
-// one coaching verdict. Taps through to AI chat.
-// Same data contract as home _AIVerdictCard.
+// STATS HERO SECTION
+// Combines orb + weekly stats chip row + coach
+// insight into one continuous visual unit —
+// replaces 3 separate cards to cut scroll depth.
 // ════════════════════════════════════════════════
-class _StatsCoachCard extends StatefulWidget {
-  const _StatsCoachCard();
-  @override State<_StatsCoachCard> createState() => _StatsCoachCardState();
+class _StatsHeroSection extends StatelessWidget {
+  final AppProvider ap;
+  const _StatsHeroSection({required this.ap});
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    const _OrbSection(),
+    const SizedBox(height: AppSpacing.md),
+    _HeroCompactPanel(ap: ap),
+  ]);
 }
 
-class _StatsCoachCardState extends State<_StatsCoachCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _scale;
-  late final Animation<double>   _scaleAnim;
+class _HeroCompactPanel extends StatelessWidget {
+  final AppProvider ap;
+  const _HeroCompactPanel({required this.ap});
 
-  @override
-  void initState() {
-    super.initState();
-    _scale = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 200));
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.985).animate(
-      CurvedAnimation(parent: _scale, curve: Curves.easeOut));
-  }
-
-  @override
-  void dispose() { _scale.dispose(); super.dispose(); }
-
-  static bool _isGeneric(String t) {
-    if (t.isEmpty) return true;
-    final l = t.toLowerCase();
-    return l.contains('session complete') ||
-        l.contains('recovery demand elevated') ||
-        l.contains('lifton ai') ||
-        l.contains('analyzes training') ||
-        l.contains('adaptive guidance');
-  }
-
-  static String _primaryMuscle(String planTitle, String train) {
-    final l = planTitle.toLowerCase();
-    if (l.contains('chest'))    return 'Chest';
-    if (l.contains('back'))     return 'Back';
-    if (l.contains('leg'))      return 'Legs';
-    if (l.contains('shoulder')) return 'Shoulders';
-    if (l.contains('push'))     return 'Push muscles';
-    if (l.contains('pull'))     return 'Pull muscles';
-    if (l.contains('arm') || l.contains('bicep') || l.contains('tricep'))
-      return 'Arms';
-    if (train.isNotEmpty)
-      return '${train[0].toUpperCase()}${train.substring(1)}';
-    return 'Trained muscles';
-  }
-
-  static String _movementAdvice(String planTitle, String train) {
-    final l = planTitle.toLowerCase();
-    if (l.contains('chest') || l.contains('push'))
-      return 'Avoid pressing movements tomorrow morning.';
-    if (l.contains('back') || l.contains('pull'))
-      return 'Avoid heavy rows and pulls tomorrow.';
-    if (l.contains('leg') || l.contains('squat'))
-      return 'Skip squats and lunges tomorrow morning.';
-    if (l.contains('shoulder'))
-      return 'Avoid overhead pressing tomorrow.';
-    if (l.contains('arm') || l.contains('bicep') || l.contains('tricep'))
-      return 'Keep direct arm work light tomorrow.';
-    final lt = train.toLowerCase();
-    if (lt == 'chest') return 'Avoid pressing movements tomorrow morning.';
-    if (lt == 'back')  return 'Avoid heavy rows and pulls tomorrow.';
-    if (lt == 'legs')  return 'Skip squats and lunges tomorrow morning.';
-    return 'Keep intensity low tomorrow morning.';
-  }
-
-  static String _message({
-    required int    recovery,
-    required double readiness,
-    required String limiting,
-    required String train,
-    required bool   isCompleted,
-    required String planTitle,
-    required double sleepHours,
-    required String nextWorkout,
-    required String etaMuscle,
-    required int    etaHours,
-  }) {
-    final cap   = (String s) => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
-    final delta = ((readiness * 100 - recovery) * 0.14).round().clamp(-12, 12);
-    final hasNext = nextWorkout.isNotEmpty;
-    final hasEta  = etaHours > 1 && etaMuscle.isNotEmpty;
-    final etaLine = hasEta ? '${cap(etaMuscle)} requires ~${etaHours}h more recovery.' : '';
-
-    // Post-workout
-    if (isCompleted) {
-      final m = _primaryMuscle(planTitle, train);
-      if (hasNext && hasEta)
-        return '$m recovery is underway.\nEstimated readiness in ~${etaHours}h.\nTomorrow\'s $nextWorkout session is positioned well.';
-      if (hasNext)
-        return '$m recovery is underway.\nTomorrow\'s $nextWorkout session is positioned well.';
-      if (hasEta)
-        return '$m recovery is underway.\nEstimated readiness in ~${etaHours}h. ${_movementAdvice(planTitle, train)}';
-      final advice  = _movementAdvice(planTitle, train);
-      final protein = recovery < 65 ? '160g' : recovery < 78 ? '140g' : '130g';
-      if (recovery < 65) return '$m recovery is underway. $advice Protein target tonight: $protein.';
-      if (recovery < 78) return '$m recovery is underway. $advice Aim for 7–8h sleep tonight.';
-      return 'Strong session. $m will adapt overnight — hit $protein protein today to lock in the gains.';
-    }
-
-    // Sleep-aware pre-workout
-    if (sleepHours >= 1.0) {
-      final isCritical = limiting.isNotEmpty && recovery < 60;
-      if (!isCritical) {
-        final s = sleepHours.toStringAsFixed(1);
-        if (hasEta && sleepHours >= 6.0) {
-          final next = hasNext
-              ? 'Tomorrow\'s $nextWorkout session remains fully supported.'
-              : 'Train around ${etaMuscle.toLowerCase()} loading today.';
-          return 'Sleep logged at ${s}h.\n$etaLine\n$next';
-        }
-        if (sleepHours < 6.0)
-          return 'Sleep logged at ${s}h.\nRecovery supports training, but peak output may be limited today.';
-        if (sleepHours >= 8.0) {
-          final suffix = hasNext
-              ? 'Strong recovery foundation supports tomorrow\'s $nextWorkout session.'
-              : 'Strong recovery foundation supports full training intensity.';
-          return 'Sleep logged at ${s}h.\n$suffix';
-        }
-        final suffix = hasNext
-            ? '$nextWorkout is next — recovery supports productive training today.'
-            : 'Recovery supports productive training today.';
-        return 'Sleep logged at ${s}h.\n$suffix';
-      }
-    }
-
-    // Training recommendation
-    final slot = DateTime.now().hour ~/ 6;
-    if (limiting.isNotEmpty && recovery < 60) {
-      if (hasEta && hasNext)
-        return '$etaLine\nTomorrow\'s $nextWorkout session remains fully supported.';
-      if (hasEta)
-        return slot.isEven
-            ? '$etaLine Train around it today.'
-            : '${cap(etaMuscle)} hasn\'t cleared yet (~${etaHours}h remaining). Redirect to a fresh muscle group.';
-      return slot.isEven
-          ? '${cap(limiting)} recovery still elevated. Skip direct work today — train around it.'
-          : 'Your ${limiting.toLowerCase()} hasn\'t cleared yet. Redirect to a fresh muscle group.';
-    }
-    if (train.isNotEmpty && recovery >= 70)
-      return slot.isEven
-          ? '${cap(train)} window is open. Recovery markers support full intensity — load up today.'
-          : 'Prime window for ${train.toLowerCase()}. This kind of readiness is worth pushing — go for it.';
-    if (delta > 2 && recovery >= 55) {
-      if (hasNext)
-        return 'Recovery is trending upward.\n$nextWorkout is next in the training rotation.';
-      return slot.isEven
-          ? 'Recovery is trending up. This week\'s consistency is compounding — keep the pattern.'
-          : 'You\'re building momentum. Each session this week is stacking adaptation.';
-    }
-    if (recovery >= 80)
-      return slot.isEven
-          ? 'High readiness. If there\'s a PR to chase, today is the day to go for it.'
-          : 'Body is primed. Optimal window for progressive overload — push the weight today.';
-    return slot.isEven
-        ? 'Moderate recovery. Prioritise compound lifts — avoid failure and control intensity.'
-        : 'Recovery at $recovery%. Good session possible — lead with technique, earn the load.';
-  }
-
-  String _buildSeedContext(AppProvider ap) {
-    final recovery  = ap.getOverallRecovery();
-    final readiness = ap.weeklyReadinessScore;
-    final delta     = ((readiness * 100 - recovery) * 0.14).round().clamp(-12, 12);
-    final trend     = delta > 2 ? 'Improving' : delta < -2 ? 'Declining' : 'Stable';
-    final readLabel = readiness > 0.70 ? 'High' : readiness > 0.40 ? 'Moderate' : 'Low';
-    final limiting  = ap.weakestMuscle.isNotEmpty
-        ? '${ap.weakestMuscle[0].toUpperCase()}${ap.weakestMuscle.substring(1)}'
-        : null;
-    final train = ap.topMuscleGroup.isNotEmpty ? ap.topMuscleGroup : null;
-    if (ap.todayPlan.isCompleted) {
-      final plan = ap.todayPlan.title;
-      final session = plan.isNotEmpty ? plan : (train ?? 'Today\'s session');
-      final hrs = ((100 - recovery) * 0.28).toInt().clamp(4, 40);
-      final buf = StringBuffer();
-      buf.writeln('$session complete. Here is your recovery breakdown.');
-      buf.writeln();
-      buf.write('Recovery: $recovery%  ·  Readiness: $readLabel  ·  Trend: $trend');
-      buf.write('\nRecovery window: ~${hrs}h');
-      if (limiting != null) buf.write('\nMost fatigued: $limiting');
-      buf.write('\nPrioritise sleep and protein intake to accelerate adaptation.');
-      return buf.toString();
-    }
-    final ci  = ap.coachInsight;
-    final buf = StringBuffer();
-    if (ci.title.isNotEmpty) { buf.writeln(ci.title); buf.writeln(); }
-    buf.write('Recovery: $recovery%  ·  Readiness: $readLabel  ·  Trend: $trend');
-    if (limiting != null) buf.write('\nMost fatigued: $limiting');
-    if (train    != null) buf.write('\nToday\'s focus: $train training');
-    return buf.toString();
-  }
+  static Color _rColor(WeekRating r) => switch (r) {
+    WeekRating.excellent    => AppColors.gold,
+    WeekRating.strong       => AppColors.goldSoft,
+    WeekRating.solid        => AppColors.goldSoft,
+    WeekRating.inconsistent => AppColors.textSecondary,
+    WeekRating.recoveryWeek => AppColors.textMuted,
+  };
 
   @override
   Widget build(BuildContext context) {
     return Selector<AppProvider, ({
-      String rawTitle,
-      Color  accent,
-      int    recovery,
-      double readiness,
-      String limiting,
-      String train,
-      bool   isCompleted,
-      String planTitle,
-      double sleepHours,
-      String nextWorkout,
-      String etaMuscle,
-      int    etaHours,
+      WeeklyReviewData review,
+      int recovery,
+      String insightTitle,
+      String badge,
+      Color accent,
     })>(
-      selector: (_, ap) {
-        final ci  = ap.coachInsight;
-        final eta = ap.limitingMuscleEta;
-        return (
-          rawTitle:    ci.title,
-          accent:      ci.accentColor,
-          recovery:    ap.getOverallRecovery(),
-          readiness:   ap.weeklyReadinessScore,
-          limiting:    ap.weakestMuscle,
-          train:       ap.topMuscleGroup,
-          isCompleted: ap.todayPlan.isCompleted,
-          planTitle:   ap.todayPlan.title,
-          sleepHours:  ap.coachSleepHours,
-          nextWorkout: ap.nextWorkoutTitle,
-          etaMuscle:   eta.muscle,
-          etaHours:    eta.hours,
-        );
-      },
+      selector: (_, ap) => (
+        review:       ap.weeklyReviewData,
+        recovery:     ap.getOverallRecovery(),
+        insightTitle: ap.coachInsight.title,
+        badge:        ap.coachInsight.badge,
+        accent:       ap.coachInsight.accentColor,
+      ),
       builder: (ctx, d, __) {
-        final msg = _isGeneric(d.rawTitle) || d.isCompleted
-            ? _message(
-                recovery:    d.recovery,
-                readiness:   d.readiness,
-                limiting:    d.limiting,
-                train:       d.train,
-                isCompleted: d.isCompleted,
-                planTitle:   d.planTitle,
-                sleepHours:  d.sleepHours,
-                nextWorkout: d.nextWorkout,
-                etaMuscle:   d.etaMuscle,
-                etaHours:    d.etaHours,
-              )
-            : d.rawTitle;
-        if (msg.isEmpty) return const SizedBox.shrink();
+        final c   = d.review.hasData ? _rColor(d.review.rating) : AppColors.gold;
+        final msg = d.insightTitle.isNotEmpty ? d.insightTitle : '${d.recovery}% recovery — system online.';
 
-        // Context chips — only shown when data exists
-        final chips = <({String label, Color color})>[];
-        chips.add((label: '${d.recovery}% recovery', color: d.accent));
-        if (d.sleepHours >= 1.0)
-          chips.add((label: 'Sleep ${d.sleepHours.toStringAsFixed(1)}h', color: AppColors.textMuted));
-        if (d.etaHours > 1 && d.etaMuscle.isNotEmpty) {
-          final m = '${d.etaMuscle[0].toUpperCase()}${d.etaMuscle.substring(1)}';
-          chips.add((label: '$m ~${d.etaHours}h', color: AppColors.textMuted));
-        }
-        if (d.nextWorkout.isNotEmpty)
-          chips.add((label: 'Next: ${d.nextWorkout}', color: AppColors.textMuted));
-
-        return ScaleTransition(
-          scale: _scaleAnim,
-          child: GestureDetector(
-            onTapDown:   (_) { _scale.forward(); HapticFeedback.lightImpact(); },
-            onTapCancel: () => _scale.reverse(),
-            behavior: HitTestBehavior.opaque,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadii.xl),
-              child: Material(
-                color: const Color(0xFF111111),
-                child: InkWell(
-                  splashColor:    Colors.white.withValues(alpha: 0.05),
-                  highlightColor: Colors.white.withValues(alpha: 0.03),
-                  onTap: () {
-                    _scale.reverse();
-                    final ap   = context.read<AppProvider>();
-                    final seed = _buildSeedContext(ap);
-                    Navigator.push(ctx, slideRoute(AIChatScreen(seedContext: seed)));
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header row
-                        Row(children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: d.accent.withValues(alpha: 0.10),
-                              borderRadius: BorderRadius.circular(AppRadii.pill),
-                            ),
-                            child: Text('AI COACH', style: TextStyle(
-                              fontFamily: 'Inter',
-                              color:  d.accent.withValues(alpha: 0.75),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.8,
-                            )),
-                          ),
-                          const Spacer(),
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            Text('Discuss with Coach', style: TextStyle(
-                              fontFamily: 'Inter',
-                              color: AppColors.textMuted.withValues(alpha: 0.55),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w400,
-                            )),
-                            const SizedBox(width: 2),
-                            Icon(Icons.arrow_forward_rounded,
-                                size: 12,
-                                color: AppColors.textMuted.withValues(alpha: 0.50)),
-                          ]),
-                        ]),
-                        const SizedBox(height: 10),
-                        // Coaching message
-                        Text(msg, style: const TextStyle(
-                          fontFamily: 'Inter',
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          height: 1.5,
-                        )),
-                        // Context chips
-                        if (chips.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Wrap(spacing: 6, runSpacing: 6, children: chips.map((c) =>
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: c.color.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(AppRadii.pill),
-                                border: Border.all(
-                                    color: c.color.withValues(alpha: 0.14),
-                                    width: 0.5),
-                              ),
-                              child: Text(c.label, style: TextStyle(
-                                fontFamily: 'Inter',
-                                color: c.color.withValues(alpha: 0.65),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.2,
-                              )),
-                            ),
-                          ).toList()),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+        return Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.circular(AppRadii.lg),
+            border: Border.all(
+              color: AppColors.borderSoft.withValues(alpha: 0.12), width: 0.5),
           ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+            // ── Weekly stats row ────────────────────
+            Row(children: [
+              Expanded(child: _HeroStat(
+                value: d.review.hasData
+                    ? '${d.review.completedSessions}/${d.review.plannedSessions}' : '–',
+                label: 'SESSIONS', color: c)),
+              Container(width: 0.5, height: 28,
+                  color: AppColors.borderSoft.withValues(alpha: 0.20)),
+              Expanded(child: _HeroStat(
+                value: d.review.hasData ? d.review.weekVolumeLabel : '–',
+                label: 'LIFTED', color: c)),
+              Container(width: 0.5, height: 28,
+                  color: AppColors.borderSoft.withValues(alpha: 0.20)),
+              Expanded(child: _HeroStat(
+                value: d.review.hasData ? '${d.review.prCount}' : '–',
+                label: 'PRs', color: c)),
+            ]),
+
+            const SizedBox(height: AppSpacing.md),
+            Divider(color: AppColors.borderSoft.withValues(alpha: 0.18),
+                height: 1, thickness: 0.5),
+            const SizedBox(height: AppSpacing.md),
+
+            // ── Coach insight (2 lines) → tap opens AI chat ──
+            GestureDetector(
+              onTap: () {
+                H.tap();
+                Navigator.push(ctx, slideRoute(AIChatScreen(
+                  seedContext: 'Recovery: ${d.recovery}%\nBadge: ${d.badge}\n${d.insightTitle}',
+                )));
+              },
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // Badge + arrow on its own row
+                Row(children: [
+                  if (d.badge.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: d.accent.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(AppRadii.pill),
+                        border: Border.all(
+                            color: d.accent.withValues(alpha: 0.22), width: 0.5),
+                      ),
+                      child: Text(d.badge, style: TextStyle(
+                        fontFamily: 'Inter',
+                        color: d.accent.withValues(alpha: 0.80),
+                        fontSize: 8, fontWeight: FontWeight.w700, letterSpacing: 0.7,
+                      )),
+                    ),
+                  const Spacer(),
+                  Text('Discuss with Coach', style: GoogleFonts.inter(
+                    color: AppColors.textMuted.withValues(alpha: 0.45),
+                    fontSize: 10, fontWeight: FontWeight.w400)),
+                  const SizedBox(width: 3),
+                  Icon(Icons.arrow_forward_rounded,
+                    size: 11, color: AppColors.textMuted.withValues(alpha: 0.38)),
+                ]),
+                const SizedBox(height: 8),
+                // Full message — typewriter reveal
+                _TypewriterText(
+                  text: msg,
+                  style: GoogleFonts.inter(
+                    color: AppColors.textSecondary, fontSize: 12.5,
+                    fontWeight: FontWeight.w400, height: 1.55)),
+              ]),
+            ),
+          ]),
         );
       },
     );
   }
 }
 
+class _HeroStat extends StatelessWidget {
+  final String value, label;
+  final Color  color;
+  const _HeroStat({required this.value, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
+    Text(value, style: GoogleFonts.rajdhani(
+      color: AppColors.textPrimary, fontSize: 18,
+      fontWeight: FontWeight.w700, height: 1.0)),
+    const SizedBox(height: 2),
+    Text(label, style: GoogleFonts.inter(
+      color: AppColors.textMuted.withValues(alpha: 0.45),
+      fontSize: 8.5, fontWeight: FontWeight.w600, letterSpacing: 0.9)),
+  ]);
+}
+
+
 // ════════════════════════════════════════════════
-// STATS RECOVERY RAIL — Phase 19
-// Compact vertical rail — eliminates identical
-// card repetition. Limiting muscle emphasized.
+// TYPEWRITER TEXT — character-by-character reveal.
+// Restarts whenever text changes (didUpdateWidget).
 // ════════════════════════════════════════════════
+class _TypewriterText extends StatefulWidget {
+  final String    text;
+  final TextStyle style;
+  const _TypewriterText({required this.text, required this.style});
+  @override State<_TypewriterText> createState() => _TypewriterTextState();
+}
+
+class _TypewriterTextState extends State<_TypewriterText> {
+  int _visible = 0;
+  static const _charDelayMs = 16;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTyping();
+  }
+
+  @override
+  void didUpdateWidget(_TypewriterText old) {
+    super.didUpdateWidget(old);
+    if (old.text != widget.text) {
+      setState(() => _visible = 0);
+      _startTyping();
+    }
+  }
+
+  void _startTyping() {
+    Future.delayed(const Duration(milliseconds: 300), _tick);
+  }
+
+  void _tick() {
+    if (!mounted) return;
+    if (_visible >= widget.text.length) return;
+    setState(() => _visible++);
+    Future.delayed(const Duration(milliseconds: _charDelayMs), _tick);
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(
+    widget.text.substring(0, _visible.clamp(0, widget.text.length)),
+    style: widget.style,
+  );
+}
+
+
 class _StatsRecoveryRail extends StatefulWidget {
   final AppProvider ap;
   const _StatsRecoveryRail({required this.ap});
@@ -576,13 +400,19 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
 
   @override
   Widget build(BuildContext context) {
-    final muscles = RecoveryGridData.muscles;
+    const allMuscles = RecoveryGridData.muscles;
     final ap = widget.ap;
+
+    // Only show muscles that are NOT fully primed (score < 80).
+    // If all are primed, show a compact "all clear" row instead.
+    final toShow = allMuscles
+        .where((m) => ap.getMuscleRecovery(m.key).toInt() < 80)
+        .toList();
 
     int limitingIdx = 0;
     int lowestScore = 101;
-    for (int i = 0; i < muscles.length; i++) {
-      final s = ap.getMuscleRecovery(muscles[i].key).toInt().clamp(0, 100);
+    for (int i = 0; i < toShow.length; i++) {
+      final s = ap.getMuscleRecovery(toShow[i].key).toInt().clamp(0, 100);
       if (s < lowestScore) { lowestScore = s; limitingIdx = i; }
     }
 
@@ -626,7 +456,19 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
               ]),
               const SizedBox(height: 12),
             ],
-            ...muscles.asMap().entries.map((e) {
+            // All muscles primed — show single compact row
+            if (toShow.isEmpty) ...[
+              Row(children: [
+                Icon(Icons.check_circle_rounded,
+                  size: 14, color: AppColors.gold.withValues(alpha: 0.72)),
+                const SizedBox(width: 8),
+                Text('All muscles primed — ready to train.',
+                  style: GoogleFonts.inter(
+                    color: AppColors.gold.withValues(alpha: 0.72),
+                    fontSize: 11, fontWeight: FontWeight.w500)),
+              ]),
+            ],
+            ...toShow.asMap().entries.map((e) {
             final i = e.key;
             final m = e.value;
             final score = ap.getMuscleRecovery(m.key).toInt().clamp(0, 100);
@@ -636,8 +478,8 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
                 (r) => r.muscle.toLowerCase() == m.label.toLowerCase());
             final rec = matches.isEmpty ? null : matches.first;
 
-            final scoreColor = score >= 70 ? AppColors.green
-                : score >= 40 ? AppColors.yellow : AppColors.red;
+            final scoreColor = score >= 70 ? AppColors.gold
+                : score >= 40 ? AppColors.textSecondary : AppColors.textMuted;
             final lbl = score >= 80 ? 'PRIMED'
                 : score >= 60 ? 'ADAPTING'
                 : score >= 40 ? 'ELEVATED' : 'RECOVERING';
@@ -647,7 +489,7 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
 
             return Padding(
               padding: EdgeInsets.only(
-                  bottom: i == muscles.length - 1 ? 0 : 14),
+                  bottom: i == toShow.length - 1 ? 0 : 14),
               child: GestureDetector(
                 onTap: rec != null ? () {
                   H.tap();
@@ -712,7 +554,7 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
                 ),
               ),
             );
-          }).toList(),
+          }),
           ],
         ),
       ),
@@ -741,9 +583,9 @@ class _Rarity {
   };
 
   static Color color(_BadgeRarity r) => switch (r) {
-    _BadgeRarity.legendary => const Color(0xFFFF6B35),
-    _BadgeRarity.elite     => AppColors.gold,
-    _BadgeRarity.rare      => AppColors.blue,
+    _BadgeRarity.legendary => AppColors.gold,
+    _BadgeRarity.elite     => AppColors.goldSoft,
+    _BadgeRarity.rare      => AppColors.textSecondary,
     _BadgeRarity.common    => AppColors.textMuted,
   };
 
@@ -766,7 +608,7 @@ class _BadgeLore {
     'hundred_workouts' => 'A century of commitment.',
     'week_streak'      => 'Seven unbroken days.',
     'two_week_streak'  => 'Fortnight of focused effort.',
-    'month_streak'     => 'Thirty days. No excuses.',
+    'month_streak'     => 'Thirty days, unbroken.',
     'early_bird'       => 'Morning sessions compound.',
     'pr_smasher'       => 'Limits exist to be broken.',
     'consistency'      => 'The most underrated trait.',
@@ -1046,6 +888,315 @@ class _GridBadge extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════
+// BADGES HORIZONTAL SCROLL
+// Single-row swipeable strip — replaces the
+// vertical grid to eliminate ~200px of scroll.
+// ════════════════════════════════════════════════
+class _BadgesHScroll extends StatelessWidget {
+  final AppProvider ap;
+  const _BadgesHScroll({required this.ap});
+
+  // Returns "N sessions" / "N days" remaining, or null for non-trackable badges.
+  static String? _remaining(AppBadge b, StreakData s) {
+    final total  = s.totalWorkouts;
+    final streak = s.currentStreak;
+    int? rem;
+    bool isDay = false;
+    switch (b.id) {
+      case 'first_workout':    rem = (1  - total).clamp(0, 1);   break;
+      case 'ten_workouts':     rem = (10  - total).clamp(0, 10); break;
+      case 'fifty_workouts':   rem = (50  - total).clamp(0, 50); break;
+      case 'hundred_workouts': rem = (100 - total).clamp(0, 100); break;
+      case 'week_streak':      rem = (7  - streak).clamp(0, 7);  isDay = true; break;
+      case 'two_week_streak':  rem = (14 - streak).clamp(0, 14); isDay = true; break;
+      case 'month_streak':     rem = (30 - streak).clamp(0, 30); isDay = true; break;
+      default: return null;
+    }
+    if (rem <= 0) return null;
+    return '$rem ${isDay ? (rem == 1 ? 'day' : 'days') : (rem == 1 ? 'session' : 'sessions')} away';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final earned = ap.streak.earnedBadges;
+    // Earned first (highest rarity), then locked (highest rarity)
+    final sorted = List<AppBadge>.from(BadgeSystem.all)
+      ..sort((a, b) {
+        final aU = earned.contains(a.id);
+        final bU = earned.contains(b.id);
+        if (aU != bU) return aU ? -1 : 1;
+        return _Rarity.of(b.id).index.compareTo(_Rarity.of(a.id).index);
+      });
+
+    return SizedBox(
+      height: 120,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        itemCount: sorted.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (ctx, i) {
+          final b        = sorted[i];
+          final unlocked = earned.contains(b.id);
+          final rarity   = _Rarity.of(b.id);
+          final color    = _Rarity.color(rarity);
+          final progress = unlocked ? null : _remaining(b, ap.streak);
+
+          return SizedBox(
+            width: 72,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // Badge icon container
+              Container(
+                width: 60, height: 60,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  color: unlocked
+                      ? color.withValues(alpha: 0.12)
+                      : const Color(0xFF0B0B0B),
+                  border: Border.all(
+                    color: unlocked
+                        ? color.withValues(alpha: rarity == _BadgeRarity.legendary ? 0.55 : 0.30)
+                        : Colors.white.withValues(alpha: 0.05),
+                    width: unlocked && rarity == _BadgeRarity.legendary ? 1.2 : 0.7,
+                  ),
+                  boxShadow: unlocked && rarity.index >= _BadgeRarity.elite.index
+                      ? [BoxShadow(
+                          color: color.withValues(alpha: rarity == _BadgeRarity.legendary ? 0.36 : 0.20),
+                          blurRadius: rarity == _BadgeRarity.legendary ? 24 : 12,
+                          spreadRadius: 1)]
+                      : null,
+                ),
+                child: Stack(alignment: Alignment.center, children: [
+                  Icon(b.icon, size: 24,
+                    color: unlocked
+                        ? color
+                        : AppColors.textMuted.withValues(alpha: 0.10)),
+                  if (!unlocked)
+                    Positioned(
+                      bottom: 6, right: 6,
+                      child: Icon(Icons.lock_rounded, size: 9,
+                          color: Colors.white.withValues(alpha: 0.10)),
+                    ),
+                ]),
+              ),
+              const SizedBox(height: 5),
+              Text(b.title,
+                style: GoogleFonts.inter(
+                  color: unlocked
+                      ? color
+                      : AppColors.textMuted.withValues(alpha: 0.24),
+                  fontSize: 8, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              if (unlocked)
+                Text(_Rarity.label(rarity),
+                  style: GoogleFonts.inter(
+                    color: color.withValues(alpha: 0.48),
+                    fontSize: 6.5, fontWeight: FontWeight.w700, letterSpacing: 0.7))
+              else if (progress != null)
+                Text(progress,
+                  style: GoogleFonts.inter(
+                    color: AppColors.textMuted.withValues(alpha: 0.38),
+                    fontSize: 6.5, fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis)
+              else
+                Text('LOCKED',
+                  style: GoogleFonts.inter(
+                    color: AppColors.textMuted.withValues(alpha: 0.18),
+                    fontSize: 6.5, fontWeight: FontWeight.w700, letterSpacing: 0.6)),
+            ]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+
+// ════════════════════════════════════════════════
+// PREDICTIVE FORWARD INTELLIGENCE CARD
+// Shows forward-looking data: next PR window,
+// limiting muscle ETA, next workout, week target.
+// Hidden when all forward data is empty.
+// ════════════════════════════════════════════════
+class _PredictiveForwardCard extends StatelessWidget {
+  final AppProvider ap;
+  const _PredictiveForwardCard({required this.ap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<AppProvider, ({
+      String nextPR,
+      String nextWorkout,
+      String etaMuscle,
+      int    etaHours,
+      int    completed,
+      int    planned,
+    })>(
+      selector: (_, ap) {
+        final eta = ap.limitingMuscleEta;
+        final wr  = ap.weeklyReviewData;
+        return (
+          nextPR:      ap.nextPRWindow,
+          nextWorkout: ap.nextWorkoutTitle,
+          etaMuscle:   eta.muscle,
+          etaHours:    eta.hours,
+          completed:   wr.completedSessions,
+          planned:     wr.plannedSessions,
+        );
+      },
+      builder: (ctx, d, __) {
+        // Only show when at least one forward signal exists
+        final hasPR      = d.nextPR.isNotEmpty;
+        final hasWorkout = d.nextWorkout.isNotEmpty;
+        final hasEta     = d.etaHours > 1 && d.etaMuscle.isNotEmpty;
+        final hasSession = d.planned > 0;
+        if (!hasPR && !hasWorkout && !hasEta && !hasSession) {
+          return const SizedBox.shrink();
+        }
+
+        // Cap muscle name
+        String cap(String s) => s.isEmpty ? s
+            : '${s[0].toUpperCase()}${s.substring(1)}';
+
+        final remaining = (d.planned - d.completed).clamp(0, d.planned);
+
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D0D09),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.gold.withValues(alpha: 0.10),
+                AppColors.bgCard,
+                const Color(0xFF0D0D09),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              stops: const [0.0, 0.50, 1.0],
+            ),
+            borderRadius: BorderRadius.circular(AppRadii.lg),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.18), width: 0.7),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.lg - 0.5),
+            child: Stack(children: [
+              // Left accent beam
+              Positioned(
+                left: 0, top: 0, bottom: 0,
+                child: Container(
+                  width: 2.5,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        AppColors.gold.withValues(alpha: 0.55),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 16, 16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  // Header
+                  Row(children: [
+                    Icon(Icons.arrow_outward_rounded,
+                      size: 11, color: AppColors.gold.withValues(alpha: 0.75)),
+                    const SizedBox(width: 6),
+                    Text('FORWARD INTELLIGENCE', style: GoogleFonts.inter(
+                      color: AppColors.gold.withValues(alpha: 0.72),
+                      fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: 1.4)),
+                  ]),
+                  const SizedBox(height: 12),
+
+                  // Intelligence rows
+                  if (hasPR) ...[
+                    _ForwardRow(
+                      icon: Icons.emoji_events_rounded,
+                      color: AppColors.gold,
+                      label: 'Next PR window',
+                      value: d.nextPR,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (hasEta) ...[
+                    _ForwardRow(
+                      icon: Icons.hourglass_bottom_rounded,
+                      color: AppColors.orange,
+                      label: '${cap(d.etaMuscle)} clears in',
+                      value: '~${d.etaHours}h${hasWorkout ? ' · ${d.nextWorkout} positioned' : ''}',
+                    ),
+                    const SizedBox(height: 8),
+                  ] else if (hasWorkout) ...[
+                    _ForwardRow(
+                      icon: Icons.fitness_center_rounded,
+                      color: AppColors.gold,
+                      label: 'Next session',
+                      value: d.nextWorkout,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (hasSession)
+                    _ForwardRow(
+                      icon: Icons.calendar_today_rounded,
+                      color: AppColors.goldSoft,
+                      label: 'Week target',
+                      value: '${d.completed}/${d.planned} done${remaining > 0 ? ' · $remaining remaining' : ' · complete'}',
+                    ),
+                ]),
+              ),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ForwardRow extends StatelessWidget {
+  final IconData icon;
+  final Color    color;
+  final String   label;
+  final String   value;
+  const _ForwardRow({
+    required this.icon, required this.color,
+    required this.label, required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(top: 1),
+        child: Icon(icon, size: 11, color: color.withValues(alpha: 0.70)),
+      ),
+      const SizedBox(width: 8),
+      Expanded(child: RichText(
+        text: TextSpan(children: [
+          TextSpan(text: '$label  ', style: GoogleFonts.inter(
+            color: AppColors.textMuted.withValues(alpha: 0.50),
+            fontSize: 11.5, fontWeight: FontWeight.w400, height: 1.4)),
+          TextSpan(text: value, style: GoogleFonts.inter(
+            color: AppColors.textSecondary,
+            fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.4)),
+        ]),
+      )),
+    ],
+  );
+}
+
+
+// ════════════════════════════════════════════════
 // LOCKED ADVANCED STATS — STEP 3
 // Blurred cards with lock icon → curiosity → conversion
 // Shows to ALL users, tapping opens PaywallSheet
@@ -1084,7 +1235,7 @@ class _LockedAdvancedStats extends StatelessWidget {
           HapticFeedback.mediumImpact();
           PaywallSheet.show(context,
             trigger: PaywallTrigger.advancedStatsTap,
-            onUpgrade: () => ap.notifyListeners(),
+            onUpgrade: () => ap.refreshMonetization(),
           );
         },
         child: Container(
@@ -1114,7 +1265,7 @@ class _LockedAdvancedStats extends StatelessWidget {
                     color: AppColors.textSecondary, fontSize: 12),
                 textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            Wrap(
+            const Wrap(
               spacing: 8, runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
@@ -1251,6 +1402,12 @@ class _ProgressTabState extends State<_ProgressTab> {
             const SizedBox(height: 24),
             if (_selected != null)
               _ExerciseChart(ap: ap, exKey: _selected!),
+
+            // ── Exercise Mastery (moved from Overview) ──
+            const SizedBox(height: AppSpacing.lg),
+            const _Label(text: 'Exercise Mastery'),
+            const SizedBox(height: AppSpacing.sm),
+            _MovementMasterySection(ap: ap),
           ],
         );
       },
@@ -1276,7 +1433,7 @@ class _ExerciseChart extends StatelessWidget {
     final pr    = ap.getPR(exKey, 'kg');
     final trend = ap.getStrengthTrend(exKey);
 
-    final tColor = trend == 'improving' ? AppColors.green
+    final tColor = trend == 'improving' ? AppColors.gold
         : trend == 'declining' ? AppColors.orange : AppColors.textMuted;
     final tLabel = trend == 'improving' ? 'Improving'
         : trend == 'declining' ? 'Declining' : 'Plateau';
@@ -1319,9 +1476,9 @@ class _ExerciseChart extends StatelessWidget {
     final maxY = ((rawMax * 1.08) / yInterval).ceil()  * yInterval;
 
     // Date label helpers
-    final _lastIdx = exLogs.length - 1;
-    final _midIdx  = _lastIdx ~/ 2;
-    String _fmtDate(DateTime d) {
+    final lastIdx = exLogs.length - 1;
+    final midIdx  = lastIdx ~/ 2;
+    String fmtDate(DateTime d) {
       const mo = ['Jan','Feb','Mar','Apr','May','Jun',
                    'Jul','Aug','Sep','Oct','Nov','Dec'];
       return '${mo[d.month - 1]} ${d.day}';
@@ -1383,7 +1540,7 @@ class _ExerciseChart extends StatelessWidget {
               show: true, drawVerticalLine: false,
               horizontalInterval: yInterval,
               getDrawingHorizontalLine: (_) =>
-                  FlLine(color: AppColors.divider, strokeWidth: 0.5)),
+                  const FlLine(color: AppColors.divider, strokeWidth: 0.5)),
             borderData: FlBorderData(show: false),
             titlesData: FlTitlesData(
               leftTitles: AxisTitles(sideTitles: SideTitles(
@@ -1401,17 +1558,17 @@ class _ExerciseChart extends StatelessWidget {
                 reservedSize: 22,
                 getTitlesWidget: (v, _) {
                   final i = v.toInt();
-                  if (i < 0 || i > _lastIdx) return const SizedBox.shrink();
+                  if (i < 0 || i > lastIdx) return const SizedBox.shrink();
                   // show only first, mid, and last; skip mid if it coincides
-                  if (i == _midIdx && (_midIdx == 0 || _midIdx == _lastIdx)) {
+                  if (i == midIdx && (midIdx == 0 || midIdx == lastIdx)) {
                     return const SizedBox.shrink();
                   }
-                  if (i != 0 && i != _midIdx && i != _lastIdx) {
+                  if (i != 0 && i != midIdx && i != lastIdx) {
                     return const SizedBox.shrink();
                   }
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(_fmtDate(exLogs[i].date),
+                    child: Text(fmtDate(exLogs[i].date),
                         style: GoogleFonts.inter(
                             color: AppColors.textMuted,
                             fontSize: 7.5, fontWeight: FontWeight.w500)),
@@ -1458,7 +1615,7 @@ class _ExerciseChart extends StatelessWidget {
                 getTooltipItems: (spots) => spots.map((s) {
                   final idx = s.x.toInt();
                   final dateLabel = (idx >= 0 && idx < exLogs.length)
-                      ? _fmtDate(exLogs[idx].date) : '';
+                      ? fmtDate(exLogs[idx].date) : '';
                   final valStr = hasWeight
                       ? '${s.y.toStringAsFixed(1)} kg'
                       : '${s.y.toInt()} reps';
@@ -1693,22 +1850,7 @@ class _AthleteIdentityCard extends StatelessWidget {
 }
 
 // Maps workout name to accent colour for icon container.
-Color _sessionAccent(String name) {
-  final n = name.toLowerCase();
-  if (n.contains('chest') || n.contains('push')) return AppColors.orange;
-  if (n.contains('back')  || n.contains('pull') || n.contains('row'))
-    return AppColors.blue;
-  if (n.contains('leg')   || n.contains('squat') || n.contains('deadlift'))
-    return AppColors.green;
-  if (n.contains('shoulder') || n.contains('delt')) return AppColors.purple;
-  if (n.contains('arm')   || n.contains('bicep') || n.contains('tricep')
-                           || n.contains('curl'))  return AppColors.cyan;
-  if (n.contains('core')  || n.contains('abs') || n.contains('plank'))
-    return AppColors.yellow;
-  if (n.contains('cardio') || n.contains('run') || n.contains('hiit'))
-    return AppColors.red;
-  return AppColors.gold;
-}
+Color _sessionAccent(String name) => AppColors.gold;
 
 class _HistoryCard extends StatelessWidget {
   final HistoryEntry entry;
@@ -1733,7 +1875,7 @@ class _HistoryCard extends StatelessWidget {
     final (milestoneLabel, milestoneColor) = isFirst
         ? ('First Session', AppColors.gold)
         : isHighVolume
-            ? ('High Volume', AppColors.green)
+            ? ('High Volume', AppColors.gold)
             : isShortSession
                 ? ('Short Session', AppColors.textMuted)
                 : ('', AppColors.textMuted);
@@ -1918,19 +2060,17 @@ class _FatigueProgressionCardState extends State<_FatigueProgressionCard>
     final fatigue     = widget.ap.weeklyFatiguePressure.clamp(0.0, 100.0);
     final progression = widget.ap.weeklyProgressionScore.clamp(0.0, 100.0);
 
-    final fatColor = fatigue >= 65 ? AppColors.red
-        : fatigue >= 40 ? AppColors.orange
-        : AppColors.green;
-    final progColor = progression >= 65 ? AppColors.green
-        : progression >= 40 ? AppColors.gold
+    final fatColor = fatigue >= 65 ? AppColors.orange
+        : fatigue >= 40 ? AppColors.textSecondary
+        : AppColors.textMuted;
+    final progColor = progression >= 65 ? AppColors.gold
+        : progression >= 40 ? AppColors.goldSoft
         : AppColors.textMuted;
 
     // Adaptive accent tint
     final accentColor = fatigue >= 65
         ? AppColors.orange
-        : progression >= 65
-            ? AppColors.gold
-            : Color.lerp(AppColors.green, AppColors.gold, 0.45)!;
+        : AppColors.gold;
 
     // Which metric is dominant for emphasis
     final fatigueIsDominant = fatigue >= progression;
@@ -2078,7 +2218,7 @@ class _MicroTrendRail extends StatelessWidget {
         final fromRight = (segments - 1 - i) < progSegs;
         final lit = fromLeft || fromRight;
         final segColor = fromLeft
-            ? (fatigue >= 65 ? AppColors.orange : AppColors.green)
+            ? (fatigue >= 65 ? AppColors.orange : AppColors.gold)
             : accentColor;
         return Expanded(
           child: Container(
@@ -2226,13 +2366,13 @@ class _MasteryCard extends StatelessWidget {
   const _MasteryCard({required this.mastery});
 
   static (String, Color) _statusBadge(double score, String trend) {
-    if (trend == 'improving' && score >= 80) return ('EXPLOSIVE',   AppColors.green);
-    if (trend == 'improving' && score >= 70) return ('PEAKING',     AppColors.green);
-    if (trend == 'improving' && score >= 50) return ('PROGRESSING', AppColors.green);
-    if (trend == 'improving')                return ('IMPROVING',   AppColors.green);
-    if (trend == 'inconsistent' && score >= 65) return ('PLATEAUING', AppColors.orange);
-    if (trend == 'inconsistent')             return ('INCONSISTENT', AppColors.orange);
-    if (score >= 72) return ('EFFICIENT',  AppColors.blue);
+    if (trend == 'improving' && score >= 80) return ('EXPLOSIVE',   AppColors.gold);
+    if (trend == 'improving' && score >= 70) return ('PEAKING',     AppColors.gold);
+    if (trend == 'improving' && score >= 50) return ('PROGRESSING', AppColors.goldSoft);
+    if (trend == 'improving')                return ('IMPROVING',   AppColors.goldSoft);
+    if (trend == 'inconsistent' && score >= 65) return ('PLATEAUING', AppColors.textSecondary);
+    if (trend == 'inconsistent')             return ('INCONSISTENT', AppColors.textMuted);
+    if (score >= 72) return ('EFFICIENT',  AppColors.goldSoft);
     if (score >= 55) return ('RESILIENT',  AppColors.gold);
     if (score >= 35) return ('ADAPTING',   AppColors.textMuted);
     return ('DEVELOPING', AppColors.textMuted);
@@ -2256,13 +2396,21 @@ class _MasteryCard extends StatelessWidget {
   static String? _movementChip(String raw) {
     final s = raw.toLowerCase();
     if (s.contains('press') || s.contains('pushdown') ||
-        s.contains('dip')   || s.contains('fly'))       return 'PUSH';
+        s.contains('dip')   || s.contains('fly')) {
+      return 'PUSH';
+    }
     if (s.contains('row')   || s.contains('pull') ||
-        s.contains('curl')  || s.contains('chin'))      return 'PULL';
+        s.contains('curl')  || s.contains('chin')) {
+      return 'PULL';
+    }
     if (s.contains('squat') || s.contains('deadlift') ||
-        s.contains('lunge') || s.contains('leg'))       return 'LEGS';
+        s.contains('lunge') || s.contains('leg')) {
+      return 'LEGS';
+    }
     if (s.contains('crunch') || s.contains('plank') ||
-        s.contains('ab')     || s.contains('core'))     return 'CORE';
+        s.contains('ab')     || s.contains('core')) {
+      return 'CORE';
+    }
     return null;
   }
 
@@ -2270,8 +2418,8 @@ class _MasteryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final score = mastery.masteryScore.clamp(0.0, 100.0);
     final (statusLabel, statusColor) = _statusBadge(score, mastery.trend);
-    final scoreColor = score >= 70 ? AppColors.green
-        : score >= 45 ? AppColors.gold
+    final scoreColor = score >= 70 ? AppColors.gold
+        : score >= 45 ? AppColors.goldSoft
         : AppColors.textMuted;
 
     // Trend glow border: color matches the status
@@ -2395,48 +2543,6 @@ class _Label extends StatelessWidget {
     ),
   );
 }
-
-
-class _MiniStat extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _MiniStat({
-    required this.value,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Text(
-        value,
-        style: GoogleFonts.rajdhani(
-          color: AppColors.textPrimary,
-          fontSize: 26,
-          fontWeight: FontWeight.w900,
-          height: 0.92,
-          letterSpacing: -0.4,
-        ),
-      ),
-
-      const SizedBox(height: 0.2),
-
-      Text(
-        label.toUpperCase(),
-        style: GoogleFonts.inter(
-          color: Colors.white54,
-          fontSize: 8.8,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.4,
-          height: 1.0,
-        ),
-      ),
-    ],
-  );
-}
-
 
 
 // ════════════════════════════════════════════════
@@ -2563,6 +2669,8 @@ class _AdaptiveReadinessOrbState extends State<_AdaptiveReadinessOrb>
   late AnimationController _breathe;
   late AnimationController _innerPulse;
   late AnimationController _haze;
+  late AnimationController _countUp;
+  late Animation<double>   _countAnim;
 
   @override
   void initState() {
@@ -2573,11 +2681,17 @@ class _AdaptiveReadinessOrbState extends State<_AdaptiveReadinessOrb>
         duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
     _haze       = AnimationController(vsync: this,
         duration: const Duration(milliseconds: 6500))..repeat();
+    _countUp    = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 900));
+    _countAnim  = CurvedAnimation(parent: _countUp, curve: Curves.easeOut);
+    Future.delayed(const Duration(milliseconds: 120),
+        () { if (mounted) _countUp.forward(); });
   }
 
   @override
   void dispose() {
-    _breathe.dispose(); _innerPulse.dispose(); _haze.dispose(); super.dispose();
+    _breathe.dispose(); _innerPulse.dispose();
+    _haze.dispose(); _countUp.dispose(); super.dispose();
   }
 
   @override
@@ -2589,10 +2703,10 @@ class _AdaptiveReadinessOrbState extends State<_AdaptiveReadinessOrb>
         progression: ap.weeklyProgressionScore.clamp(0, 100),
       ),
       builder: (_, d, __) {
-        final orbColor = d.readiness >= 75 ? AppColors.green
-            : d.readiness >= 55 ? AppColors.gold
-            : d.readiness >= 35 ? AppColors.yellow
-            : AppColors.orange;
+        final orbColor = d.readiness >= 75 ? AppColors.gold
+            : d.readiness >= 55 ? AppColors.goldSoft
+            : d.readiness >= 35 ? AppColors.textSecondary
+            : AppColors.textMuted;
 
         final readLabel = d.readiness >= 80 ? 'PRIMED'
             : d.readiness >= 65 ? 'READY'
@@ -2605,7 +2719,7 @@ class _AdaptiveReadinessOrbState extends State<_AdaptiveReadinessOrb>
             : d.readiness >= 55 ? 0.82 : 0.50;
 
         return AnimatedBuilder(
-          animation: Listenable.merge([_breathe, _innerPulse, _haze]),
+          animation: Listenable.merge([_breathe, _innerPulse, _haze, _countUp]),
           builder: (_, __) {
             final b  = _breathe.value * energyScale;
             final ip = _innerPulse.value;
@@ -2741,7 +2855,7 @@ class _AdaptiveReadinessOrbState extends State<_AdaptiveReadinessOrb>
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('${d.readiness.round()}',
+                        Text('${(d.readiness * _countAnim.value).round()}',
                             style: GoogleFonts.rajdhani(
                               color: orbColor, fontSize: 42,
                               fontWeight: FontWeight.w900, height: 1.0)),
@@ -2959,13 +3073,13 @@ class _AnalyticsHeroInsightCardState extends State<_AnalyticsHeroInsightCard>
                       ),
                     ),
                     // Internal shadow depth — bottom-right cinematic darkening
-                    Positioned.fill(
+                    const Positioned.fill(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: const Alignment(0.88, 0.92),
+                            center: Alignment(0.88, 0.92),
                             radius: 1.10,
-                            colors: const [Colors.transparent, Color(0x1C000000)],
+                            colors: [Colors.transparent, Color(0x1C000000)],
                           ),
                         ),
                       ),
@@ -3029,7 +3143,7 @@ class _AnalyticsHeroInsightCardState extends State<_AnalyticsHeroInsightCard>
         subtitle: 'Low fatigue alongside rising output is a rare convergence. Use it with intention.',
         label:    'OVERLOAD WINDOW',
         icon:     Icons.trending_up_rounded,
-        color:    AppColors.green,
+        color:    AppColors.gold,
       );
     }
     if (d.improvement.abs() < 1.5 && d.progression < 45) {
@@ -3038,7 +3152,7 @@ class _AnalyticsHeroInsightCardState extends State<_AnalyticsHeroInsightCard>
         subtitle: 'The body adapts to predictable demands. A controlled shift in stimulus reactivates progress.',
         label:    'PLATEAU SIGNAL',
         icon:     Icons.remove_rounded,
-        color:    AppColors.yellow,
+        color:    AppColors.textSecondary,
       );
     }
     if (d.narrative.isNotEmpty) {
@@ -3059,331 +3173,6 @@ class _AnalyticsHeroInsightCardState extends State<_AnalyticsHeroInsightCard>
       color:    AppColors.gold,
     );
   }
-}
-
-
-// ════════════════════════════════════════════════
-// WEEKLY REVIEW CARD — Phase 2
-// Hero summary of the current calendar week.
-// Data comes exclusively from AppProvider.weeklyReviewData.
-// ════════════════════════════════════════════════
-class _WeeklyReviewCard extends StatelessWidget {
-  const _WeeklyReviewCard();
-
-  static Color _ratingColor(WeekRating r) => switch (r) {
-    WeekRating.excellent    => AppColors.gold,
-    WeekRating.strong       => AppColors.green,
-    WeekRating.solid        => AppColors.green,
-    WeekRating.inconsistent => AppColors.yellow,
-    WeekRating.recoveryWeek => AppColors.cyan,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return Selector<AppProvider, (WeeklyReviewData, int)>(
-      selector: (_, ap) => (
-        ap.weeklyReviewData,
-        ap.recoveryState.overallScore.round(),
-      ),
-      builder: (_, rec, __) {
-        final data         = rec.$1;
-        final liveRecovery = rec.$2;
-        return data.hasData ? _card(data, liveRecovery) : _emptyState();
-      },
-    );
-  }
-
-  Widget _emptyState() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-    decoration: BoxDecoration(
-      color: AppColors.bgCard,
-      borderRadius: BorderRadius.circular(AppRadii.xl),
-      border: Border.all(
-        color: AppColors.borderSoft.withValues(alpha: 0.10), width: 0.5),
-    ),
-    child: Row(children: [
-      Icon(Icons.calendar_view_week_rounded,
-        size: 16,
-        color: AppColors.textMuted.withValues(alpha: 0.28)),
-      const SizedBox(width: 12),
-      Expanded(child: Text(
-        'Complete your first session to unlock your weekly review.',
-        style: GoogleFonts.inter(
-          color: AppColors.textMuted.withValues(alpha: 0.36),
-          fontSize: 11, height: 1.4),
-      )),
-    ]),
-  );
-
-  Widget _card(WeeklyReviewData data, int liveRecovery) {
-    final c = _ratingColor(data.rating);
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D0D09),
-        gradient: LinearGradient(
-          colors: [
-            c.withValues(alpha: 0.10),
-            AppColors.bgCard,
-            const Color(0xFF0D0D09),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: const [0.0, 0.45, 1.0],
-        ),
-        borderRadius: BorderRadius.circular(AppRadii.xl),
-        border: Border.all(color: c.withValues(alpha: 0.18), width: 0.8),
-        boxShadow: [
-          BoxShadow(
-            color: c.withValues(alpha: 0.06),
-            blurRadius: 24, spreadRadius: 0),
-          const BoxShadow(
-            color: Color(0x20000000),
-            blurRadius: 8, offset: Offset(0, 4)),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadii.xl - 0.5),
-        child: Stack(children: [
-          // Left-edge color beam
-          Positioned(
-            left: 0, top: 0, bottom: 0,
-            child: Container(
-              width: 2.5,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end:   Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    c.withValues(alpha: 0.55),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Content
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Header row ──────────────────────────────
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'WEEK REVIEW',
-                      style: GoogleFonts.inter(
-                        color: AppColors.textMuted.withValues(alpha: 0.55),
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.4,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: c.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: c.withValues(alpha: 0.28), width: 0.7),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 4, height: 4,
-                            decoration: BoxDecoration(
-                              color: c, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            data.rating.label.toUpperCase(),
-                            style: GoogleFonts.inter(
-                              color: c,
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.9,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // ── Headline ────────────────────────────────
-                if (data.headline.isNotEmpty)
-                  Text(
-                    data.headline,
-                    style: GoogleFonts.rajdhani(
-                      color: AppColors.textPrimary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1.1,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-
-                if (data.summary.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    data.summary,
-                    style: GoogleFonts.inter(
-                      color: AppColors.textSecondary.withValues(alpha: 0.65),
-                      fontSize: 11.5,
-                      height: 1.45,
-                    ),
-                  ),
-                ],
-
-                const SizedBox(height: 14),
-                Divider(
-                  color: AppColors.borderSoft.withValues(alpha: 0.18),
-                  height: 1, thickness: 0.5),
-                const SizedBox(height: 12),
-
-                // ── Metrics row ─────────────────────────────
-                Row(children: [
-                  Expanded(child: _ReviewStat(
-                    value: '${data.completedSessions}/${data.plannedSessions}',
-                    label: 'SESSIONS',
-                    color: c,
-                  )),
-                  Container(
-                    width: 0.5, height: 32,
-                    color: AppColors.borderSoft.withValues(alpha: 0.20)),
-                  Expanded(child: _ReviewStat(
-                    value: data.weekVolumeLabel,
-                    label: 'LIFTED',
-                    color: c,
-                    sublabel: data.hasVolumeDelta
-                        ? data.volumeDeltaLabel : null,
-                    sublabelUp: data.volumeUp,
-                  )),
-                  Container(
-                    width: 0.5, height: 32,
-                    color: AppColors.borderSoft.withValues(alpha: 0.20)),
-                  Expanded(child: _ReviewStat(
-                    value: '${data.prCount}',
-                    label: 'PRs SET',
-                    color: c,
-                  )),
-                ]),
-
-                if (data.overallRecovery > 0) ...[
-                  const SizedBox(height: 12),
-                  Divider(
-                    color: AppColors.borderSoft.withValues(alpha: 0.18),
-                    height: 1, thickness: 0.5),
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    Icon(Icons.bolt_rounded,
-                      size: 11,
-                      color: AppColors.textMuted.withValues(alpha: 0.38)),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Recovery $liveRecovery%',
-                      style: GoogleFonts.inter(
-                        color: AppColors.textMuted.withValues(alpha: 0.50),
-                        fontSize: 10, fontWeight: FontWeight.w500),
-                    ),
-                    if (data.limitingMuscle.isNotEmpty)
-                      Text(
-                        '  ·  Limiting: ${data.limitingMuscle}',
-                        style: GoogleFonts.inter(
-                          color: AppColors.textMuted.withValues(alpha: 0.35),
-                          fontSize: 10),
-                      ),
-                  ]),
-                ],
-
-                // ── Brand signature ──────────────────────────────
-                const SizedBox(height: 12),
-                Text(
-                  'Keep Lifting.  Lifton Keeps Count.',
-                  style: GoogleFonts.inter(
-                    color: AppColors.textMuted.withValues(alpha: 0.18),
-                    fontSize: 9.0,
-                    fontStyle: FontStyle.italic,
-                    letterSpacing: 0.2,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
-}
-
-class _ReviewStat extends StatelessWidget {
-  final String  value;
-  final String  label;
-  final Color   color;
-  final String? sublabel;
-  final bool    sublabelUp;
-
-  const _ReviewStat({
-    required this.value,
-    required this.label,
-    required this.color,
-    this.sublabel,
-    this.sublabelUp = true,
-  });
-
-  @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text(
-            value,
-            style: GoogleFonts.rajdhani(
-              color: AppColors.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              height: 1.0,
-              letterSpacing: -0.3,
-            ),
-          ),
-          if (sublabel != null) ...[
-            const SizedBox(width: 3),
-            Text(
-              sublabel!,
-              style: GoogleFonts.inter(
-                color: (sublabelUp ? AppColors.green : AppColors.red)
-                    .withValues(alpha: 0.80),
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ],
-      ),
-      const SizedBox(height: 2),
-      Text(
-        label,
-        style: GoogleFonts.inter(
-          color: AppColors.textMuted.withValues(alpha: 0.45),
-          fontSize: 8.5,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.9,
-        ),
-      ),
-    ],
-  );
 }
 
 
@@ -3497,26 +3286,26 @@ class _OrbSectionState extends State<_OrbSection>
                           _OrbDetailStat(
                             label: 'READINESS',
                             value: '${d.readiness.round()}',
-                            color: d.readiness >= 75 ? AppColors.green
-                                : d.readiness >= 50 ? AppColors.gold
-                                : AppColors.orange,
+                            color: d.readiness >= 75 ? AppColors.gold
+                                : d.readiness >= 50 ? AppColors.goldSoft
+                                : AppColors.textSecondary,
                           ),
                           Container(width: 0.5, height: 32,
                               color: AppColors.borderSoft.withValues(alpha: 0.28)),
                           _OrbDetailStat(
                             label: 'FATIGUE',
                             value: '${d.fatigue.round()}',
-                            color: d.fatigue >= 65 ? AppColors.red
-                                : d.fatigue >= 40 ? AppColors.orange
-                                : AppColors.green,
+                            color: d.fatigue >= 65 ? AppColors.orange
+                                : d.fatigue >= 40 ? AppColors.textSecondary
+                                : AppColors.textMuted,
                           ),
                           Container(width: 0.5, height: 32,
                               color: AppColors.borderSoft.withValues(alpha: 0.28)),
                           _OrbDetailStat(
                             label: 'PROGRESS',
                             value: '${d.progression.round()}',
-                            color: d.progression >= 65 ? AppColors.green
-                                : d.progression >= 40 ? AppColors.gold
+                            color: d.progression >= 65 ? AppColors.gold
+                                : d.progression >= 40 ? AppColors.goldSoft
                                 : AppColors.textMuted,
                           ),
                         ],

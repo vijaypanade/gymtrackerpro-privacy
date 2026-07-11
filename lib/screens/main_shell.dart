@@ -9,6 +9,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/connectivity_service.dart';
+import '../services/monetization_service.dart';
+import '../services/workout_session_service.dart';
 import '../utils/app_constants.dart';
 import 'home_screen.dart';
 import 'planner_screen.dart';
@@ -46,7 +48,7 @@ class MainShellState extends State<MainShell>
     _NavItem(icon: Icons.home_rounded,        label: 'Home'),
     _NavItem(icon: Icons.calendar_month_rounded, label: 'Planner'),
     _NavItem(icon: Icons.bar_chart_rounded,   label: 'Stats'),
-    _NavItem(icon: Icons.science_outlined,      label: 'Tools'),
+    _NavItem(icon: Icons.science_outlined,      label: 'Explore'),
     _NavItem(icon: Icons.person_rounded,      label: 'Profile'),
   ];
 
@@ -64,11 +66,31 @@ class MainShellState extends State<MainShell>
     ).toList();
     // Animate initial tab
     _iconControllers[0].forward();
+
+    // Deferred paywall — a trigger earned during a workout (or AI limit)
+    // fires here on the next app open, never during the completion moment.
+    // Short delay so the home screen settles first.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (!mounted) return;
+        final ap = context.read<AppProvider>();
+        final trigger = ap.pendingPaywallTrigger;
+        if (trigger == null) return;
+        ap.clearPaywallTrigger();
+        PaywallSheet.show(context,
+          trigger:      trigger,
+          onUpgrade:    () => ap.refreshMonetization(),
+          onAdComplete: () => ap.refreshMonetization(),
+        );
+      });
+    });
   }
 
   @override
   void dispose() {
-    for (final c in _iconControllers) c.dispose();
+    for (final c in _iconControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -76,6 +98,11 @@ class MainShellState extends State<MainShell>
   void changeTab(int index) {
     if (index == _current) return;
     HapticFeedback.selectionClick();
+    // Discard pending intent when navigating away from Planner without training
+    if (_current == 1 && index != 1 &&
+        !WorkoutSessionService.instance.isActive) {
+      WorkoutSessionService.instance.clearIntent();
+    }
     setState(() {
       _previous = _current;
       _current  = index;
@@ -91,6 +118,9 @@ class MainShellState extends State<MainShell>
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (_current != 0) {
+          if (_current == 1 && !WorkoutSessionService.instance.isActive) {
+            WorkoutSessionService.instance.clearIntent();
+          }
           setState(() {
             _previous = _current;
             _current = 0;
@@ -266,7 +296,7 @@ class _NavTile extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        height: 54,
+        height: 64,
         alignment: Alignment.center,
         child: ScaleTransition(
           scale: scale,
@@ -359,7 +389,7 @@ class _OfflineBanner extends StatelessWidget {
           duration: const Duration(milliseconds: 300),
           child: online
               ? const SizedBox.shrink()
-              : _OfflineBannerBody(key: const ValueKey('offline')),
+              : const _OfflineBannerBody(key: ValueKey('offline')),
         );
       },
     );

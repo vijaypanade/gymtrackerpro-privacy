@@ -3,7 +3,6 @@
 // Ambient pulse + message reveal animation. No external state deps.
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../models/coach_visual_state.dart';
 import '../../utils/app_constants.dart';
 
@@ -181,7 +180,7 @@ class _HeaderRow extends StatelessWidget {
     return Row(
       children: [
         Text(
-          'AI COACH',
+          'COACH',
           style: TextStyle(
             fontFamily: 'Inter',
             color: theme.accent,

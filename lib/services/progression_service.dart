@@ -35,17 +35,17 @@ class PRResult {
 
   String get uxMessage {
     switch (outcome) {
-      case PROutcome.first: return '🎉 First rep logged! Every journey starts here.';
-      case PROutcome.pr:    return '🔥 You\'re getting stronger!';
-      case PROutcome.match: return '💪 Consistency builds strength. Keep pushing.';
-      case PROutcome.drop:  return '📈 Recovery matters — come back stronger.';
+      case PROutcome.first: return 'First lift logged.';
+      case PROutcome.pr:    return 'Stronger than last time.';
+      case PROutcome.match: return 'Matched your best.';
+      case PROutcome.drop:  return 'Lighter today. That happens.';
     }
   }
 
   String get improvementStr {
-    if (outcome == PROutcome.first) return '🎉 First ever!';
-    if (improvePct == 0) return 'No change 🔁';
-    if (improvePct > 0) return '+${improvePct.toStringAsFixed(1)}% 🔥';
+    if (outcome == PROutcome.first) return 'First entry';
+    if (improvePct == 0) return 'No change';
+    if (improvePct > 0) return '+${improvePct.toStringAsFixed(1)}%';
     return '${improvePct.toStringAsFixed(1)}%';
   }
 }
@@ -253,16 +253,13 @@ abstract final class ProgressionService {
 
     final recent = ex.take(3).toList();
 
-    double avgWeight = 0;
-    double avgReps   = 0;
+    double avgReps = 0;
 
     for (final l in recent) {
-      avgWeight += l.weight;
-      avgReps   += l.reps;
+      avgReps += l.reps;
     }
 
-    avgWeight /= recent.length;
-    avgReps   /= recent.length;
+    avgReps /= recent.length;
 
     final currentPR = getPR(logs, exerciseKey, unit);
 
@@ -297,13 +294,13 @@ abstract final class ProgressionService {
     if (ex.bodyweight) {
       if (last.reps >= 15) {
         return SetProgressionHint(
-          message:    '🔥 Increase reps or add difficulty!',
+          message:    'Ready for more. Add reps or load.',
           nextWeight: 0,
           targetReps: (last.reps + 2).clamp(1, 50),
         );
       }
       return SetProgressionHint(
-        message:    '💪 Keep pushing reps',
+        message:    'Add a rep next set.',
         nextWeight: 0,
         targetReps: (last.reps + 1).clamp(1, 50),
       );

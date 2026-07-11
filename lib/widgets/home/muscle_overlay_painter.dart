@@ -296,7 +296,7 @@ class MuscleGlowPainter extends CustomPainter {
                 ],
                 [0.0, 0.55, 1.0],
               )
-              ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 10.0),
+              ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 10.0),
           );
 
           // R2: Anatomical bloom — contour shape definition
@@ -360,7 +360,7 @@ class MuscleGlowPainter extends CustomPainter {
                 ],
                 [0.0, 0.55, 1.0],
               )
-              ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 12.0),
+              ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 12.0),
           );
 
           // F2: Anatomical bloom — contour shape definition

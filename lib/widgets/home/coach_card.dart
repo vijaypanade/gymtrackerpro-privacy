@@ -5,11 +5,12 @@
 // Follows the Selector<AppProvider, T> + RepaintBoundary pattern.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../coach/models/coach_intent.dart';
+import '../../brain/models/brain_card_data.dart' show MissionType;
+import '../../screens/main_shell.dart' show MainShellState;
 import '../../coach/models/coach_message.dart';
-import '../../coach/models/coach_mode.dart';
 import '../../providers/app_provider.dart';
 import '../../utils/app_constants.dart';
 
@@ -18,6 +19,7 @@ import '../../utils/app_constants.dart';
 @immutable
 class _CoachCardData {
   final BrainCoachMessage coachMessage;
+  final MissionType       missionType;
   final String            missionLabel;
   final int               confidencePct;
   final String            identityLabel;
@@ -25,9 +27,19 @@ class _CoachCardData {
   final String            recoveryLabel;
   final int               recoveryScore;
   final bool              hasBrainData;
+  final int               totalWorkouts;
+  // Today's plan fields — same source as _TrainingDecisionCard
+  final String            planTitle;
+  final int               exerciseCount;
+  final bool              isCompleted;
+  final bool              isRestDay;
+  final double            totalVolume;
+  final String            topMuscleGroup;
+  final int               todayPRCount;
 
   const _CoachCardData({
     required this.coachMessage,
+    required this.missionType,
     required this.missionLabel,
     required this.confidencePct,
     required this.identityLabel,
@@ -35,12 +47,22 @@ class _CoachCardData {
     required this.recoveryLabel,
     required this.recoveryScore,
     required this.hasBrainData,
+    required this.totalWorkouts,
+    required this.planTitle,
+    required this.exerciseCount,
+    required this.isCompleted,
+    required this.isRestDay,
+    required this.totalVolume,
+    required this.topMuscleGroup,
+    required this.todayPRCount,
   });
 
   factory _CoachCardData.from(AppProvider ap) {
-    final bd = ap.brainCardData;
+    final bd   = ap.brainCardData;
+    final plan = ap.todayPlan;
     return _CoachCardData(
       coachMessage:             ap.coachMessage,
+      missionType:              bd.missionType,
       missionLabel:             bd.missionLabel,
       confidencePct:            bd.confidencePct,
       identityLabel:            bd.identityLabel,
@@ -48,6 +70,19 @@ class _CoachCardData {
       recoveryLabel:            bd.recoveryLabel,
       recoveryScore:            bd.recoveryScore,
       hasBrainData:             bd.confidencePct > 0,
+      totalWorkouts:            ap.totalWorkouts,
+      planTitle:                plan.title,
+      exerciseCount:            plan.exercises.length,
+      isCompleted:              plan.isCompleted,
+      isRestDay:                plan.isRestDay,
+      totalVolume:              plan.exercises
+          .expand((e) => e.sets)
+          .where((s) => s.done && s.weight > 0 && s.reps > 0)
+          .fold(0.0, (v, s) => v + s.weight * s.reps),
+      topMuscleGroup:           ap.topMuscleGroup,
+      todayPRCount:             ap.recentPRs
+          .where((pr) => DateTime.now().difference(pr.date).inHours < 24)
+          .length,
     );
   }
 
@@ -58,19 +93,29 @@ class _CoachCardData {
     if (identical(this, other)) return true;
     if (other is! _CoachCardData) return false;
     return other.coachMessage             == coachMessage             &&
+           other.missionType              == missionType              &&
            other.missionLabel             == missionLabel             &&
            other.confidencePct            == confidencePct            &&
            other.identityLabel            == identityLabel            &&
            other.preferredDurationMinutes == preferredDurationMinutes &&
            other.recoveryLabel            == recoveryLabel            &&
            other.recoveryScore            == recoveryScore            &&
-           other.hasBrainData             == hasBrainData;
+           other.hasBrainData             == hasBrainData             &&
+           other.totalWorkouts            == totalWorkouts            &&
+           other.planTitle                == planTitle                &&
+           other.exerciseCount            == exerciseCount            &&
+           other.isCompleted              == isCompleted              &&
+           other.isRestDay                == isRestDay                &&
+           other.totalVolume              == totalVolume              &&
+           other.topMuscleGroup           == topMuscleGroup           &&
+           other.todayPRCount             == todayPRCount;
   }
 
   @override
   int get hashCode => Object.hash(
-    coachMessage, missionLabel, confidencePct, identityLabel,
+    coachMessage, missionType, missionLabel, confidencePct, identityLabel,
     preferredDurationMinutes, recoveryLabel, recoveryScore, hasBrainData,
+    totalWorkouts, planTitle, exerciseCount, isCompleted, isRestDay, totalVolume, topMuscleGroup, todayPRCount,
   );
 }
 
@@ -98,77 +143,51 @@ class _CoachCardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (data.isOnboarding) return const _OnboardingCoachContent();
+    if (data.totalWorkouts == 0) return const _OnboardingCoachContent();
+    if (data.totalWorkouts < 5)  return _WarmingUpCoachContent(data: data);
     return Container(
-      margin: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end:   Alignment.bottomRight,
-          colors: [
-            _modeAccent(data.coachMessage.tone).withValues(alpha: 0.06),
-            const Color(0xFF0C0C0C),
-            const Color(0xFF101010),
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ),
+        color: const Color(0xFF0F0F0F),
         borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.all(
-          color: _modeAccent(data.coachMessage.tone).withValues(alpha: 0.22),
+          color: const Color(0xFF242424),
           width: 0.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.70),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: _modeAccent(data.coachMessage.tone).withValues(alpha: 0.05),
-            blurRadius: 32,
+            color: Colors.black.withValues(alpha: 0.55),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _Header(data: data),
             if (data.coachMessage.hasWarning) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               const _WarningBanner(),
             ],
             if (data.coachMessage.isCelebration) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               const _CelebrationBanner(),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 6),
             _HeroTitle(data: data),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             _Subtitle(data: data),
-            const SizedBox(height: 16),
-            _PrimaryAction(data: data),
-            const SizedBox(height: 16),
-            _CardDivider(),
-            const SizedBox(height: 14),
-            _FooterRow(data: data),
+            const SizedBox(height: 6),
+            _TodaysPlanSection(data: data),
           ],
         ),
       ),
     );
   }
 
-  static Color _modeAccent(CoachMode mode) {
-    switch (mode) {
-      case CoachMode.motivate:  return AppColors.goldHero;
-      case CoachMode.protect:   return AppColors.red;
-      case CoachMode.celebrate: return AppColors.green;
-      case CoachMode.guide:     return AppColors.goldSoft;
-      case CoachMode.nudge:     return AppColors.gold;
-      case CoachMode.educate:   return AppColors.goldAmber;
-    }
-  }
 }
 
 // ── Header — Coach Mode badge + mission context ───────────────────────────────
@@ -179,98 +198,27 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return const Row(
       children: [
-        _ModeBadge(mode: data.coachMessage.tone),
-        const SizedBox(width: 8),
+        Icon(Icons.record_voice_over_outlined, size: 16, color: AppColors.goldSoft),
+        SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Mission: ${data.missionLabel}',
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textMuted,
-              letterSpacing: 0.5,
+            'LiftOn Coach',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+              letterSpacing: 0.8,
             ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        _ConfidenceChip(pct: data.confidencePct),
-      ],
-    );
-  }
-}
-
-// ── Mode badge ────────────────────────────────────────────────────────────────
-
-class _ModeBadge extends StatelessWidget {
-  final CoachMode mode;
-  const _ModeBadge({required this.mode});
-
-  Color get _color {
-    switch (mode) {
-      case CoachMode.motivate:  return AppColors.goldHero;
-      case CoachMode.protect:   return AppColors.red;
-      case CoachMode.celebrate: return AppColors.green;
-      case CoachMode.guide:     return AppColors.goldSoft;
-      case CoachMode.nudge:     return AppColors.gold;
-      case CoachMode.educate:   return AppColors.goldAmber;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: _color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(AppRadii.chip),
-        border: Border.all(color: _color.withValues(alpha: 0.35), width: 0.5),
-      ),
-      child: Text(
-        mode.label.toUpperCase(),
-        style: AppTextStyles.caption.copyWith(
-          color: _color,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.0,
-        ),
-      ),
-    );
-  }
-}
-
-// ── Confidence chip ───────────────────────────────────────────────────────────
-
-class _ConfidenceChip extends StatelessWidget {
-  final int pct;
-  const _ConfidenceChip({required this.pct});
-
-  Color get _color {
-    if (pct >= 75) return AppColors.green;
-    if (pct >= 50) return AppColors.gold;
-    return AppColors.textMuted;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 5, height: 5,
-          decoration: BoxDecoration(color: _color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          '$pct%',
-          style: AppTextStyles.caption.copyWith(
-            color: _color,
-            fontWeight: FontWeight.w600,
           ),
         ),
       ],
     );
   }
 }
+
 
 // ── Warning banner ────────────────────────────────────────────────────────────
 
@@ -288,7 +236,7 @@ class _WarningBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Text('⚠️', style: TextStyle(fontSize: 13)),
+          const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.red),
           const SizedBox(width: 8),
           Text(
             'Recovery warning — protect your body today',
@@ -310,17 +258,17 @@ class _CelebrationBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.green.withValues(alpha: 0.10),
+        color: AppColors.gold.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(AppRadii.button),
-        border: Border.all(color: AppColors.green.withValues(alpha: 0.30), width: 0.5),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.30), width: 0.5),
       ),
       child: Row(
         children: [
-          const Text('\u{1F3C6}', style: TextStyle(fontSize: 13)),
+          const Icon(Icons.emoji_events_outlined, size: 14, color: AppColors.gold),
           const SizedBox(width: 8),
           Text(
-            'You\'re in a performance window — capitalize on it',
-            style: AppTextStyles.caption.copyWith(color: AppColors.green),
+            "You're in a performance window — capitalize on it",
+            style: AppTextStyles.caption.copyWith(color: AppColors.gold),
           ),
         ],
       ),
@@ -338,10 +286,8 @@ class _HeroTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       data.coachMessage.title,
-      style: AppTextStyles.h2.copyWith(
-        color: AppColors.goldHero,
-        fontWeight: FontWeight.w800,
-        height: 1.15,
+      style: AppTextStyles.h3.copyWith(
+        color: AppColors.textPrimary,
       ),
     );
   }
@@ -357,158 +303,226 @@ class _Subtitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       data.coachMessage.subtitle,
-      style: AppTextStyles.body.copyWith(
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: AppTextStyles.bodySmall.copyWith(
         color: AppColors.textSecondary,
-        height: 1.5,
+        height: 1.4,
       ),
     );
   }
 }
 
-// ── Primary action ────────────────────────────────────────────────────────────
+// ── Today's Plan section — embedded action layer ──────────────────────────────
 
-class _PrimaryAction extends StatelessWidget {
+class _TodaysPlanSection extends StatelessWidget {
   final _CoachCardData data;
-  const _PrimaryAction({required this.data});
+  const _TodaysPlanSection({required this.data});
 
-  static Color _accentFor(CoachIntent intent) {
-    switch (intent) {
-      case CoachIntent.warnOvertraining:  return AppColors.red;
-      case CoachIntent.celebratePR:       return AppColors.green;
-      case CoachIntent.suggestRecovery:   return AppColors.goldSoft;
-      case CoachIntent.triggerComeback:   return AppColors.gold;
-      case CoachIntent.encourageConsistency:
-      case CoachIntent.reinforceIdentity:
-      case CoachIntent.acknowledgeMilestone:
-      case CoachIntent.redirectFocus:     return AppColors.goldHero;
-    }
+  Color _chevronColor(int score) {
+    if (score <= 20) return const Color(0xFFEF5350);
+    if (score <= 40) return AppColors.red;
+    if (score <= 70) return AppColors.orange;
+    if (score <= 85) return AppColors.goldAmber;
+    return AppColors.gold;
   }
 
   @override
   Widget build(BuildContext context) {
-    final accent = _accentFor(data.coachMessage.intent);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadii.button),
-        border: Border.all(color: accent.withValues(alpha: 0.35), width: 0.5),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            data.coachMessage.primaryAction,
-            style: AppTextStyles.button.copyWith(
-              color: accent,
-              fontWeight: FontWeight.w700,
-            ),
+    final String planDisplay;
+    final Color  textColor;
+
+    if (data.isCompleted) {
+      planDisplay = '${data.planTitle.isNotEmpty ? data.planTitle : 'Session'}  ✓ Done';
+      textColor   = AppColors.textMuted;
+    } else if (data.isRestDay) {
+      planDisplay = 'Rest day';
+      textColor   = AppColors.textSecondary;
+    } else {
+      planDisplay = data.planTitle.isNotEmpty
+          ? data.planTitle
+          : data.topMuscleGroup.isNotEmpty
+              ? '${data.topMuscleGroup[0].toUpperCase()}${data.topMuscleGroup.substring(1)} Training'
+              : 'Training Session';
+      textColor = AppColors.textPrimary;
+    }
+
+    final chevron = _chevronColor(data.recoveryScore);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(height: 0.5, color: AppColors.borderSoft),
+        const SizedBox(height: 9),
+
+        // ── TODAY'S PLAN · Pull Day — single row ─────────────────────
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            context.findAncestorStateOfType<MainShellState>()?.changeTab(1);
+          },
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Label + title inline
+              Text(
+                "TODAY'S PLAN  ",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: AppColors.textMuted.withValues(alpha: 0.45),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  planDisplay,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    color: textColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right_rounded,
+                  size: 16, color: chevron.withValues(alpha: 0.60)),
+            ],
           ),
-          Icon(Icons.arrow_forward_ios_rounded, color: accent, size: 14),
+        ),
+
+
+        // ── Small CTA — only when session pending ────────────────────
+        if (!data.isRestDay && !data.isCompleted) ...[
+          const SizedBox(height: 10),
+          const _CtaButton(isCompleted: false),
+        ],
+
+        const SizedBox(height: 2),
+      ],
+    );
+  }
+}
+
+// ── Warming up state (workouts 1–4) ──────────────────────────────────────────
+
+class _WarmingUpCoachContent extends StatelessWidget {
+  final _CoachCardData data;
+  const _WarmingUpCoachContent({required this.data});
+
+  int get _totalWorkouts => data.totalWorkouts;
+
+  String get _title {
+    if (_totalWorkouts == 1) return 'First workout done.';
+    if (_totalWorkouts == 2) return 'Two sessions in.';
+    if (_totalWorkouts <= 3) return 'Finding your rhythm.';
+    return 'Almost there.';
+  }
+
+  String get _body {
+    if (_totalWorkouts == 1) {
+      return 'Good start. Each session builds on the last.';
+    }
+    if (_totalWorkouts == 2) {
+      return 'Strength is building.';
+    }
+    if (_totalWorkouts <= 3) {
+      return 'Getting to know your recovery pace. One more session.';
+    }
+    return 'One more session and I\'ll know your pace.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F0F0F),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(color: const Color(0xFF242424), width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.55),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                const Icon(Icons.record_voice_over_outlined, size: 16, color: AppColors.goldSoft),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'LiftOn Coach',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.textMuted.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: AppColors.textMuted.withValues(alpha: 0.20), width: 0.5),
+                  ),
+                  child: Text(
+                    'Adapting',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textMuted.withValues(alpha: 0.65),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(_title, style: AppTextStyles.h3.copyWith(color: AppColors.textPrimary)),
+            const SizedBox(height: 3),
+            Text(_body, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary, height: 1.4)),
+            const SizedBox(height: 8),
+            // Calibration progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: _totalWorkouts / 5.0,
+                backgroundColor: AppColors.gold.withValues(alpha: 0.08),
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.gold),
+                minHeight: 2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Session $_totalWorkouts of 5',
+              style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
+            ),
+            // Today's plan + CTA — same as full coach card
+            _TodaysPlanSection(data: data),
+          ],
+        ),
+      ),
     );
   }
-}
-
-// ── Footer row ────────────────────────────────────────────────────────────────
-
-class _FooterRow extends StatelessWidget {
-  final _CoachCardData data;
-  const _FooterRow({required this.data});
-
-  Color _recoveryColor(int score) {
-    if (score >= 75) return AppColors.green;
-    if (score >= 50) return AppColors.gold;
-    return AppColors.red;
-  }
-
-  String _capitalize(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _FooterItem(
-            icon: '\u{1F464}',
-            label: 'Identity',
-            value: _capitalize(data.identityLabel),
-          ),
-        ),
-        _VSep(),
-        Expanded(
-          child: _FooterItem(
-            icon: '⏱',
-            label: 'Session',
-            value: '${data.preferredDurationMinutes} min',
-          ),
-        ),
-        _VSep(),
-        Expanded(
-          child: _FooterItem(
-            icon: '\u{1F4AA}',
-            label: 'Recovery',
-            value: data.recoveryLabel,
-            valueColor: _recoveryColor(data.recoveryScore),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FooterItem extends StatelessWidget {
-  final String  icon;
-  final String  label;
-  final String  value;
-  final Color?  valueColor;
-
-  const _FooterItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 14)),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: AppTextStyles.caption.copyWith(
-            color: valueColor ?? AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-}
-
-class _VSep extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      Container(width: 0.5, height: 44, color: AppColors.borderSoft);
-}
-
-class _CardDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      Container(height: 0.5, color: AppColors.borderSoft);
 }
 
 // ── Onboarding state (0 workouts) ────────────────────────────────────────────
@@ -519,129 +533,77 @@ class _OnboardingCoachContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end:   Alignment.bottomRight,
-          colors: [
-            AppColors.goldSoft.withValues(alpha: 0.06),
-            const Color(0xFF0C0C0C),
-            const Color(0xFF101010),
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ),
+        color: const Color(0xFF0F0F0F),
         borderRadius: BorderRadius.circular(AppRadii.xl),
-        border: Border.all(
-          color: AppColors.goldSoft.withValues(alpha: 0.22),
-          width: 0.5,
-        ),
+        border: Border.all(color: const Color(0xFF242424), width: 0.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.70),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.55),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+            // Header — same pattern as all other coach states and brain card
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.goldSoft.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(AppRadii.chip),
-                    border: Border.all(
-                      color: AppColors.goldSoft.withValues(alpha: 0.35),
-                      width: 0.5,
-                    ),
-                  ),
+                const Icon(Icons.record_voice_over_outlined, size: 16, color: AppColors.goldSoft),
+                const SizedBox(width: 8),
+                const Expanded(
                   child: Text(
-                    'GUIDE',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.goldSoft,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.0,
+                    'LiftOn Coach',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 0.8,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Day one',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.textMuted,
-                      letterSpacing: 0.5,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.25),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: const Text(
+                    'Coach Active',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.goldSoft,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            // Title
+            const SizedBox(height: 6),
+            // Title — distinct from Brain: relational, not analytical
             Text(
-              BrainCoachMessage.onboarding.title,
-              style: AppTextStyles.h2.copyWith(
-                color: AppColors.goldHero,
-                fontWeight: FontWeight.w800,
-                height: 1.15,
+              'Coach is ready.',
+              style: AppTextStyles.h3.copyWith(
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
-            // Subtitle
+            const SizedBox(height: 4),
             Text(
-              BrainCoachMessage.onboarding.subtitle,
-              style: AppTextStyles.body.copyWith(
+              'Train once to start building recovery insights.',
+              style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.textSecondary,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Primary action
-            Builder(
-              builder: (ctx) => GestureDetector(
-                onTap: () {
-                  // Navigate to Planner tab
-                  final shell = ctx.findAncestorWidgetOfExactType<Scaffold>();
-                  if (shell == null) return;
-                  Navigator.of(ctx).popUntil((r) => r.isFirst);
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.goldHero.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(AppRadii.button),
-                    border: Border.all(
-                      color: AppColors.goldHero.withValues(alpha: 0.35),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        BrainCoachMessage.onboarding.primaryAction,
-                        style: AppTextStyles.button.copyWith(
-                          color: AppColors.goldHero,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        color: AppColors.goldHero,
-                        size: 14,
-                      ),
-                    ],
-                  ),
-                ),
+                height: 1.4,
               ),
             ),
           ],
@@ -650,3 +612,49 @@ class _OnboardingCoachContent extends StatelessWidget {
     );
   }
 }
+
+// ── Hero CTA button ───────────────────────────────────────────────────────────
+
+class _CtaButton extends StatelessWidget {
+  final bool isCompleted;
+  const _CtaButton({required this.isCompleted});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        context.findAncestorStateOfType<MainShellState>()?.changeTab(1);
+      },
+      child: Container(
+        height: 38,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.gold, AppColors.goldSoft],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.play_arrow_rounded, size: 16, color: Colors.black),
+            SizedBox(width: 5),
+            Text(
+              "Start Today's Workout",
+              style: TextStyle(
+                fontFamily: 'Rajdhani',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

@@ -19,7 +19,6 @@ import 'providers/settings_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/workout_provider.dart';
 
-import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 
 import 'services/ad_service.dart';
@@ -32,6 +31,7 @@ import 'services/storage_service.dart';
 import 'utils/app_constants.dart';
 import 'services/ai_quota_service.dart';
 import 'services/exercise_video_service.dart';
+import 'services/exercise_gif_service.dart';
 import 'services/voice_coach_service.dart';
 
 void main() {
@@ -54,6 +54,9 @@ void main() {
       systemNavigationBarColor: AppColors.bgSurface,
       systemNavigationBarIconBrightness: Brightness.light,
     ));
+
+    // Warm GIF cache in background — ready before user opens exercise cards
+    ExerciseGifService.instance.prefetch();
 
     runApp(const LiftOnApp());
   }, (error, stack) {

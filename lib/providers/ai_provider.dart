@@ -589,7 +589,11 @@ class AIProvider extends ChangeNotifier {
           '$prevLine\n\n'
           'Respond with exactly 2 sentences. Start with one relevant emoji.';
 
-      final response = await ApiService.askAI(prompt, type: AiRequestType.insight);
+      final response = await ApiService.askAI(
+        prompt,
+        type:      AiRequestType.insight,
+        isPremium: MonetizationService.instance.isPremium,
+      );
 
       if (!response.startsWith('⚠️') && !response.startsWith('❌')) {
         _lastSessionInsight = response;
@@ -653,7 +657,11 @@ class AIProvider extends ChangeNotifier {
           '${history.isNotEmpty ? "Recent bests: $history" : ""}\n\n'
           'One sentence. Reference specific muscle recovery or last weight. Be a coach, not a chatbot.';
 
-      final response = await ApiService.askAI(prompt, type: AiRequestType.brief);
+      final response = await ApiService.askAI(
+        prompt,
+        type:      AiRequestType.brief,
+        isPremium: MonetizationService.instance.isPremium,
+      );
       if (!response.startsWith('⚠️') && !response.startsWith('❌')) {
         _dailyBrief     = response;
         _dailyBriefDate = _todayStr;
@@ -1743,7 +1751,7 @@ class AIProvider extends ChangeNotifier {
               '💪 Strength improving. Time to go heavier.',
             ]),
             strict: _pickUnique('weight_strict', [
-              '📈 Data supports overload. Increase weight.',
+              '📈 The numbers support it. Increase weight.',
             ]),
             military: _pickUnique('weight_military', [
               '🪖 INCREASE LOAD. EXECUTE.',

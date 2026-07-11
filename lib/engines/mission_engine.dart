@@ -16,7 +16,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
-import '../models/workout_log.dart';
 
 // ─────────────────────────────────────────────────────────
 // MISSION — extended with progress tracking
@@ -174,7 +173,7 @@ class MissionEngine extends ChangeNotifier {
       // Building streak → streak mission
       missions.add(Mission(
         id:          'streak_$dayCode',
-        title:       'Extend Your ${streak}-Day Streak',
+        title:       'Extend Your $streak-Day Streak',
         description: 'Don\'t break the chain! Train today.',
         emoji:       '🔥',
         xpReward:    XPSystem.xpStreakBonus * (streak ~/ 3 + 1),

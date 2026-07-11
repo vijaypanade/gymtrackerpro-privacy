@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
+import '../services/billing_service.dart';
 import '../services/monetization_service.dart';
 import '../utils/app_constants.dart';
 
@@ -22,6 +23,7 @@ class _PremiumScreenState extends State<PremiumScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _shimmer;
   bool _loading = false;
+  bool _restoring = false;
   String _selectedPlan = 'yearly'; // yearly default — best value anchor
 
   @override
@@ -37,13 +39,13 @@ class _PremiumScreenState extends State<PremiumScreen>
 
   // ── Feature rows: (emoji, label, free, premium) ──────────
   static const _features = [
-    ('🤖', 'AI Workout Plans',         '2/day',      'Unlimited'),
+    ('💪', 'Workout Plans',             '2/day',      'Unlimited'),
     ('📅', 'Weekly Planner',           '✓',          '✓'),
     ('💪', 'PR Tracking',              '✓',          '✓'),
     ('🔥', 'Streaks & XP',             '✓',          '✓'),
     ('📊', 'Basic Stats',              '✓',          '✓'),
     ('📈', 'Fatigue & Plateau Index',  '—',          '✓'),
-    ('🧠', 'Scientific AI Coach',      '—',          '✓'),
+    ('🎯', 'Personalised Coaching',     '—',          '✓'),
     ('🎯', 'Weak Muscle Detection',    '—',          '✓'),
     ('🔄', 'Weekly Memory Coaching',   '—',          '✓'),
   ];
@@ -151,13 +153,13 @@ class _PremiumScreenState extends State<PremiumScreen>
                             fontWeight: FontWeight.w800, letterSpacing: 1.2)),
                   ]),
                   const SizedBox(height: 10),
-                  _PreviewRow(Icons.trending_up_rounded, 'Next week plan auto-adjusts to your progress'),
+                  const _PreviewRow(Icons.trending_up_rounded, 'Next week plan auto-adjusts to your progress'),
                   const SizedBox(height: 6),
-                  _PreviewRow(Icons.psychology_rounded, 'AI tracks your weak muscles every session'),
+                  const _PreviewRow(Icons.psychology_rounded, 'Tracks your weak muscles every session'),
                   const SizedBox(height: 6),
-                  _PreviewRow(Icons.emoji_events_rounded, 'Advanced PR predictions — know before you lift'),
+                  const _PreviewRow(Icons.emoji_events_rounded, 'Advanced PR predictions — know before you lift'),
                   const SizedBox(height: 6),
-                  _PreviewRow(Icons.track_changes_rounded, 'Deload auto-detected — never overtrain again'),
+                  const _PreviewRow(Icons.track_changes_rounded, 'Deload auto-detected — never overtrain again'),
                 ]),
               ),
               const SizedBox(height: 20),
@@ -166,7 +168,7 @@ class _PremiumScreenState extends State<PremiumScreen>
               Row(children: [
                 Expanded(child: _PlanTile(
                   price: '₹150', period: '/month',
-                  badge: '3 days free', badgeColor: AppColors.green,
+                  badge: '3 days free', badgeColor: AppColors.gold,
                   isSelected: _selectedPlan == 'monthly',
                   onTap: () => setState(() => _selectedPlan = 'monthly'),
                 )),
@@ -193,9 +195,9 @@ class _PremiumScreenState extends State<PremiumScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: AppColors.bgSurface,
-                      borderRadius: const BorderRadius.vertical(
+                      borderRadius: BorderRadius.vertical(
                           top: Radius.circular(16)),
                     ),
                     child: Row(children: [
@@ -289,11 +291,11 @@ class _PremiumScreenState extends State<PremiumScreen>
               const SizedBox(height: 12),
 
               // ── Trust badges ───────────────────────────────
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 _TrustBadge('🔒', 'Secure'),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 _TrustBadge('↩️', 'Cancel anytime'),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 _TrustBadge('🚫', 'No hidden fees'),
               ]),
               const SizedBox(height: 20),
@@ -307,29 +309,76 @@ class _PremiumScreenState extends State<PremiumScreen>
 
               const SizedBox(height: 10),
 
-              GestureDetector(
-                onTap: () async {
-                  final uri = Uri.parse(
-                    'https://play.google.com/store/account/subscriptions',
-                  );
-                  await launchUrl(uri,
-                      mode: LaunchMode.externalApplication);
-                },
-                child: Text(
-                  'Manage Subscription',
-                  style: GoogleFonts.inter(
-                    color: AppColors.gold,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    decoration: TextDecoration.underline,
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                GestureDetector(
+                  onTap: _restoring ? null : _onRestore,
+                  child: _restoring
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: AppColors.gold))
+                      : Text(
+                          'Restore Purchase',
+                          style: GoogleFonts.inter(
+                            color: AppColors.gold,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                ),
+                Text('  ·  ',
+                    style: GoogleFonts.inter(
+                        color: AppColors.textMuted, fontSize: 12)),
+                GestureDetector(
+                  onTap: () async {
+                    final uri = Uri.parse(
+                        'https://play.google.com/store/account/subscriptions');
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  },
+                  child: Text(
+                    'Manage Subscription',
+                    style: GoogleFonts.inter(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
-              ),
+              ]),
             ])),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _onRestore() async {
+    HapticFeedback.lightImpact();
+    setState(() => _restoring = true);
+    try {
+      await BillingService.instance.restorePurchases();
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      if (BillingService.instance.isPremium) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Premium restored successfully!',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+          backgroundColor: AppColors.gold,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No active subscription found.'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _restoring = false);
+    }
   }
 
   Future<void> _onUpgrade() async {
@@ -338,11 +387,11 @@ class _PremiumScreenState extends State<PremiumScreen>
     try {
       await MonetizationService.instance.upgradeToPremium(plan: _selectedPlan);
       if (!mounted) return;
-      context.read<AppProvider>().notifyListeners();
+      context.read<AppProvider>().refreshMonetization();
       {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Welcome to Premium — unlimited AI coaching unlocked.',
+          content: Text('Welcome to Premium. All features unlocked.',
               style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
           backgroundColor: AppColors.gold,
           behavior: SnackBarBehavior.floating,
@@ -399,7 +448,7 @@ class _AlreadyPremiumScreen extends StatelessWidget {
                 color: AppColors.gold, fontSize: 28,
                 fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-            Text('All features unlocked. Unlimited AI. Full analytics.',
+            Text('All features unlocked. Full coaching and analytics.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                     color: AppColors.textSecondary, fontSize: 14,
@@ -443,7 +492,7 @@ class _PreviewRow extends StatelessWidget {
           color: AppColors.textSecondary, fontSize: 12,
           fontWeight: FontWeight.w500, height: 1.4))),
       const Icon(Icons.check_circle_rounded,
-          color: AppColors.green, size: 14),
+          color: AppColors.gold, size: 14),
     ],
   );
 }

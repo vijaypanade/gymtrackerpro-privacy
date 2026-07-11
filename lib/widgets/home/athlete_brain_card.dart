@@ -3,8 +3,10 @@
 // AthleteBrain Home Card — surfaces mission intelligence to the athlete.
 // Pure UI. All computation is in AppProvider.brainCardData.
 // Follows the Selector<AppProvider, T> + RepaintBoundary pattern.
+// Expansion state is local — only this widget rebuilds on toggle.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../brain/models/brain_card_data.dart';
@@ -18,26 +20,47 @@ class AthleteBrainCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<AppProvider, BrainCardData>(
-      selector: (_, ap) => ap.brainCardData,
-      builder:  (_, data, __) => RepaintBoundary(
-        child: _BrainCardContent(data: data),
+    return Selector<AppProvider, ({BrainCardData data, int totalWorkouts})>(
+      selector: (_, ap) => (data: ap.brainCardData, totalWorkouts: ap.totalWorkouts),
+      builder:  (_, snap, __) => RepaintBoundary(
+        child: _BrainCardContent(data: snap.data, totalWorkouts: snap.totalWorkouts),
       ),
     );
   }
 }
 
-// ── Content ──────────────────────────────────────────────────────────────────
+// ── Content (stateful for local expand/collapse) ──────────────────────────────
 
-class _BrainCardContent extends StatelessWidget {
+class _BrainCardContent extends StatefulWidget {
   final BrainCardData data;
-  const _BrainCardContent({required this.data});
+  final int totalWorkouts;
+  const _BrainCardContent({required this.data, required this.totalWorkouts});
+
+  @override
+  State<_BrainCardContent> createState() => _BrainCardContentState();
+}
+
+class _BrainCardContentState extends State<_BrainCardContent> {
+  bool _expanded = false;
+
+  void _toggle() {
+    HapticFeedback.selectionClick();
+    setState(() => _expanded = !_expanded);
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (data.isOnboarding) return _OnboardingBrainContent();
+    if (widget.totalWorkouts == 0) {
+      return const _OnboardingBrainContent(totalWorkouts: 0);
+    }
+    if (widget.data.isOnboarding) {
+      return _OnboardingBrainContent(totalWorkouts: widget.totalWorkouts);
+    }
+
+    final data = widget.data;
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -56,26 +79,38 @@ class _BrainCardContent extends StatelessWidget {
           BoxShadow(
             color: AppColors.gold.withValues(alpha: 0.04),
             blurRadius: 40,
-            offset: const Offset(0, 0),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Header(data: data),
-            const SizedBox(height: 16),
+            // ── Always visible: icon + title + one human sentence ───────────
+            _Header(data: data, totalWorkouts: widget.totalWorkouts),
+            const SizedBox(height: 6),
             _MissionRow(data: data),
-            const SizedBox(height: 18),
-            _Divider(),
-            const SizedBox(height: 14),
-            _WhySection(data: data),
-            const SizedBox(height: 14),
-            _Divider(),
-            const SizedBox(height: 14),
-            _FooterRow(data: data),
+            const SizedBox(height: 4),
+            _MissionVoice(data: data),
+            const SizedBox(height: 4),
+
+            // ── Expandable detail panel ─────────────────────────────────────
+            AnimatedSize(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: _expanded
+                  ? _ExpandedPanel(data: data)
+                  : const SizedBox.shrink(),
+            ),
+
+            // ── Footer — toggle for 5+, calibrating progress bar for 1-4 ──
+            Container(height: 0.5, color: AppColors.borderSoft),
+            if (widget.totalWorkouts >= 5)
+              _WhyToggleRow(expanded: _expanded, onTap: _toggle)
+            else
+              _CalibratingFooter(totalWorkouts: widget.totalWorkouts),
           ],
         ),
       ),
@@ -87,109 +122,118 @@ class _BrainCardContent extends StatelessWidget {
 
 class _Header extends StatelessWidget {
   final BrainCardData data;
-  const _Header({required this.data});
+  final int totalWorkouts;
+  const _Header({required this.data, required this.totalWorkouts});
+
+  String get _label {
+    if (totalWorkouts == 1) return 'First Insight';
+    if (totalWorkouts < 5)  return 'Pattern Found';
+    return "Today's Signal";
+  }
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Text(
-          '\u{1F9E0}',
-          style: TextStyle(fontSize: 16),
-        ),
+        const Icon(Icons.psychology_outlined, size: 16, color: AppColors.goldSoft),
         const SizedBox(width: 8),
         Text(
-          "Today's Mission",
-          style: AppTextStyles.caption.copyWith(
+          _label,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
             color: AppColors.textSecondary,
             letterSpacing: 0.8,
           ),
         ),
-        const Spacer(),
-        _ConfidenceBadge(pct: data.confidencePct),
       ],
     );
   }
 }
 
-// ── Confidence badge ──────────────────────────────────────────────────────────
-
-class _ConfidenceBadge extends StatelessWidget {
-  final int pct;
-  const _ConfidenceBadge({required this.pct});
-
-  Color get _color {
-    if (pct >= 75) return AppColors.green;
-    if (pct >= 55) return AppColors.gold;
-    return AppColors.textMuted;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: _color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _color.withValues(alpha: 0.30), width: 0.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 5,
-            height: 5,
-            decoration: BoxDecoration(color: _color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            '$pct% confidence',
-            style: AppTextStyles.caption.copyWith(color: _color),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Mission row ───────────────────────────────────────────────────────────────
+// ── Mission row (label + icon only — recommendation moves to expanded) ────────
 
 class _MissionRow extends StatelessWidget {
   final BrainCardData data;
   const _MissionRow({required this.data});
 
+  // Presentation-only titles — plain language a first-week user understands.
+  // Engine labels ("Deload Session") never reach the screen.
+  static String _displayTitle(MissionType t) => switch (t) {
+    MissionType.protectRecovery     => 'Recover today',
+    MissionType.maintainConsistency => 'Train normally',
+    MissionType.pushPerformance     => 'Ready to push',
+    MissionType.comeback            => 'Ease back in',
+    MissionType.deload              => 'Take it lighter today',
+    MissionType.volumeReduction     => 'A little less today',
+    MissionType.homeAdaptation      => 'Home session today',
+    MissionType.technique           => 'Focus on form',
+    MissionType.recoverySession     => 'Easy movement today',
+  };
+
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _MissionIcon(missionType: data.missionType),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                data.missionLabel,
-                style: AppTextStyles.h3.copyWith(
-                  color: AppColors.goldHero,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                data.recommendation,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+          child: Text(
+            _displayTitle(data.missionType),
+            style: AppTextStyles.h3.copyWith(
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Mission voice — one human sentence, coach speaking ─────────────────────────
+// Presentation-only. Never numbers, never engine phrasing, never a restatement
+// of the Recovery card. Recovery Card = body state; this card = today's call.
+
+String _missionSentence(MissionType t) => switch (t) {
+  MissionType.protectRecovery     =>
+      'Your body is asking for an easier day.',
+  MissionType.maintainConsistency =>
+      'Showing up is the win today.',
+  MissionType.pushPerformance     =>
+      'Everything lines up. A good day to push.',
+  MissionType.comeback            =>
+      'Ease back in. No need to rush.',
+  MissionType.deload              =>
+      'You\'ve worked hard lately. A lighter day fits better.',
+  MissionType.volumeReduction     =>
+      'A little less today keeps you moving forward.',
+  MissionType.homeAdaptation      =>
+      'Today\'s plan works with what you have at home.',
+  MissionType.technique           =>
+      'Slow it down. Make every rep clean.',
+  MissionType.recoverySession     =>
+      'Light movement today. Nothing heavy.',
+};
+
+class _MissionVoice extends StatelessWidget {
+  final BrainCardData data;
+  const _MissionVoice({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 48),
+      child: Text(
+        _missionSentence(data.missionType),
+        style: AppTextStyles.bodySmall.copyWith(
+          color: AppColors.textSecondary,
+          height: 1.4,
+        ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }
@@ -200,218 +244,272 @@ class _MissionIcon extends StatelessWidget {
   final MissionType missionType;
   const _MissionIcon({required this.missionType});
 
-  String get _emoji {
+  IconData get _icon {
     switch (missionType) {
-      case MissionType.protectRecovery:   return '\u{1F6E1}';  // 🛡
-      case MissionType.maintainConsistency: return '\u{1F4CA}'; // 📊
-      case MissionType.pushPerformance:   return '\u{26A1}';   // ⚡
-      case MissionType.comeback:          return '\u{1F525}';  // 🔥
-      case MissionType.deload:            return '\u{1F4AB}';  // 💫
-      case MissionType.volumeReduction:   return '\u{1F53D}';  // 🔽
-      case MissionType.homeAdaptation:    return '\u{1F3E0}';  // 🏠
-      case MissionType.technique:         return '\u{1F3AF}';  // 🎯
-      case MissionType.recoverySession:   return '\u{1F9D8}';  // 🧘
+      case MissionType.protectRecovery:     return Icons.shield_outlined;
+      case MissionType.maintainConsistency: return Icons.bar_chart_rounded;
+      case MissionType.pushPerformance:     return Icons.bolt_rounded;
+      case MissionType.comeback:            return Icons.local_fire_department_outlined;
+      case MissionType.deload:              return Icons.remove_circle_outline_rounded;
+      case MissionType.volumeReduction:     return Icons.trending_down_rounded;
+      case MissionType.homeAdaptation:      return Icons.home_outlined;
+      case MissionType.technique:           return Icons.track_changes_rounded;
+      case MissionType.recoverySession:     return Icons.self_improvement_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 48,
-      height: 48,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         color: AppColors.gold.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(9),
         border: Border.all(color: AppColors.gold.withValues(alpha: 0.20), width: 0.5),
       ),
       alignment: Alignment.center,
-      child: Text(_emoji, style: const TextStyle(fontSize: 22)),
+      child: Icon(_icon, size: 18, color: AppColors.gold),
     );
   }
 }
 
-// ── Why section ───────────────────────────────────────────────────────────────
+// ── Why? toggle row ───────────────────────────────────────────────────────────
 
-class _WhySection extends StatelessWidget {
-  final BrainCardData data;
-  const _WhySection({required this.data});
+class _WhyToggleRow extends StatelessWidget {
+  final bool expanded;
+  final VoidCallback onTap;
+  const _WhyToggleRow({required this.expanded, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              expanded ? 'Hide' : 'Why this?',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.goldSoft,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            AnimatedRotation(
+              turns: expanded ? 0.5 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: AppColors.goldSoft,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Expanded detail panel ─────────────────────────────────────────────────────
+
+class _ExpandedPanel extends StatelessWidget {
+  final BrainCardData data;
+  const _ExpandedPanel({required this.data});
+
+  // Translate an engine signal into one quiet human line.
+  // Numbers, scores and engine phrasing never reach the screen — a signal
+  // that can't be said plainly is not shown. Presentation-only mapping.
+  static String? _humanize(String signal) {
+    final l = signal.toLowerCase();
+    if (l.contains('%') || RegExp(r'\d').hasMatch(l)) {
+      // Any numeric signal is a report, not a sentence.
+      if (l.contains('fatigue'))  return 'Fatigue has been building.';
+      if (l.contains('recover'))  return 'Recovery still needs time.';
+      if (l.contains('volume'))   return 'Training has been heavy lately.';
+      if (l.contains('streak') || l.contains('consisten')) {
+        return 'You\'ve been showing up steadily.';
+      }
+      return null;
+    }
+    if (l.contains('fatigue'))   return 'Fatigue has been building.';
+    if (l.contains('recover'))   return 'Recovery still needs time.';
+    // Sleep belongs to other surfaces — this card never mentions it.
+    if (l.contains('sleep'))     return null;
+    if (l.contains('volume'))    return 'Training has been heavy lately.';
+    if (l.contains('pr') || l.contains('record') || l.contains('strength')) {
+      return 'Strength is trending up.';
+    }
+    if (l.contains('streak') || l.contains('consisten')) {
+      return 'You\'ve been showing up steadily.';
+    }
+    if (l.contains('missed') || l.contains('gap') || l.contains('inactive')) {
+      return 'There\'s been a gap in training.';
+    }
+    return null;
+  }
+
+  // Two short decision lines per mission — what to do, what comes next.
+  static List<String> _decisionLines(MissionType t) => switch (t) {
+    MissionType.protectRecovery     => [
+      'Keep today easy.',
+      'Normal training returns soon.',
+    ],
+    MissionType.maintainConsistency => [
+      'A steady session is enough.',
+      'No need to push for more.',
+    ],
+    MissionType.pushPerformance     => [
+      'Push your main lifts today.',
+      'This is a good window for it.',
+    ],
+    MissionType.comeback            => [
+      'Start lighter than you think.',
+      'Strength comes back fast.',
+    ],
+    MissionType.deload              => [
+      'Keep today\'s volume lower.',
+      'Normal training can return soon.',
+    ],
+    MissionType.volumeReduction     => [
+      'Fewer sets today.',
+      'Quality over quantity.',
+    ],
+    MissionType.homeAdaptation      => [
+      'Work with what\'s available.',
+      'The plan adapts with you.',
+    ],
+    MissionType.technique           => [
+      'Lighter weight, cleaner reps.',
+      'Control every rep.',
+    ],
+    MissionType.recoverySession     => [
+      'A walk or light session is plenty.',
+      'Heavy work waits a day.',
+    ],
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    // Max 3 humanized signals, deduplicated. A silent panel is fine.
+    final signals = <String>[];
+    for (final s in data.dominantSignals) {
+      final h = _humanize(s);
+      if (h != null && !signals.contains(h)) signals.add(h);
+      if (signals.length == 3) break;
+    }
+    final decision = _decisionLines(data.missionType);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 4),
+        Container(height: 0.5, color: AppColors.borderSoft),
+        const SizedBox(height: 12),
+
+        // ── What the coach noticed ────────────────────────────────────────
+        ...signals.map((s) => Padding(
+          padding: const EdgeInsets.only(bottom: 5),
+          child: Text(
+            s,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        )),
+        if (signals.isNotEmpty) const SizedBox(height: 8),
+
+        // ── The decision ──────────────────────────────────────────────────
+        ...decision.map((s) => Padding(
+          padding: const EdgeInsets.only(bottom: 5),
+          child: Text(
+            s,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textPrimary.withValues(alpha: 0.85),
+              height: 1.4,
+            ),
+          ),
+        )),
+
+        const SizedBox(height: 6),
         Text(
-          'Why this decision?',
+          'We\'ll check again after your next session.',
           style: AppTextStyles.caption.copyWith(
             color: AppColors.textMuted,
-            letterSpacing: 0.6,
           ),
         ),
         const SizedBox(height: 8),
-        ...data.dominantSignals.take(3).map(
-          (signal) => Padding(
-            padding: const EdgeInsets.only(bottom: 5),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 5),
-                  child: Container(
-                    width: 4,
-                    height: 4,
-                    decoration: const BoxDecoration(
-                      color: AppColors.goldSoft,
-                      shape: BoxShape.circle,
-                    ),
+      ],
+    );
+  }
+}
+
+// ── Calibrating footer — shown in place of toggle for workouts 1-4 ───────────
+
+class _CalibratingFooter extends StatelessWidget {
+  final int totalWorkouts;
+  const _CalibratingFooter({required this.totalWorkouts});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: totalWorkouts / 5.0,
+                    backgroundColor: AppColors.gold.withValues(alpha: 0.08),
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.gold),
+                    minHeight: 2,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    signal,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'Recovery Intelligence',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.goldSoft,
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          data.confidenceNarrative,
-          style: AppTextStyles.caption.copyWith(
-            color: AppColors.textMuted,
-            fontStyle: FontStyle.italic,
+          const SizedBox(height: 2),
+          Text(
+            totalWorkouts == 1
+                ? 'First recovery tracked'
+                : 'Pattern updating',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textMuted,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
-  }
-}
-
-// ── Footer row ────────────────────────────────────────────────────────────────
-
-class _FooterRow extends StatelessWidget {
-  final BrainCardData data;
-  const _FooterRow({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _FooterItem(
-            icon: '\u{1F464}',
-            label: 'Identity',
-            value: _capitalize(data.identityLabel),
-          ),
-        ),
-        _VerticalSep(),
-        Expanded(
-          child: _FooterItem(
-            icon: '⏱',
-            label: 'Session',
-            value: '${data.preferredDurationMinutes} min',
-          ),
-        ),
-        _VerticalSep(),
-        Expanded(
-          child: _FooterItem(
-            icon: '\u{1F4AA}',
-            label: 'Recovery',
-            value: data.recoveryLabel,
-            valueColor: _recoveryColor(data.recoveryScore),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Color _recoveryColor(int score) {
-    if (score >= 75) return AppColors.green;
-    if (score >= 50) return AppColors.gold;
-    return AppColors.red;
-  }
-
-  String _capitalize(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
-}
-
-class _FooterItem extends StatelessWidget {
-  final String icon;
-  final String label;
-  final String value;
-  final Color? valueColor;
-
-  const _FooterItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 14)),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: AppTextStyles.caption.copyWith(
-            color: valueColor ?? AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-}
-
-class _VerticalSep extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 0.5,
-      height: 44,
-      color: AppColors.borderSoft,
-    );
-  }
-}
-
-class _Divider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(height: 0.5, color: AppColors.borderSoft);
   }
 }
 
 // ── Onboarding state (0 workouts) ────────────────────────────────────────────
 
 class _OnboardingBrainContent extends StatelessWidget {
-  static const _stages = [
-    'Building',
-    'Developing',
-    'Consistent',
-    'Disciplined',
-    'Elite',
-  ];
+  final int totalWorkouts;
+  const _OnboardingBrainContent({required this.totalWorkouts});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -434,140 +532,100 @@ class _OnboardingBrainContent extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+            // Header — identical pattern to active card _Header
             Row(
               children: [
-                const Text('\u{1F9E0}', style: TextStyle(fontSize: 16)),
+                const Icon(Icons.psychology_outlined, size: 16, color: AppColors.goldSoft),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'Athlete Brain',
-                  style: AppTextStyles.caption.copyWith(
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                     letterSpacing: 0.8,
                   ),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.textMuted.withValues(alpha: 0.08),
+                    color: AppColors.gold.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: AppColors.textMuted.withValues(alpha: 0.20),
+                      color: AppColors.gold.withValues(alpha: 0.22),
                       width: 0.5,
                     ),
                   ),
-                  child: Text(
-                    'Waiting for data',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.textMuted,
+                  child: const Text(
+                    'Inactive',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.goldSoft,
                     ),
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 20),
-            // Hero message
-            Text(
-              'Your Training Brain is Ready',
-              style: AppTextStyles.h3.copyWith(
-                color: AppColors.goldHero,
-                fontWeight: FontWeight.w700,
-              ),
             ),
             const SizedBox(height: 8),
+            // Hero message
             Text(
-              'Complete your first workout to activate personalised intelligence. '
-              'The more you train, the smarter it gets.',
+              'Train once to activate.',
+              style: AppTextStyles.h3.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Recovery intelligence unlocks after your first session.',
               style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.textSecondary,
-                height: 1.5,
+                height: 1.4,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 6),
             Container(height: 0.5, color: AppColors.borderSoft),
-            const SizedBox(height: 16),
-            // Progress indicator
+            const SizedBox(height: 8),
+            // Signal collection footer — no CTA
+            // At 0 workouts skip LinearProgressIndicator entirely (avoids
+            // Material 3 rounded-indicator dot artifact at value=0).
+            if (totalWorkouts == 0)
+              Container(
+                height: 2,
+                decoration: BoxDecoration(
+                  color: AppColors.gold.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              )
+            else
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: totalWorkouts / 5.0,
+                  backgroundColor: AppColors.gold.withValues(alpha: 0.10),
+                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.gold),
+                  minHeight: 2,
+                ),
+              ),
+            const SizedBox(height: 5),
             Text(
-              'ACTIVATION PROGRESS',
+              'Recovery Intelligence',
               style: AppTextStyles.caption.copyWith(
-                color: AppColors.textMuted,
-                letterSpacing: 0.8,
+                color: AppColors.goldSoft,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: 0,
-                      backgroundColor: AppColors.gold.withValues(alpha: 0.10),
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.gold),
-                      minHeight: 6,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  '0 / 1 workout',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Container(height: 0.5, color: AppColors.borderSoft),
-            const SizedBox(height: 16),
-            // Identity path
+            const SizedBox(height: 2),
             Text(
-              'YOUR PATH',
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textMuted,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: _stages.asMap().entries.map((e) {
-                final isFirst = e.key == 0;
-                final color   = isFirst ? AppColors.gold : AppColors.textMuted.withValues(alpha: 0.25);
-                return Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Container(
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: color,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              e.value,
-                              style: AppTextStyles.caption.copyWith(
-                                color: isFirst ? AppColors.gold : AppColors.textMuted.withValues(alpha: 0.35),
-                                fontSize: 9,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (e.key < _stages.length - 1) const SizedBox(width: 4),
-                    ],
-                  ),
-                );
-              }).toList(),
+              'Activates after first session',
+              style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
             ),
           ],
         ),

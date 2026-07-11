@@ -126,11 +126,11 @@ class SplitRecommendationEngine {
         );
       }
       // 6 days beginner — nudge to PPL, not Bro Split
-      return SplitRecommendation(
+      return const SplitRecommendation(
         split: SplitStyle.pushPullLegs,
         headline: 'Push Pull Legs',
         body: 'For 6 training days at your level, PPL gives the right frequency without taxing your recovery like a bro split would.',
-        bullets: const [
+        bullets: [
           'Better recovery than a bro split',
           'Each muscle trained twice weekly',
           'Simpler load progression to track',

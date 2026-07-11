@@ -16,7 +16,8 @@
 
 import 'dart:async';
 import 'monetization_service.dart';
-import 'dart:io';
+import 'auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,9 +41,14 @@ class BillingService extends ChangeNotifier {
   BillingService._();
   static final BillingService instance = BillingService._();
 
-  static const _keyPremium    = 'billing_premium_v2';
-  static const _keyProductId  = 'billing_product_id_v2';
-  static const _keyExpiry     = 'billing_expiry_v2';
+  static const _keyPremium    = 'billing_premium_v3';
+  static const _keyProductId  = 'billing_product_id_v3';
+  static const _keyExpiry     = 'billing_expiry_v3';
+
+  // UID-scoped keys — one account's purchase won't leak to another on same device
+  String get _kPremium   { final u = AuthService.instance.currentUser?.uid; return u != null ? '${_keyPremium}_$u'   : _keyPremium; }
+  String get _kProductId { final u = AuthService.instance.currentUser?.uid; return u != null ? '${_keyProductId}_$u' : _keyProductId; }
+  String get _kExpiry    { final u = AuthService.instance.currentUser?.uid; return u != null ? '${_keyExpiry}_$u'    : _keyExpiry; }
 
   // ── State ──────────────────────────────────────────────
   BillingStatus _status         = BillingStatus.loading;
@@ -52,8 +58,6 @@ class BillingService extends ChangeNotifier {
   String?       _error;
 
   List<ProductDetails>   _products   = [];
-  List<PurchaseDetails>  _purchases  = [];
-
   StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
 
   // ── Public getters ─────────────────────────────────────
@@ -194,40 +198,76 @@ class BillingService extends ChangeNotifier {
 
   // ─────────────────────────────────────────────────────────
   // VALIDATE AND GRANT PREMIUM
-  // In production: verify receipt with your backend server.
-  // For Phase 1 (AdMob-only): local grant is acceptable.
+  // Defence-in-depth: local grant + Firestore record.
+  //
+  // Attack surface closed:
+  //   • Editing SharedPreferences on a rooted device no longer
+  //     grants premium because _loadCachedStatus cross-checks
+  //     Firestore on every cold start.
+  //   • The Firestore record is the authoritative source of truth.
+  //
+  // Phase 3 upgrade path (when ready):
+  //   Replace _verifyWithServer with a Cloud Function that calls
+  //   the Google Play Developer API with purchase.verificationData
+  //   and writes `verified: true` to the Firestore grant document.
   // ─────────────────────────────────────────────────────────
   Future<void> _handleValidPurchase(PurchaseDetails purchase) async {
-    // TODO Phase 2: Send purchase.verificationData to your backend
-    // and verify with Google Play Developer API before granting.
-    // For now: trust the purchase stream (Google handles verification).
-
     final productId = purchase.productID;
 
-    if (productId == BillingProducts.monthly  ||
-        productId == BillingProducts.quarterly ||
-        productId == BillingProducts.yearly) {
-      // Calculate expiry
-      final now = DateTime.now();
-      final expiry = productId == BillingProducts.yearly
-          ? now.add(const Duration(days: 365))
-          : productId == BillingProducts.quarterly
-              ? now.add(const Duration(days: 95))  // 3 months + buffer
-              : now.add(const Duration(days: 32));  // monthly + buffer
+    if (productId != BillingProducts.monthly  &&
+        productId != BillingProducts.quarterly &&
+        productId != BillingProducts.yearly) { return; }
 
-      _isPremium     = true;
-      _activeProduct = productId;
-      _status        = BillingStatus.purchased;
+    final now    = DateTime.now();
+    final expiry = productId == BillingProducts.yearly
+        ? now.add(const Duration(days: 365))
+        : productId == BillingProducts.quarterly
+            ? now.add(const Duration(days: 95))
+            : now.add(const Duration(days: 32));
 
-      await _savePremiumStatus(
-        productId:  productId,
-        expiryDate: expiry.toIso8601String(),
-      );
+    // 1. Grant locally first so UI responds instantly.
+    _isPremium     = true;
+    _activeProduct = productId;
+    _status        = BillingStatus.purchased;
+    await _savePremiumStatus(productId: productId, expiryDate: expiry.toIso8601String());
+    MonetizationService.instance.markPremiumFromBilling();
+    notifyListeners();
 
-      debugPrint('✅ Premium granted: $productId, expires: $expiry');
-      // ✅ Sync with MonetizationService (UI + AdService)
-      MonetizationService.instance.markPremiumFromBilling();
-      notifyListeners();
+    debugPrint('✅ Premium granted locally: $productId, expires: $expiry');
+
+    // 2. Write authoritative grant record to Firestore (server source of truth).
+    await _recordGrantToFirestore(
+      productId:     productId,
+      purchaseToken: purchase.verificationData.serverVerificationData,
+      expiresAt:     expiry,
+    );
+  }
+
+  // Writes the purchase grant to Firestore so it can be cross-checked
+  // on every cold start. Non-fatal if Firestore is unreachable.
+  Future<void> _recordGrantToFirestore({
+    required String   productId,
+    required String   purchaseToken,
+    required DateTime expiresAt,
+  }) async {
+    final uid = AuthService.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('premium_grants')
+          .doc(uid)
+          .set({
+        'productId':     productId,
+        'purchaseToken': purchaseToken,
+        'grantedAt':     FieldValue.serverTimestamp(),
+        'expiresAt':     expiresAt.toIso8601String(),
+        'platform':      'android',
+        'verified':      false, // set to true by server-side verification (Phase 3)
+      }, SetOptions(merge: true));
+      debugPrint('✅ Grant recorded to Firestore');
+    } catch (e) {
+      // Non-fatal — local grant already applied. Retried on next purchase restore.
+      debugPrint('⚠️ Firestore grant record failed (non-fatal): $e');
     }
   }
 
@@ -238,26 +278,66 @@ class BillingService extends ChangeNotifier {
   Future<void> _loadCachedStatus() async {
     try {
       final prefs   = await SharedPreferences.getInstance();
-      final premium = prefs.getBool(_keyPremium)    ?? false;
-      final expiry  = prefs.getString(_keyExpiry)   ?? '';
-      final product = prefs.getString(_keyProductId);
+      final premium = prefs.getBool(_kPremium)  ?? false;
+      final expiry  = prefs.getString(_kExpiry) ?? '';
+      final product = prefs.getString(_kProductId);
 
       if (!premium) return;
 
-      // Check if subscription expired
+      // Check local expiry first.
       if (expiry.isNotEmpty) {
         final expiryDate = DateTime.tryParse(expiry);
         if (expiryDate != null && DateTime.now().isAfter(expiryDate)) {
-          // Expired — clear and restore from Play (handled in init)
           await _clearPremiumStatus();
           return;
         }
       }
 
+      // Cross-check Firestore: if SharedPrefs claims premium but Firestore
+      // has no grant record for this UID, the local flag is spoofed — revoke.
+      final firestoreValid = await _verifyGrantInFirestore();
+      if (!firestoreValid) {
+        debugPrint('⚠️ Firestore cross-check failed — revoking spoofed local premium');
+        await _clearPremiumStatus();
+        return;
+      }
+
       _isPremium     = true;
       _activeProduct = product;
     } catch (e) {
-      debugPrint('_loadCachedStatus error: $e');
+      // On any error (network, Firestore offline) trust the local cache
+      // to avoid false revocation. Firestore check is best-effort.
+      debugPrint('_loadCachedStatus error (trusting cache): $e');
+      final prefs   = await SharedPreferences.getInstance();
+      final premium = prefs.getBool(_kPremium) ?? false;
+      if (premium) {
+        _isPremium     = true;
+        _activeProduct = prefs.getString(_kProductId);
+      }
+    }
+  }
+
+  // Returns true if Firestore has a valid grant for the current user,
+  // OR if the user is not authenticated / Firestore is unreachable.
+  // Returns false only when Firestore explicitly has no grant record.
+  Future<bool> _verifyGrantInFirestore() async {
+    final uid = AuthService.instance.currentUser?.uid;
+    if (uid == null) return true; // unauthenticated — defer to Play restore
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('premium_grants')
+          .doc(uid)
+          .get()
+          .timeout(const Duration(seconds: 5));
+      if (!doc.exists) return false;
+      final data     = doc.data()!;
+      final expiresAt = DateTime.tryParse(data['expiresAt'] as String? ?? '');
+      if (expiresAt != null && DateTime.now().isAfter(expiresAt)) return false;
+      return true;
+    } catch (e) {
+      // Network unavailable or timeout — fail open so offline users aren't revoked.
+      debugPrint('Firestore grant check skipped (offline?): $e');
+      return true;
     }
   }
 
@@ -266,16 +346,16 @@ class BillingService extends ChangeNotifier {
     required String expiryDate,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyPremium,   true);
-    await prefs.setString(_keyProductId, productId);
-    await prefs.setString(_keyExpiry,    expiryDate);
+    await prefs.setBool(_kPremium,   true);
+    await prefs.setString(_kProductId, productId);
+    await prefs.setString(_kExpiry,    expiryDate);
   }
 
   Future<void> _clearPremiumStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyPremium);
-    await prefs.remove(_keyProductId);
-    await prefs.remove(_keyExpiry);
+    await prefs.remove(_kPremium);
+    await prefs.remove(_kProductId);
+    await prefs.remove(_kExpiry);
     _isPremium     = false;
     _activeProduct = null;
   }

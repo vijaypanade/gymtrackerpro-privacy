@@ -39,7 +39,7 @@ class ExerciseMemory {
 
   @override
   String toString() =>
-      'ExerciseMemory($name: ${bestWeight}$unit x $bestReps, vol=$totalVolume)';
+      'ExerciseMemory($name: $bestWeight$unit x $bestReps, vol=$totalVolume)';
 }
 
 /// One week of training summarized for periodization.

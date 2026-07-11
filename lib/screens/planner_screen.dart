@@ -1,8 +1,7 @@
 // lib/screens/planner_screen.dart — v9.0 PHASE 1
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
+import 'dart:async';
+import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import '../widgets/rest_timer_overlay.dart';
@@ -36,7 +35,6 @@ import '../utils/app_constants.dart';
 import '../utils/app_routes.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/progress_chart.dart';
-import '../widgets/exercise_animation_widget.dart';
 import '../data/exercise_data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/exercise_icon_mapper.dart';
@@ -53,10 +51,11 @@ import '../widgets/pr_celebration.dart';
 import '../engines/pr_engine.dart' as pre;
 import '../utils/haptics.dart';
 import '../widgets/planner/planner_video_widgets.dart';
-import '../models/coach_visual_state.dart';
+import '../widgets/planner/session_prophecy_card.dart';
+import '../utils/launch_beacon.dart';
 import '../services/recovery_session_service.dart';
 import '../services/ghost_copy_service.dart';
-import '../services/wger_service.dart';
+import '../services/exercise_gif_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 // ════════════════════════════════════════════════
@@ -74,34 +73,77 @@ String _buildHeaderMessage(
   String coaching;
   final raw = fb.message.toLowerCase();
   if (raw.contains('perfect')) {
+    // Last session was near-perfect → progress signal
     const v = [
-      'Optimal execution. Push as planned.',
-      'Strong performance. Apply progression.',
-      'Quality execution — add load today.',
-      'Elite form. Progressive overload supported.',
-      'Perfect session. Increase weight as planned.',
+      'Last session was clean. Add 2.5 kg today — muscles are ready.',
+      'You hit all reps with good form. Time to increase the load.',
+      'Strong last set. Small weight jump today.',
+      'Consistent performance. Muscles adapt — add weight to keep growing.',
+      'Great execution last time. Push slightly heavier today.',
     ];
     coaching = v[slot];
   } else if (raw.contains('good') || raw.contains('solid')) {
+    // Good session, not perfect — maintain or micro-progress
     const v = [
-      'Solid execution. Maintain current load.',
-      'Good quality. Focus on bar speed.',
-      'Consistent. Hold this weight today.',
-      'Performance on track. Maintain.',
-      'Good tempo. Controlled reps recommended.',
+      'Good last session. Stay at this weight and focus on rep quality.',
+      'Solid output. Lock in the same load — aim for cleaner reps.',
+      'Keep the same weight. Consistency before progression.',
+      'Performance is on track. Same load, better control today.',
+      'Good session last time. Maintain weight, improve tempo.',
     ];
     coaching = v[slot];
   } else if (raw.contains('maintain') || raw.contains('hold')) {
+    // Body needs more time at this weight
     const v = [
-      'Maintain current load.',
-      'Quality execution over volume.',
-      'Focus on tempo and control.',
-      'Recovery supports this load.',
-      'Controlled progression today.',
+      'Hold this weight. Your body is still adapting — don\'t rush.',
+      'Same load today. Strength builds over weeks, not days.',
+      'Maintain current weight. Focus on full range of motion.',
+      'Stay here. Consistent reps at this load build a strong base.',
+      'No jump yet. Quality reps at this weight matter more than heavier.',
+    ];
+    coaching = v[slot];
+  } else if (raw.contains('hypertrophy') || raw.contains('zone')) {
+    // 8–12 rep range — muscle building zone
+    const v = [
+      '8–12 reps builds muscle. Lower slowly (2 sec), push up controlled.',
+      'This rep range stimulates muscle growth. Feel the muscle work each rep.',
+      'Slow down the lowering phase — that\'s where muscle is built.',
+      'Don\'t rush. Controlled reps in this range = maximum muscle stimulus.',
+      'Full range of motion matters. Partial reps reduce muscle growth.',
+    ];
+    coaching = v[slot];
+  } else if (raw.contains('heavy') || raw.contains('strength')) {
+    // Low reps, high weight — neural strength
+    const v = [
+      'Low reps, heavy weight trains your nervous system to move more load.',
+      'Rest 2–3 min between sets. Strength needs full recovery.',
+      'Brace your core before every rep — it protects your spine.',
+      'Heavy sets: quality over speed. Slow and controlled is safer.',
+      'Strength reps: breathe in before lifting, breathe out at the top.',
+    ];
+    coaching = v[slot];
+  } else if (raw.contains('high volume') || raw.contains('endurance')) {
+    // High rep, metabolic/endurance
+    const v = [
+      'High reps build muscle endurance. Keep a steady pace — don\'t sprint.',
+      'Shorter rest (60 sec) between sets maximises the endurance effect.',
+      'Lots of reps = more blood flow. Keep form even when it burns.',
+      'If form breaks, stop the set. Sloppy reps cause injury, not gains.',
+      'High volume day. Manage fatigue — it\'s normal to feel the burn.',
+    ];
+    coaching = v[slot];
+  } else if (raw.contains('target') || raw.contains('form') || raw.contains('focus on')) {
+    // True first session — no prior data at all
+    const v = [
+      'First time on this exercise. Go light, learn the movement pattern.',
+      'New exercise. Focus on how it feels — weight doesn\'t matter yet.',
+      'Start light. Good form now prevents injury later.',
+      'Learn the movement first. Add weight only when form feels natural.',
+      'No rush. Every expert started here — master the basics first.',
     ];
     coaching = v[slot];
   } else {
-    coaching = fb.message;
+    coaching = fallback.isNotEmpty ? fallback : fb.message;
   }
 
   String next;
@@ -195,6 +237,10 @@ class PlannerScreen extends StatefulWidget {
 
 class _PlannerScreenState extends State<PlannerScreen> {
   int _day = 0;
+  // Incremented once per Home → Planner navigation. Drives the Today Beacon
+  // scale pulse in _DayStrip. Never persisted; resets with the app process.
+  int _beaconFires = 0;
+
   static const _names = [
     'Monday','Tuesday','Wednesday',
     'Thursday','Friday','Saturday','Sunday'];
@@ -206,6 +252,21 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final i = widget.initialDayIndex;
     _day = (i != null && i >= 0 && i < 7)
         ? i : (DateTime.now().weekday - 1).clamp(0, 6);
+    LaunchBeacon.listenable.addListener(_onBeacon);
+  }
+
+  @override
+  void dispose() {
+    LaunchBeacon.listenable.removeListener(_onBeacon);
+    super.dispose();
+  }
+
+  // Fires 80ms after Home arms the beacon — giving the Planner transition
+  // time to reach the user's eyes before the pulse begins.
+  void _onBeacon() {
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (mounted) setState(() => _beaconFires++);
+    });
   }
 
   @override
@@ -216,19 +277,19 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final isLoading = context.select<AppProvider, bool>((ap) => ap.loading);
     final planLen   = context.select<AppProvider, int>((ap) => ap.weekPlan.length);
 
-    if (isLoading) return Scaffold(
+    if (isLoading) { return const Scaffold(
       backgroundColor: AppColors.bg,
-      body: const Center(child: CircularProgressIndicator(
-          color: AppColors.gold)));
+      body: Center(child: CircularProgressIndicator(
+          color: AppColors.gold))); }
 
-    if (planLen < 7) return Scaffold(
+    if (planLen < 7) { return Scaffold(
       backgroundColor: AppColors.bg,
       body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
         const CircularProgressIndicator(color: AppColors.gold),
         const SizedBox(height: AppSpacing.lg),
         Text('Setting up your plan…', style: GoogleFonts.inter(
             color: AppColors.textMuted)),
-      ])));
+      ]))); }
 
     final safe = _day.clamp(0, planLen - 1);
     final col  = AppColors.dayColors[safe % AppColors.dayColors.length];
@@ -256,13 +317,19 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
         // ── DAY STRIP ─────────────────────────────
         // Self-selects completion bitmask — rebuilds only when a day is completed.
-        _DayStrip(
-          selected: safe,
-          shorts: _shorts,
-          onSelect: (i) {
-            H.selection();
-            setState(() => _day = i);
-          },
+        // Also listens to WorkoutSessionService for the one-shot intent pulse.
+        ListenableBuilder(
+          listenable: WorkoutSessionService.instance,
+          builder: (_, __) => _DayStrip(
+            selected: safe,
+            shorts: _shorts,
+            hasIntent: WorkoutSessionService.instance.hasIntent,
+            beacon: _beaconFires,
+            onSelect: (i) {
+              H.selection();
+              setState(() => _day = i);
+            },
+          ),
         ),
 
         // ── DAY BODY ──────────────────────────────
@@ -405,31 +472,66 @@ class _PlannerAppBar extends StatelessWidget {
 class _SessionPill extends StatelessWidget {
   const _SessionPill();
 
+  Widget _timerPill(WorkoutSessionService svc) => Container(
+    key: const ValueKey('active'),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    decoration: BoxDecoration(
+      color: AppColors.gold.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(9),
+      border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.25), width: 0.8),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      const _PulseDot(color: AppColors.gold),
+      const SizedBox(width: 5),
+      Text(svc.elapsedFormatted,
+          style: GoogleFonts.rajdhani(
+              color: AppColors.gold,
+              fontSize: 12,
+              fontWeight: FontWeight.w700)),
+    ]),
+  );
+
+  Widget _readyPill() => Container(
+    key: const ValueKey('ready'),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    decoration: BoxDecoration(
+      color: AppColors.gold.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(9),
+      border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.20), width: 0.8),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(Icons.bolt_rounded,
+          size: 10, color: AppColors.gold.withValues(alpha: 0.80)),
+      const SizedBox(width: 4),
+      Text('Ready to Train',
+          style: GoogleFonts.inter(
+              color: AppColors.gold.withValues(alpha: 0.80),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3)),
+    ]),
+  );
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: WorkoutSessionService.instance,
       builder: (_, __) {
         final svc = WorkoutSessionService.instance;
-        if (!svc.isActive) return const SizedBox.shrink();
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppColors.green.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(
-                color: AppColors.green.withValues(alpha: 0.28), width: 0.8),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            _PulseDot(color: AppColors.green),
-            const SizedBox(width: 5),
-            Text(svc.elapsedFormatted,
-                style: GoogleFonts.rajdhani(
-                    color: AppColors.green,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700)),
-          ]),
+        // AnimatedSwitcher crossfades between all three states:
+        //   ready → active  (no layout shift, no jump)
+        //   active → empty  (clean fade out after session ends)
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          transitionBuilder: (child, animation) =>
+              FadeTransition(opacity: animation, child: child),
+          child: svc.isActive
+              ? _timerPill(svc)
+              : svc.hasIntent
+                  ? _readyPill()
+                  : const SizedBox.shrink(key: ValueKey('empty')),
         );
       },
     );
@@ -439,51 +541,6 @@ class _SessionPill extends StatelessWidget {
 // ════════════════════════════════════════════════
 // BANNER PRIORITY SLOT
 // ════════════════════════════════════════════════
-// PASSIVE STATUS LINE
-// Always-on one-liner derived from live analytics.
-// No buttons, no interaction — pure signal.
-// ════════════════════════════════════════════════
-class _PassiveStatusLine extends StatelessWidget {
-  const _PassiveStatusLine();
-
-  @override
-  Widget build(BuildContext context) {
-    return Selector<AppProvider,
-        ({double risk, String trend, double pct, int daysSince})>(
-      selector: (_, ap) => (
-        risk:      ap.overTrainingRisk,
-        trend:     ap.recoveryTrend,
-        pct:       ap.weeklyImprovementPercent,
-        daysSince: ap.daysSinceLastWorkout,
-      ),
-      builder: (_, d, __) {
-        final msg = _derive(d.risk, d.trend, d.pct, d.daysSince);
-        if (msg == null) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 5, AppSpacing.lg, 0),
-          child: Text(msg,
-              style: GoogleFonts.inter(
-                  color: AppColors.textMuted,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.1)),
-        );
-      },
-    );
-  }
-
-  String? _derive(double risk, String trend, double pct, int daysSince) {
-    if (risk > 70)    return 'Workload elevated — reduce volume today.';
-    if (risk > 45)    return 'Volume accumulation building. Monitor fatigue.';
-    if (daysSince >= 4) return 'Extended rest — comeback at 80% intensity.';
-    if (trend == 'improving') return 'Recovery trending up — good push window.';
-    if (trend == 'declining') return 'Recovery declining — prioritize form over load.';
-    if (pct >= 20)    return 'High volume week. Prioritize sleep and hydration.';
-    if (pct <= -20)   return 'Low volume this week. Comeback session recommended.';
-    return 'Recovery stable.';
-  }
-}
-
 // Shows ONE banner at a time, highest priority first.
 // Priority: Overtraining > Injury > Comeback > RecoveryDirective > Adaptive > NewWeek > AI
 // ════════════════════════════════════════════════
@@ -560,7 +617,7 @@ class _ContextualBannerSlot extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg, 0, AppSpacing.lg, 4),
             child: Row(children: [
-              Icon(Icons.info_outline_rounded,
+              const Icon(Icons.info_outline_rounded,
                   color: AppColors.textMuted, size: 10),
               const SizedBox(width: 4),
               Text('+${s.extraCount} more ${s.extraCount == 1 ? "insight" : "insights"}',
@@ -596,10 +653,10 @@ class _RecoveryDirectiveBanner extends StatelessWidget {
       },
       builder: (_, d, __) {
         final col = d.intensity >= 1.05
-            ? AppColors.green
+            ? AppColors.gold
             : d.intensity >= 0.90
-                ? AppColors.gold
-                : AppColors.red;
+                ? AppColors.goldSoft
+                : AppColors.textSecondary;
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -672,10 +729,10 @@ class _AdjustmentPills extends StatelessWidget {
     }
 
     Color col(double mult) {
-      if (mult >= 1.05) return AppColors.green;
+      if (mult >= 1.05) return AppColors.gold;
       if (mult >= 0.98) return AppColors.textMuted;
-      if (mult >= 0.85) return AppColors.gold;
-      return AppColors.red;
+      if (mult >= 0.85) return AppColors.goldSoft;
+      return AppColors.textSecondary;
     }
 
     return Wrap(spacing: 5, children: [
@@ -723,6 +780,13 @@ class _AIBanner extends StatelessWidget {
       selector: (_, ap) => ap.plannerNarrativeFor(dayIdx),
       builder: (_, msg, __) {
         final text = msg.isEmpty ? 'Ready to train today.' : msg;
+        // Hierarchy: first line is the headline, remaining lines (session
+        // stats) render smaller and quieter — numbers support, never dominate.
+        final lines    = text.split('\n');
+        final headline = lines.first;
+        final detail   = lines.length > 1
+            ? lines.sublist(1).join('\n')
+            : '';
         return Container(
           margin: const EdgeInsets.fromLTRB(
               AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 2),
@@ -737,7 +801,7 @@ class _AIBanner extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('AI COACH',
+              Text('TODAY',
                 style: GoogleFonts.inter(
                   color: AppColors.goldAmber.withValues(alpha: 0.60),
                   fontSize: 9, fontWeight: FontWeight.w700,
@@ -745,17 +809,31 @@ class _AIBanner extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 5),
-              Text(text,
+              Text(headline,
                 softWrap: true,
-                maxLines: 3,
-                overflow: TextOverflow.visible,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
-                  color: AppColors.textPrimary.withValues(alpha: 0.85),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  height: 1.50,
+                  color: AppColors.textPrimary.withValues(alpha: 0.90),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
                 ),
               ),
+              if (detail.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(detail,
+                  softWrap: true,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: AppColors.textSecondary.withValues(alpha: 0.70),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w400,
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -809,21 +887,24 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<AppProvider, ({bool show, bool plateau, bool deload})>(
+    return Selector<AppProvider, ({bool show, bool plateau, bool deload, bool deloadWeek})>(
       selector: (_, ap) => (
-        show:    ap.shouldSuggestPlanRefresh,
-        plateau: ap.isOnPlateau,
-        deload:  ap.needsDeloadByVolume,
+        show:       ap.shouldSuggestPlanRefresh || ap.isDeloadWeek,
+        plateau:    ap.isOnPlateau,
+        deload:     ap.needsDeloadByVolume,
+        deloadWeek: ap.isDeloadWeek,
       ),
       builder: (ctx, data, __) {
         if (!data.show || _dismissed) return const SizedBox.shrink();
 
         final reason = data.plateau
-            ? 'Plateau detected — same weights 3+ weeks'
-            : 'High volume — deload week recommended';
+            ? 'Plateau — same weights 3+ weeks'
+            : data.deloadWeek
+                ? 'Deload week — every 4th week, reduce load to grow stronger'
+                : 'High volume — deload week recommended';
         final action = data.plateau
-            ? 'AI can rotate exercises to break through'
-            : 'AI will reduce volume for recovery';
+            ? 'Exercises can be rotated to break through.'
+            : 'Reduce all weights to 60 % to aid recovery';
 
         return Container(
           margin: const EdgeInsets.fromLTRB(
@@ -858,18 +939,18 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
                   child: CircularProgressIndicator(
                     strokeWidth: 1.5, color: AppColors.gold)),
                 const SizedBox(height: 3),
-                Text('Analyzing...', style: GoogleFonts.inter(
+                Text('Reading your data', style: GoogleFonts.inter(
                     color: AppColors.textMuted, fontSize: 8.5)),
               ])
-            else
+            else if (data.plateau)
               GestureDetector(
                 onTap: () async {
                   final p = ctx.read<AppProvider>();
                   if (!p.canUseAI()) {
                     await PaywallSheet.show(ctx,
                       trigger:      PaywallTrigger.aiLimitHit,
-                      onUpgrade:    () => p.notifyListeners(),
-                      onAdComplete: () => p.notifyListeners(),
+                      onUpgrade:    () => p.refreshMonetization(),
+                      onAdComplete: () => p.refreshMonetization(),
                     );
                     return;
                   }
@@ -906,11 +987,53 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
                       color: Colors.black, fontSize: 11,
                       fontWeight: FontWeight.w800)),
                 ),
+              )
+            else
+              GestureDetector(
+                onTap: () {
+                  final p = ctx.read<AppProvider>();
+                  p.applyDeloadWeights();
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                      content: Row(children: [
+                        const Icon(Icons.check_circle_rounded,
+                            color: AppColors.gold, size: 16),
+                        const SizedBox(width: 8),
+                        Text('Deload applied — all weights reduced to 60 %',
+                            style: GoogleFonts.inter(fontSize: 12.5,
+                                color: Colors.white)),
+                      ]),
+                      backgroundColor: const Color(0xFF1C1C1C),
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                              color: AppColors.gold.withValues(alpha: 0.25),
+                              width: 0.8)),
+                      duration: const Duration(seconds: 3),
+                    ));
+                  }
+                  _dismiss();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [
+                      Color(0xFF8C6A1A), Color(0xFFBF953F),
+                    ]),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('Apply', style: GoogleFonts.inter(
+                      color: Colors.black, fontSize: 11,
+                      fontWeight: FontWeight.w800)),
+                ),
               ),
             const SizedBox(width: AppSpacing.xs),
             GestureDetector(
               onTap: _dismiss,
-              child: Icon(Icons.close_rounded,
+              child: const Icon(Icons.close_rounded,
                   color: AppColors.textMuted, size: 16),
             ),
           ]),
@@ -977,7 +1100,7 @@ class _NewWeekBannerState extends State<_NewWeekBanner> {
                       fontWeight: FontWeight.w800))),
                 GestureDetector(
                   onTap: () => ctx.read<AppProvider>().dismissNewWeekBanner(),
-                  child: Icon(Icons.close_rounded,
+                  child: const Icon(Icons.close_rounded,
                       color: AppColors.textMuted, size: 16),
                 ),
               ]),
@@ -1007,19 +1130,19 @@ class _NewWeekBannerState extends State<_NewWeekBanner> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 1.5, color: AppColors.gold)),
                           const SizedBox(height: 4),
-                          Text('Building plan...', style: GoogleFonts.inter(
+                          Text('Preparing plan...', style: GoogleFonts.inter(
                               color: AppColors.textMuted, fontSize: 9)),
                         ]))
                       : GoldButton(
-                          text: 'Upgrade with AI',
+                          text: 'Upgrade to Pro',
                           small: true,
                           onTap: () async {
                             final p = ctx.read<AppProvider>();
                             if (!p.canUseAI()) {
                               await PaywallSheet.show(ctx,
                                 trigger:      PaywallTrigger.aiLimitHit,
-                                onUpgrade:    () => p.notifyListeners(),
-                                onAdComplete: () => p.notifyListeners(),
+                                onUpgrade:    () => p.refreshMonetization(),
+                                onAdComplete: () => p.refreshMonetization(),
                               );
                               return;
                             }
@@ -1129,7 +1252,7 @@ class _ComebackBannerState extends State<_ComebackBanner> {
                   child: CircularProgressIndicator(
                       strokeWidth: 1.5, color: AppColors.orange)),
                 const SizedBox(height: 3),
-                Text('Analyzing...', style: GoogleFonts.inter(
+                Text('Reading your data', style: GoogleFonts.inter(
                     color: AppColors.textMuted, fontSize: 8.5)),
               ])
             else
@@ -1139,8 +1262,8 @@ class _ComebackBannerState extends State<_ComebackBanner> {
                   if (!p.canUseAI()) {
                     await PaywallSheet.show(ctx,
                       trigger:      PaywallTrigger.aiLimitHit,
-                      onUpgrade:    () => p.notifyListeners(),
-                      onAdComplete: () => p.notifyListeners(),
+                      onUpgrade:    () => p.refreshMonetization(),
+                      onAdComplete: () => p.refreshMonetization(),
                     );
                     return;
                   }
@@ -1182,7 +1305,7 @@ class _ComebackBannerState extends State<_ComebackBanner> {
             const SizedBox(width: AppSpacing.xs),
             GestureDetector(
               onTap: _dismiss,
-              child: Icon(Icons.close_rounded,
+              child: const Icon(Icons.close_rounded,
                   color: AppColors.textMuted, size: 16),
             ),
           ]),
@@ -1199,11 +1322,16 @@ class _DayStrip extends StatelessWidget {
   final int selected;
   final List<String> shorts;
   final ValueChanged<int> onSelect;
+  final bool hasIntent;
+  // Incremented each time user arrives from Home → triggers Today Beacon pulse.
+  final int beacon;
 
   const _DayStrip({
     required this.selected,
     required this.shorts,
     required this.onSelect,
+    this.hasIntent = false,
+    this.beacon = 0,
   });
 
   DateTime _weekDate(int index) {
@@ -1242,7 +1370,7 @@ class _DayStrip extends StatelessWidget {
             bottom: BorderSide(
                 color: AppColors.divider.withValues(alpha: 0.4))),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
       child: Row(
         children: List.generate(n, (i) {
           final day = plan[i];
@@ -1254,12 +1382,10 @@ class _DayStrip extends StatelessWidget {
               day.exercises.isNotEmpty;
           final col = AppColors.dayColors[i % AppColors.dayColors.length];
 
-          return Expanded(child: GestureDetector(
-            onTap: () => onSelect(i),
-            child: AnimatedContainer(
+          final cellInner = AnimatedContainer(
               duration: const Duration(milliseconds: 260),
               margin: const EdgeInsets.symmetric(horizontal: 3),
-              padding: const EdgeInsets.symmetric(vertical: 5),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               decoration: BoxDecoration(
                 color: sel
                     ? AppColors.gold.withValues(alpha: 0.10)
@@ -1269,11 +1395,16 @@ class _DayStrip extends StatelessWidget {
                   color: sel
                       ? AppColors.gold.withValues(alpha: 0.22)
                       : tod
-                          ? Colors.white.withValues(alpha: 0.08)
+                          ? AppColors.gold.withValues(alpha: 0.14)
                           : Colors.transparent,
-                  width: sel ? 0.8 : 0.6,
+                  width: sel ? 0.8 : 0.7,
                 ),
-                boxShadow: const [],
+                // Today carries a whisper of gold — static, no animation.
+                boxShadow: tod && !sel
+                    ? [BoxShadow(
+                        color: AppColors.gold.withValues(alpha: 0.05),
+                        blurRadius: 8)]
+                    : const [],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1306,7 +1437,7 @@ class _DayStrip extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
 
                 // Day indicator dot / icon
                 _DayIndicator(
@@ -1319,13 +1450,17 @@ class _DayStrip extends StatelessWidget {
 
                 // Today pulse dot
                 if (tod) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   _PulseDot(color: col),
                 ] else
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
 
-                // Workout title for selected day
-                if (sel && !day.isRestDay && day.title.isNotEmpty) ...[
+                // Workout title for selected day — skipped when the title is
+                // just the weekday name ("Tuesday"), which would duplicate
+                // the TUE label above.
+                if (sel && !day.isRestDay && day.title.isNotEmpty &&
+                    !day.title.toLowerCase().startsWith(
+                        shorts[i].toLowerCase())) ...[
                   const SizedBox(height: 2),
                   Text(
                     _fixTitleGrammar(day.title),
@@ -1342,7 +1477,72 @@ class _DayStrip extends StatelessWidget {
                 ] else
                   const SizedBox(height: 0),
               ]),
-            ),
+          );
+
+          // Today's cell:
+          //  ① Today Beacon — scale pulse (1.00→1.05→1.00, 560ms) + soft gold
+          //    halo (peaks at 7% opacity, midpoint of animation) fires once per
+          //    Home → Planner navigation. Key is the beacon counter so each
+          //    arrival from Home is a unique event; arbitrary rebuilds are ignored.
+          //  ② Intent border glow (700ms fade) — separate from beacon pulse.
+          return Expanded(child: GestureDetector(
+            onTap: () => onSelect(i),
+            child: tod
+                ? TweenAnimationBuilder<double>(
+                    // Outer: Today Beacon scale + halo — fires on each Home launch.
+                    key: ValueKey('beacon_${beacon}_$tod'),
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 560),
+                    curve: Curves.easeInOut,
+                    builder: (_, v, child) {
+                      // sin curve: 0 at start and end, peaks at midpoint.
+                      final pulse = beacon > 0
+                          ? math.sin(v * math.pi)
+                          : 0.0;
+                      return Transform.scale(
+                        scale: 1.0 + 0.05 * pulse,
+                        child: Stack(children: [
+                          child!,
+                          // Soft gold halo — 7% max opacity, no particles.
+                          if (pulse > 0.02) Positioned.fill(
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: AppColors.gold.withValues(alpha: 0.07 * pulse),
+                              ),
+                            ),
+                          ),
+                        ]),
+                      );
+                    },
+                    child: TweenAnimationBuilder<double>(
+                      // Inner: intent border glow — fires when hasIntent flips.
+                      key: ValueKey(tod && hasIntent),
+                      tween: Tween(
+                          begin: (tod && hasIntent) ? 1.0 : 0.0,
+                          end: 0.0),
+                      duration: const Duration(milliseconds: 700),
+                      curve: Curves.easeOut,
+                      builder: (_, glow, child) => Stack(children: [
+                        child!,
+                        if (glow > 0.01) Positioned.fill(
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppColors.gold.withValues(alpha: 0.55 * glow),
+                                width: 1.4,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ]),
+                      child: cellInner,
+                    ),
+                  )
+                : cellInner,
           ));
         }),
       ),
@@ -1436,7 +1636,7 @@ class _DayIndicator extends StatelessWidget {
           strokeWidth: 2.5,
           backgroundColor: AppColors.bgElevated,
           valueColor: AlwaysStoppedAnimation(
-              done == total ? AppColors.green : color),
+              done == total ? AppColors.gold : color),
         ),
         Column(
           mainAxisSize: MainAxisSize.min,
@@ -1530,10 +1730,8 @@ class _DayBodyState extends State<_DayBody> {
 
     return ListView(
       controller: _scroll,
-      cacheExtent: 400,
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
-      ),
+      cacheExtent: 600,
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 90),
       children: [
@@ -1561,7 +1759,8 @@ class _DayBodyState extends State<_DayBody> {
                 child: (p.recoverySuggestion.shouldSuggestAlternative &&
                         !day.exercises.any((ex) => ex.sets.any((s) => s.done)))
                     ? _RecoverySessionCard(suggestion: p.recoverySuggestion)
-                    : p.yesterdayMissedPlan != null
+                    : (p.yesterdayMissedPlan != null &&
+                            p.streak.totalWorkouts > 0)
                         ? _MissedDayRecoveryCard(missed: p.yesterdayMissedPlan!)
                         : const SizedBox.shrink(),
               ),
@@ -1570,6 +1769,8 @@ class _DayBodyState extends State<_DayBody> {
               _WeeklyAdjustmentBanner(adjustment: p.topWeeklyAdjustment!),
             if (!p.onboardingComplete && p.isHighIntimidation)
               const _OnboardingConfidenceNote(),
+            // Session Prophecy — pre-workout prediction (today only)
+            SessionProphecyCard(day: day, idx: safe),
           ],
           if (day.exercises.isEmpty)
             _EmptyDay(idx: safe, color: col, p: p)
@@ -1629,25 +1830,22 @@ class _DayHeader extends StatelessWidget {
         s + e.sets.fold(0.0, (ss, set) => ss + set.weight * set.reps));
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Fatigue warning
+      // Load note — neutral recommendation, never a warning.
+      // Planner confirms today's work; alarm tones belong nowhere.
       if (fat.isNotEmpty) Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md, vertical: AppSpacing.sm),
         decoration: BoxDecoration(
-          color: AppColors.red.withValues(alpha: 0.07),
+          color: AppColors.goldAmber.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-              color: AppColors.red.withValues(alpha: 0.4)),
+              color: AppColors.goldAmber.withValues(alpha: 0.18),
+              width: 0.6),
         ),
-        child: Row(children: [
-          const Icon(Icons.warning_amber_rounded,
-              color: AppColors.red, size: 16),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(child: Text(fat, style: GoogleFonts.inter(
-              color: AppColors.red, fontSize: 12,
-              fontWeight: FontWeight.w600))),
-        ]),
+        child: Text(fat, style: GoogleFonts.inter(
+            color: AppColors.textSecondary, fontSize: 12,
+            fontWeight: FontWeight.w500, height: 1.4)),
       ),
 
       // Header card — compact single row
@@ -1781,11 +1979,11 @@ class _AdaptiveDecisionCard extends StatelessWidget {
         final swaps = context.read<AppProvider>().adaptiveSwaps;
 
         final (icon, col) = switch (d.focusIdx) {
-          0 => (Icons.bolt_rounded,                    AppColors.green),
+          0 => (Icons.bolt_rounded,                    AppColors.gold),
           2 => (Icons.battery_charging_full_rounded,   AppColors.gold),
           3 => (Icons.nightlight_rounded,              AppColors.textMuted),
-          4 => (Icons.trending_up_rounded,             AppColors.green),
-          5 => (Icons.fitness_center_rounded,          AppColors.green),
+          4 => (Icons.trending_up_rounded,             AppColors.goldSoft),
+          5 => (Icons.fitness_center_rounded,          AppColors.goldSoft),
           6 => (Icons.precision_manufacturing_rounded, AppColors.textSecondary),
           7 => (Icons.emoji_events_rounded,            AppColors.gold),
           _ => (Icons.sync_rounded,                    AppColors.textMuted),
@@ -1868,8 +2066,8 @@ class _AdaptiveDecisionCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6),
                           child: Icon(Icons.arrow_forward_rounded,
                               color: AppColors.textMuted, size: 11),
                         ),
@@ -1919,7 +2117,7 @@ class _RecoveryAlignedInsight extends StatelessWidget {
             height: 34,
             margin: const EdgeInsets.only(top: 1, right: 10),
             decoration: BoxDecoration(
-              color: AppColors.green.withValues(alpha: 0.45),
+              color: AppColors.gold.withValues(alpha: 0.40),
               borderRadius: BorderRadius.circular(1),
             ),
           ),
@@ -1950,7 +2148,7 @@ class _WeeklyAdjustmentBanner extends StatelessWidget {
 
   Color _col() => switch (adjustment.priority) {
     AdjustmentPriority.high     => AppColors.orange,
-    AdjustmentPriority.moderate => AppColors.blue,
+    AdjustmentPriority.moderate => AppColors.goldSoft,
     AdjustmentPriority.low      => AppColors.textMuted,
   };
 
@@ -2092,7 +2290,7 @@ class _HeaderMenu extends StatelessWidget {
     },
     itemBuilder: (_) => [
       _mi('rename',   Icons.edit_outlined,         'Rename'),
-      _mi('generate', Icons.auto_awesome_rounded,  'AI Generate'),
+      _mi('generate', Icons.auto_awesome_rounded,  'Generate Plan'),
       _mi('rest',     Icons.bedtime_outlined,
           day.isRestDay ? 'Unset Rest Day' : 'Set as Rest Day'),
       _mi('clear',    Icons.delete_sweep_outlined,
@@ -2118,8 +2316,26 @@ class _HeaderMenu extends StatelessWidget {
           fontWeight: FontWeight.w700)),
       content: TextField(
         controller: ctrl, autofocus: true,
-        style: GoogleFonts.inter(color: AppColors.textPrimary),
-        decoration: const InputDecoration(hintText: 'e.g. Push Day A'),
+        style: GoogleFonts.inter(color: AppColors.textPrimary, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: 'e.g. Push Day A',
+          hintStyle: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14),
+          filled: true,
+          fillColor: AppColors.bgElevated,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: AppColors.gold.withValues(alpha: 0.20)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: AppColors.gold.withValues(alpha: 0.15)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.gold, width: 1.2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx),
@@ -2206,112 +2422,264 @@ class _RestCard extends StatelessWidget {
 // ════════════════════════════════════════════════
 // EMPTY DAY CARD
 // ════════════════════════════════════════════════
-class _EmptyDay extends StatelessWidget {
+// ════════════════════════════════════════════════
+// PREMIUM EMPTY DAY — animated, context-aware.
+// Breathing orb · pulsing border · shimmer CTA ·
+// recovery-aware headline · floating particles.
+// ════════════════════════════════════════════════
+class _EmptyDay extends StatefulWidget {
   final int idx; final Color color; final AppProvider p;
-  const _EmptyDay({required this.idx, required this.color,
-      required this.p});
+  const _EmptyDay({required this.idx, required this.color, required this.p});
+  @override State<_EmptyDay> createState() => _EmptyDayState();
+}
 
-  void _gen(BuildContext ctx) {
-    H.medium();
-    final split = _type();
-    p.generateWorkoutForDay(split, idx);
-    final updated = p.weekPlan[idx];
-    if (updated.exercises.isEmpty) {
-      final workout = AIEngine.generateDayWorkout(
-        goal: p.goal, level: p.level, type: split,
-        history: p.lastWorkouts, weakMuscle: p.weakMuscle,
-        isBeginner: p.level == 'beginner',
-      );
-      for (final ex in workout) {
-        p.addExercise(idx,
-          name:         ex['name']       as String? ?? '',
-          category:     ex['muscle']     as String? ?? '',
-          emoji:        ex['emoji']      as String? ?? '💪',
-          type:         ex['type']       as String? ?? '',
-          unit:         ex['unit']       as String? ?? 'kg',
-          baseId:       '${ex["name"]}_${ex["type"] ?? ""}',
-          isBodyweight: ex['bodyweight'] as bool?   ?? false,
-        );
-      }
-    }
-    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-      content: Text('AI Workout Ready',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-      backgroundColor: AppColors.green,
-      behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ));
-  }
+class _EmptyDayState extends State<_EmptyDay> with TickerProviderStateMixin {
+  late AnimationController _breathe;
+  late AnimationController _pulse;
+  late AnimationController _shimmer;
+  late AnimationController _drift;
 
-  String _type() {
-    final s = p.level == 'beginner'
-        ? ['Full','Rest','Full','Rest','Full','Rest','Rest']
-        : (p.level == 'advanced' && p.goal == 'muscle_gain')
-            ? ['Push','Pull','Legs','Push','Pull','Legs','Rest']
-            : ['Push','Pull','Legs','Rest','Push','Pull','Rest'];
-    final r = idx < s.length ? s[idx] : 'Full';
-    return r == 'Rest' ? 'Full' : r;
+  @override
+  void initState() {
+    super.initState();
+    _breathe = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 3400))..repeat(reverse: true);
+    _pulse   = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 2200))..repeat(reverse: true);
+    _shimmer = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 3000))..repeat();
+    _drift   = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 7000))..repeat();
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(AppSpacing.xxl),
-    decoration: BoxDecoration(
-      color: AppColors.bgCard,
-      borderRadius: BorderRadius.circular(AppSpacing.lg),
-      border: Border.all(color: color.withValues(alpha: 0.15), width: 0.8),
-    ),
-    child: Column(children: [
-      Container(
-        width: 72, height: 72,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [
-            color.withValues(alpha: 0.20),
-            color.withValues(alpha: 0.06),
-          ], begin: Alignment.topLeft, end: Alignment.bottomRight),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(Icons.fitness_center_rounded, color: color, size: 32),
-      ),
-      const SizedBox(height: AppSpacing.lg),
-      Text('No Exercises Yet', style: GoogleFonts.rajdhani(
-          color: AppColors.textPrimary, fontSize: 22,
-          fontWeight: FontWeight.w700)),
-      const SizedBox(height: AppSpacing.xs),
-      Text('Build your perfect workout\nby adding exercises below.',
-          style: GoogleFonts.inter(color: AppColors.textMuted,
-              fontSize: 12, height: 1.4),
-          textAlign: TextAlign.center),
-      const SizedBox(height: 18),
+  void dispose() {
+    _breathe.dispose(); _pulse.dispose();
+    _shimmer.dispose(); _drift.dispose(); super.dispose();
+  }
 
-      // Add Exercises button (manual)
-      _Tap(
-        onTap: () { H.tap(); _showPicker(context, idx); },
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 14),
+  @override
+  Widget build(BuildContext context) {
+    final color     = widget.color;
+    final p         = widget.p;
+    final outerCtx  = context;
+
+    // Context-aware copy from live coach data
+    final badge    = p.coachInsight.badge;
+    final recovery = p.getOverallRecovery();
+    final muscle   = p.topMuscleGroup;
+
+    final statusLine = badge.isNotEmpty
+        ? badge
+        : recovery >= 80 ? 'SYSTEM PRIMED'
+        : recovery >= 60 ? 'READY TO TRAIN'
+        : 'LIGHT SESSION ADVISED';
+
+    final subLine = muscle.isNotEmpty
+        ? '${muscle[0].toUpperCase()}${muscle.substring(1)} focus recommended today.'
+        : 'Build your session — add exercises below.';
+
+    return AnimatedBuilder(
+      animation: Listenable.merge([_breathe, _pulse, _shimmer, _drift]),
+      builder: (_, __) {
+        final b  = _breathe.value;
+        final pv = _pulse.value;
+        final sv = _shimmer.value;
+        final dv = _drift.value;
+
+        // Shimmer fires in first 45% of cycle, then holds off
+        final shimmerX = sv < 0.45
+            ? (sv / 0.45) * 340.0 - 80.0
+            : 340.0;
+
+        // Two floating particles — slow elliptical orbits
+        final a1 = dv * 2 * math.pi;
+        final a2 = dv * 2 * math.pi + math.pi;
+
+        return Container(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFD4AF37), Color(0xFFA8892C)]),
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [BoxShadow(
-                color: AppColors.gold.withValues(alpha: 0.35),
-                blurRadius: 16, offset: const Offset(0, 4))],
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.circular(AppSpacing.lg),
+            border: Border.all(
+              color: color.withValues(alpha: 0.14 + 0.12 * pv), width: 0.8),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.05 + 0.05 * pv),
+                blurRadius: 28, spreadRadius: 2),
+            ],
           ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-            const Icon(Icons.add_rounded,
-                color: Colors.black, size: 20),
-            const SizedBox(width: AppSpacing.sm),
-            Text('Add Exercises', style: GoogleFonts.rajdhani(
-                color: Colors.black, fontSize: 17,
-                fontWeight: FontWeight.w800)),
+          child: Column(children: [
+
+            // ── Animated orb with floating particles ──
+            SizedBox(
+              width: 120, height: 120,
+              child: Stack(alignment: Alignment.center, children: [
+
+                // Outer ambient glow — breathes
+                Container(
+                  width: 104 + 10 * pv,
+                  height: 104 + 10 * pv,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(
+                      color: color.withValues(alpha: 0.10 + 0.10 * pv),
+                      blurRadius: 30 + 14 * pv, spreadRadius: 2)],
+                  ),
+                ),
+
+                // Particle 1
+                Transform.translate(
+                  offset: Offset(36 * math.cos(a1), 22 * math.sin(a1)),
+                  child: Container(
+                    width: 3.5, height: 3.5,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: color.withValues(alpha: 0.28 + 0.20 * b),
+                      boxShadow: [BoxShadow(
+                        color: color.withValues(alpha: 0.20),
+                        blurRadius: 4)],
+                    ),
+                  ),
+                ),
+
+                // Particle 2
+                Transform.translate(
+                  offset: Offset(32 * math.cos(a2), 20 * math.sin(a2)),
+                  child: Container(
+                    width: 2.5, height: 2.5,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: color.withValues(alpha: 0.16 + 0.14 * b),
+                    ),
+                  ),
+                ),
+
+                // Core orb — breathes in scale
+                Transform.scale(
+                  scale: 0.95 + 0.05 * b,
+                  child: Container(
+                    width: 82, height: 82,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        center: const Alignment(-0.30, -0.35),
+                        radius: 1.1,
+                        colors: [
+                          color.withValues(alpha: 0.22 + 0.10 * b),
+                          color.withValues(alpha: 0.06),
+                        ],
+                      ),
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.28 + 0.18 * pv),
+                        width: 0.9),
+                    ),
+                    child: Stack(alignment: Alignment.center, children: [
+                      // Specular highlight
+                      ClipOval(child: Align(
+                        alignment: Alignment.topLeft,
+                        child: Container(
+                          width: 82, height: 41,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.06 + 0.04 * b),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      )),
+                      Icon(Icons.fitness_center_rounded, color: color, size: 30),
+                    ]),
+                  ),
+                ),
+              ]),
+            ),
+
+            const SizedBox(height: 18),
+
+            // ── Context status badge ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: color.withValues(alpha: 0.22), width: 0.6),
+              ),
+              child: Text(statusLine, style: GoogleFonts.inter(
+                color: color.withValues(alpha: 0.85),
+                fontSize: 8.5, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+            ),
+
+            const SizedBox(height: 10),
+
+            // ── Headline ──
+            Text('No exercises planned', style: GoogleFonts.rajdhani(
+              color: AppColors.textPrimary,
+              fontSize: 21, fontWeight: FontWeight.w700, height: 1.1)),
+
+            const SizedBox(height: 6),
+
+            // ── Subtext from live data ──
+            Text(subLine, style: GoogleFonts.inter(
+              color: AppColors.textMuted,
+              fontSize: 12, height: 1.45),
+              textAlign: TextAlign.center),
+
+            const SizedBox(height: 24),
+
+            // ── CTA button with shimmer sweep ──
+            _Tap(
+              onTap: () { H.medium(); _showPicker(outerCtx, widget.idx); },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFD4AF37), Color(0xFFA8892C)]),
+                    boxShadow: [BoxShadow(
+                      color: AppColors.gold.withValues(alpha: 0.30 + 0.15 * pv),
+                      blurRadius: 16 + 8 * pv, offset: const Offset(0, 4))],
+                  ),
+                  child: Stack(alignment: Alignment.center, children: [
+                    // Shimmer sweep
+                    Positioned(
+                      top: 0, bottom: 0,
+                      left: shimmerX,
+                      width: 70,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [
+                            Colors.transparent,
+                            Colors.white.withValues(alpha: 0.22),
+                            Colors.transparent,
+                          ]),
+                        ),
+                      ),
+                    ),
+                    // Label
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.add_rounded, color: Colors.black, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Add Exercises', style: GoogleFonts.rajdhani(
+                        color: Colors.black, fontSize: 17,
+                        fontWeight: FontWeight.w800)),
+                    ]),
+                  ]),
+                ),
+              ),
+            ),
           ]),
-        ),
-      ),
-    ]),
-  );
+        );
+      },
+    );
+  }
 }
 
 // ════════════════════════════════════════════════
@@ -2409,7 +2777,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
               color: AppColors.gold, size: 26),
           const SizedBox(width: AppSpacing.sm),
           Flexible(
-            child: Text('Workout Complete', style: GoogleFonts.rajdhani(
+            child: Text('Session Complete', style: GoogleFonts.rajdhani(
                 color: AppColors.textPrimary, fontSize: 20,
                 fontWeight: FontWeight.w700),
               overflow: TextOverflow.ellipsis),
@@ -2432,10 +2800,10 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _DialogStat('$exCount', 'exercises'),
-                  _DialogStatDivider(),
+                  const _DialogStatDivider(),
                   _DialogStat('$setCount', 'sets'),
                   if (vol > 0) ...[
-                    _DialogStatDivider(),
+                    const _DialogStatDivider(),
                     _DialogStat(
                         '${(vol / 1000).toStringAsFixed(1)}t', 'volume'),
                   ],
@@ -2523,17 +2891,62 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                   text: 'Complete Workout',
                   icon: Icons.check_circle_rounded,
                   onTap: () async {
+                // Capture providers before any async gap
                 final p  = ctx.read<AppProvider>();
                 final gp = ctx.read<GamificationProvider>();
+                // Guard: warn if no sets were logged
+                final anySetsLogged = day?.exercises.any(
+                  (ex) => ex.sets.any((s) => s.done)) ?? false;
+                if (!anySetsLogged) {
+                  final confirmed = await showDialog<bool>(
+                    context: d2,
+                    barrierColor: Colors.black54,
+                    builder: (_) => AlertDialog(
+                      backgroundColor: AppColors.bgCard,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18)),
+                      title: const Text('No sets logged',
+                          style: TextStyle(fontFamily: 'Rajdhani',
+                              color: AppColors.textPrimary,
+                              fontSize: 18, fontWeight: FontWeight.w800)),
+                      content: const Text(
+                          'You haven\'t logged any sets for this workout.\nMark as complete anyway?',
+                          style: TextStyle(fontFamily: 'Inter',
+                              color: AppColors.textSecondary,
+                              fontSize: 13, height: 1.5)),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(_, false),
+                          child: const Text('Go Back',
+                              style: TextStyle(color: AppColors.textMuted,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(_, true),
+                          child: const Text('Mark Complete',
+                              style: TextStyle(color: AppColors.gold,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
+                }
                 Navigator.pop(d2);
                 await WorkoutSessionService.instance.endSession();
                 final badges    = await p.markDayComplete(widget.idx, dur);
+                // Completion can be rejected (e.g. a stale non-today day).
+                // Never show the celebration for a day that didn't complete.
+                if (widget.idx < p.weekPlan.length &&
+                    !p.weekPlan[widget.idx].isCompleted) {
+                  return;
+                }
                 final weightMsg = p.weightSuggestionMessage;
                 final xp = XPSystem.xpWorkoutComplete +
                     XPSystem.xpStreakBonus *
                     (p.streak.currentStreak ~/ 7 + 1);
                 gp.addXP(xp); gp.onWorkoutComplete();
-                for (final b in badges) gp.triggerBadgePopup(b);
+                for (final b in badges) { gp.triggerBadgePopup(b); }
                 // Coach reaction: build a fresh message after the session is saved.
                 final coachMsg  = p.aiSuggestion;
                 final hasPR     = p.recentPRs.isNotEmpty &&
@@ -2549,16 +2962,9 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                   hasPR:             hasPR,
                   totalVolumeTonnes: volTonnes > 0 ? volTonnes : 0.0,
                 );
-                if (!ctx.mounted) return;
-                final trigger = p.pendingPaywallTrigger;
-                if (trigger != null) {
-                  p.clearPaywallTrigger();
-                  await PaywallSheet.show(ctx,
-                    trigger:   trigger,
-                    onUpgrade: () => p.notifyListeners(),
-                    onAdComplete: () => p.notifyListeners(),
-                  );
-                }
+                // Paywall intentionally NOT shown here — the completion
+                // moment belongs to the user. The pending trigger stays set
+                // and fires on the next app open (main_shell) instead.
                 // Session summary sheet — AI analysis of the just-completed workout
                 if (!ctx.mounted) return;
                 final ap2 = ctx.read<AppProvider>();
@@ -2650,14 +3056,14 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    Text('Analyzing your session...',
+                    Text('Reviewing your session...',
                       style: GoogleFonts.inter(
                         color: AppColors.textMuted, fontSize: 13,
                         fontStyle: FontStyle.italic)),
                   ])
                 else
                   Text(
-                    insight.isNotEmpty ? insight : 'Session logged. Keep the momentum going.',
+                    insight.isNotEmpty ? insight : 'Session logged.',
                     style: GoogleFonts.inter(
                       color: AppColors.textPrimary,
                       fontSize: 13, height: 1.55),
@@ -2770,51 +3176,6 @@ class _CompleteBtnState extends State<_CompleteBtn> {
     );
   }
 
-  void _streakDialog(BuildContext ctx, int streak) {
-    H.success();
-    showDialog(context: ctx, builder: (_) => Dialog(
-      backgroundColor: Colors.transparent,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.0, end: 1.0),
-        duration: const Duration(milliseconds: 550),
-        curve: AppCurves.primary,
-        builder: (_, v, child) =>
-            Transform.scale(scale: v, child: child),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          decoration: BoxDecoration(
-            color: AppColors.bgModal,
-            borderRadius: BorderRadius.circular(AppRadii.xl),
-            border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
-                width: 0.8),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 18, offset: Offset(0, 6))],
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.local_fire_department_rounded, color: AppColors.gold, size: 44),
-            const SizedBox(height: AppSpacing.sm),
-            Text('Streak Extended', style: GoogleFonts.rajdhani(
-                color: AppColors.textPrimary, fontSize: 20,
-                fontWeight: FontWeight.w800)),
-            const SizedBox(height: AppSpacing.xs),
-            Text('$streak ${streak == 1 ? "day" : "days"} strong',
-                style: GoogleFonts.inter(
-                    color: AppColors.textSecondary, fontSize: 14)),
-            const SizedBox(height: 10),
-            Text('You\'re building an unbreakable habit.',
-                style: GoogleFonts.inter(
-                    color: AppColors.textMuted, fontSize: 12)),
-          ]),
-        ),
-      ),
-    ));
-    Future.delayed(const Duration(seconds: 2), () {
-      if (ctx.mounted && Navigator.of(ctx).canPop()) {
-        Navigator.of(ctx).pop();
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     // Select only isPendingReview for this day — avoids rebuilding on
@@ -2889,6 +3250,313 @@ class _CompleteBtnState extends State<_CompleteBtn> {
 }
 
 // ════════════════════════════════════════════════
+// SHIMMER BOX — GIF loading placeholder
+// ════════════════════════════════════════════════
+class _ShimmerBox extends StatefulWidget {
+  final double size;
+  const _ShimmerBox({super.key, required this.size});
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final v = _ctrl.value;
+        return Container(
+          width: widget.size,
+          height: widget.size,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: LinearGradient(
+              begin: Alignment(-1.5 + v * 3, 0),
+              end: Alignment(-0.5 + v * 3, 0),
+              colors: const [
+                Color(0xFF1C1C1C),
+                Color(0xFF2C2620),
+                Color(0xFF1C1C1C),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ════════════════════════════════════════════════
+// GIF THUMBNAIL — 46×46 with gold border + fade
+// ════════════════════════════════════════════════
+class _GifThumbnail extends StatelessWidget {
+  final String gifUrl;
+  final double size;
+  final Color color;
+  final String muscle;
+  final String emoji;
+
+  const _GifThumbnail({
+    super.key,
+    required this.gifUrl,
+    required this.size,
+    required this.color,
+    required this.muscle,
+    required this.emoji,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.55),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.gold.withValues(alpha: 0.14),
+            blurRadius: 8,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12.8),
+        child: Image.network(
+          gifUrl,
+          width: size, height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => ExerciseIconBox(
+            muscle: muscle, color: color,
+            boxSize: size, iconSize: size * 0.48,
+            fallbackEmoji: emoji,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════
+// GIF EXPAND SHEET — tap GIF to see full size
+// ════════════════════════════════════════════════
+class _GifExpandSheet extends StatefulWidget {
+  final String gifUrl;
+  final PlannedExercise ex;
+  final Color color;
+  final bool isAnimated;
+  const _GifExpandSheet({
+    required this.gifUrl,
+    required this.ex,
+    required this.color,
+    this.isAnimated = true,
+  });
+  @override
+  State<_GifExpandSheet> createState() => _GifExpandSheetState();
+}
+
+class _GifExpandSheetState extends State<_GifExpandSheet> {
+  bool _imgError = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(top: BorderSide(color: AppColors.gold, width: 1)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 16),
+              child: Container(
+                width: 44, height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.gold.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(children: [
+                ExerciseIconBox(
+                  muscle: widget.ex.category,
+                  color: widget.color,
+                  boxSize: 40, iconSize: 20,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.ex.name,
+                        style: GoogleFonts.rajdhani(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        )),
+                    Text(widget.ex.category,
+                        style: GoogleFonts.inter(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                        )),
+                  ],
+                )),
+                Text('FORM DEMO',
+                    style: GoogleFonts.rajdhani(
+                      color: AppColors.gold.withValues(alpha: 0.6),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                    )),
+              ]),
+            ),
+            const SizedBox(height: 16),
+
+            // Full-size GIF with gold border
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.35),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.gold.withValues(alpha: 0.07),
+                      blurRadius: 24,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: _imgError
+                    ? Container(
+                        height: 240,
+                        color: AppColors.bgCard,
+                        child: Center(
+                          child: ExerciseIconBox(
+                            muscle: widget.ex.category,
+                            color: widget.color,
+                            boxSize: 72, iconSize: 36,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      )
+                    : Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Image.network(
+                            widget.gifUrl,
+                            width: double.infinity,
+                            height: 240,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) setState(() => _imgError = true);
+                              });
+                              return const SizedBox(height: 240);
+                            },
+                          ),
+                          // Play overlay when showing YouTube thumbnail (not animated GIF)
+                          if (!widget.isAnimated)
+                            Container(
+                              width: 56, height: 56,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.55),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 32,
+                              ),
+                            ),
+                        ],
+                      ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Watch Full Tutorial CTA
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  ExerciseDemoButton.openFor(context, widget.ex.name);
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.gold,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.gold.withValues(alpha: 0.28),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.play_circle_fill_rounded,
+                          color: Colors.black, size: 18),
+                      const SizedBox(width: 8),
+                      Text('Watch Full Tutorial',
+                          style: GoogleFonts.rajdhani(
+                            color: Colors.black,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════
 // EXERCISE CARD — premium redesign
 // ════════════════════════════════════════════════
 class _ExCard extends StatefulWidget {
@@ -2902,9 +3570,10 @@ class _ExCard extends StatefulWidget {
 
 class _ExCardState extends State<_ExCard>
     with SingleTickerProviderStateMixin {
-  bool    _open       = false;
+  bool    _open         = false;
   String? _gifUrl;
-  bool    _gifLoading = false;
+  bool    _gifLoading   = false;
+  bool    _gifAnimated  = false; // true = real GIF, false = YouTube thumbnail
 
   late AnimationController _entryC;
   late Animation<double>   _entryF;
@@ -2923,13 +3592,39 @@ class _ExCardState extends State<_ExCard>
             () { if (mounted) _entryC.forward(); });
   }
 
+  String? _youtubeThumbnail(String name) {
+    for (final ex in ExerciseData.list) {
+      if ((ex['name'] as String?)?.toLowerCase() == name.toLowerCase()) {
+        final ids = ex['youtubeIds'];
+        String? id;
+        if (ids is List && ids.isNotEmpty) {
+          id = ids.first as String?;
+        } else {
+          id = ex['youtubeId'] as String?;
+        }
+        if (id != null && id.isNotEmpty) {
+          return 'https://img.youtube.com/vi/$id/hqdefault.jpg';
+        }
+      }
+    }
+    return null;
+  }
+
   Future<void> _loadGif() async {
     if (_gifUrl != null || _gifLoading) return;
-    debugPrint('[GIF] loading for: ${widget.ex.name}');
     setState(() => _gifLoading = true);
-    final url = await WgerService.instance.getGifUrl(widget.ex.name);
-    debugPrint('[GIF] result: $url');
-    if (mounted) setState(() { _gifUrl = url; _gifLoading = false; });
+    // 1. Try animated GIF from ExerciseDB
+    String? url = await ExerciseGifService.instance.getGifUrl(widget.ex.name);
+    bool isAnimated = url != null;
+    // 2. Guaranteed fallback — YouTube thumbnail (all 141 exercises have IDs)
+    if (url == null) {
+      url = _youtubeThumbnail(widget.ex.name);
+    }
+    if (mounted) setState(() {
+      _gifUrl = url;
+      _gifAnimated = isAnimated;
+      _gifLoading = false;
+    });
   }
 
   @override void dispose() { _entryC.dispose(); super.dispose(); }
@@ -2989,12 +3684,16 @@ class _ExCardState extends State<_ExCard>
             curve: AppCurves.primary,
             margin: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
             decoration: BoxDecoration(
-              color: AppColors.bgCard,
+              color: (doneSets == totalSets && totalSets > 0)
+                  ? const Color(0xFF131313)
+                  : AppColors.bgCard,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: _open
-                    ? AppColors.goldAmber.withValues(alpha: 0.30)
-                    : AppColors.divider.withValues(alpha: 0.25),
+                color: (doneSets == totalSets && totalSets > 0)
+                    ? AppColors.gold.withValues(alpha: 0.08)
+                    : _open
+                        ? AppColors.goldAmber.withValues(alpha: 0.30)
+                        : AppColors.divider.withValues(alpha: 0.25),
                 width: _open ? 0.8 : 0.4,
               ),
             ),
@@ -3015,72 +3714,95 @@ class _ExCardState extends State<_ExCard>
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md, vertical: 10),
                   child: Row(children: [
-                    // SVG icon → GIF when expanded
-                    Stack(clipBehavior: Clip.none, children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: (_open && _gifUrl != null)
-                          ? ClipRRect(
-                              key: const ValueKey('gif'),
-                              borderRadius: BorderRadius.circular(14),
-                              child: Image.network(
-                                _gifUrl!,
-                                width: 46, height: 46,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => ExerciseIconBox(
-                                  muscle: ex.category,
-                                  color: widget.color,
-                                  boxSize: 46, iconSize: 22,
-                                  fallbackEmoji: ex.emoji,
-                                ),
-                              ),
-                            )
-                          : (_open && _gifLoading)
-                              ? Container(
-                                  key: const ValueKey('loading'),
-                                  width: 46, height: 46,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.bgElevated,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                        color: widget.color.withValues(alpha: 0.25)),
+                    // Icon (closed) → YouTube demo tap
+                    // GIF  (open)   → expand sheet tap
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        H.light();
+                        if (_open && _gifUrl != null) {
+                          showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            isScrollControlled: true,
+                            builder: (_) => _GifExpandSheet(
+                              gifUrl: _gifUrl!,
+                              ex: ex,
+                              color: widget.color,
+                              isAnimated: _gifAnimated,
+                            ),
+                          );
+                        } else {
+                          ExerciseDemoButton.openFor(context, ex.name);
+                        }
+                      },
+                      child: Stack(clipBehavior: Clip.none, children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 350),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          child: (_open && _gifUrl != null)
+                            ? _GifThumbnail(
+                                key: const ValueKey('gif'),
+                                gifUrl: _gifUrl!,
+                                size: 46,
+                                color: widget.color,
+                                muscle: ex.category,
+                                emoji: ex.emoji,
+                              )
+                            : (_open && _gifLoading)
+                                ? _ShimmerBox(
+                                    key: const ValueKey('shimmer'),
+                                    size: 46,
+                                  )
+                                : ExerciseIconBox(
+                                    key: const ValueKey('icon'),
+                                    muscle: ex.category,
+                                    color: (doneSets == totalSets && totalSets > 0)
+                                        ? AppColors.textMuted.withValues(alpha: 0.30)
+                                        : widget.color,
+                                    boxSize: 46, iconSize: 22,
+                                    fallbackEmoji: ex.emoji,
                                   ),
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 16, height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 1.5,
-                                        color: widget.color.withValues(alpha: 0.7),
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : ExerciseIconBox(
-                                  key: const ValueKey('icon'),
-                                  muscle: ex.category,
-                                  color: (doneSets == totalSets && totalSets > 0)
-                                      ? widget.color.withValues(alpha: 0.40)
-                                      : widget.color,
-                                  boxSize: 46, iconSize: 22,
-                                  fallbackEmoji: ex.emoji,
-                                ),
-                      ),
-                      if (doneSets == totalSets && totalSets > 0)
+                        ),
+                        // Badge: check (done) or expand arrow (GIF loaded) or play (icon)
                         Positioned(
                           bottom: -2, right: -2,
-                          child: Container(
-                            width: 14, height: 14,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2E7D32),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: AppColors.bgCard, width: 1.2),
-                            ),
-                            child: const Icon(Icons.check_rounded,
-                                color: Colors.white, size: 8),
-                          ),
+                          child: (doneSets == totalSets && totalSets > 0)
+                            ? Container(
+                                width: 14, height: 14,
+                                decoration: BoxDecoration(
+                                  color: AppColors.gold,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppColors.bgCard, width: 1.2),
+                                ),
+                                child: const Icon(Icons.check_rounded,
+                                    color: Colors.black, size: 8),
+                              )
+                            : (_open && _gifUrl != null)
+                                ? Container(
+                                    width: 14, height: 14,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.gold.withValues(alpha: 0.9),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: AppColors.bgCard, width: 1.2),
+                                    ),
+                                    child: const Icon(Icons.open_in_full_rounded,
+                                        color: Colors.black, size: 7),
+                                  )
+                                : Container(
+                                    width: 14, height: 14,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.gold.withValues(alpha: 0.88),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: AppColors.bgCard, width: 1.2),
+                                    ),
+                                    child: const Icon(Icons.play_arrow_rounded,
+                                        color: Colors.black, size: 8),
+                                  ),
                         ),
-                    ]),
+                      ]),
+                    ),
                     const SizedBox(width: AppSpacing.md),
 
                     // Name + info
@@ -3107,11 +3829,11 @@ class _ExCardState extends State<_ExCard>
                             borderRadius: BorderRadius.circular(5),
                           ),
                           child: Text(
-                            ex.category,
+                            ex.category.toLowerCase(),
                             style: GoogleFonts.inter(
                                 color: (doneSets == totalSets && totalSets > 0)
-                                    ? AppColors.goldAmber.withValues(alpha: 0.35)
-                                    : AppColors.goldAmber.withValues(alpha: 0.65),
+                                    ? AppColors.goldAmber.withValues(alpha: 0.30)
+                                    : AppColors.goldAmber.withValues(alpha: 0.60),
                                 fontSize: 9, fontWeight: FontWeight.w600)),
                         ),
                         if (trend.isNotEmpty && !(doneSets == totalSets && totalSets > 0)) ...[
@@ -3128,10 +3850,20 @@ class _ExCardState extends State<_ExCard>
                         if (GhostCopyService.showTag(ex.ghostWeekGap) &&
                             !(doneSets == totalSets && totalSets > 0)) ...[
                           const SizedBox(width: 5),
-                          _GhostTag(weekGap: ex.ghostWeekGap),
+                          // Flexible — the longest chip in the row; must
+                          // shrink on narrow screens instead of overflowing.
+                          Flexible(
+                            child: _GhostTag(weekGap: ex.ghostWeekGap),
+                          ),
                         ],
                       ]),
-                      if (msg.isNotEmpty && !(doneSets == totalSets && totalSets > 0)) ...[
+                      // One coaching instruction per card. When a ghost
+                      // recovery tag is visible ("Coming back — ease in"),
+                      // the progression hint is suppressed — the two can
+                      // contradict each other. Priority: ghost > progression.
+                      if (msg.isNotEmpty &&
+                          !(doneSets == totalSets && totalSets > 0) &&
+                          !GhostCopyService.showTag(ex.ghostWeekGap)) ...[
                         const SizedBox(height: 3),
                         Text(
                           msg,
@@ -3148,7 +3880,7 @@ class _ExCardState extends State<_ExCard>
 
                     const SizedBox(width: AppSpacing.xs),
 
-                    // Right side: PR + sets progress + chevron
+                    // Right side: PR badge + sets progress + chevron
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -3156,15 +3888,16 @@ class _ExCardState extends State<_ExCard>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.orange.withValues(alpha: 0.18),
+                          color: AppColors.gold.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                              color: AppColors.orange.withValues(
-                                  alpha: 0.35)),
+                              color: AppColors.gold.withValues(alpha: 0.30)),
                         ),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.emoji_events_rounded,
-                              color: AppColors.orange, size: 10),
+                          Icon(Icons.emoji_events_rounded,
+                              color: AppColors.gold.withValues(
+                                  alpha: doneSets == totalSets ? 0.45 : 1.0),
+                              size: 10),
                           const SizedBox(width: 2),
                           Text(
                             ex.unit == 'min'
@@ -3175,24 +3908,30 @@ class _ExCardState extends State<_ExCard>
                                         ? '${pr.toStringAsFixed(1)}×$prR'
                                         : pr.toStringAsFixed(1),
                             style: GoogleFonts.inter(
-                                color: AppColors.orange, fontSize: 9.5,
+                                color: AppColors.gold.withValues(
+                                    alpha: doneSets == totalSets ? 0.45 : 1.0),
+                                fontSize: 9.5,
                                 fontWeight: FontWeight.w800)),
                         ]),
                       ),
                       const SizedBox(height: 10),
                       // Sets done indicator
-                      Text('$doneSets/$totalSets sets',
-                          style: GoogleFonts.inter(
-                            color: doneSets == totalSets
-                                ? AppColors.textMuted.withValues(alpha: 0.50)
-                                : AppColors.textMuted,
-                            fontSize: 11, fontWeight: FontWeight.w600,
-                          )),
+                      Text(
+                        doneSets == totalSets && totalSets > 0
+                            ? '✓'
+                            : '$doneSets/$totalSets sets',
+                        style: GoogleFonts.inter(
+                          color: doneSets == totalSets && totalSets > 0
+                              ? AppColors.gold.withValues(alpha: 0.40)
+                              : AppColors.textMuted,
+                          fontSize: 11, fontWeight: FontWeight.w600,
+                        )),
                       const SizedBox(height: 2),
                       Icon(
                         _open ? Icons.expand_less_rounded
                             : Icons.expand_more_rounded,
-                        color: AppColors.textMuted, size: 16),
+                        color: AppColors.textMuted.withValues(alpha: 0.40),
+                        size: 16),
                     ]),
                   ]),
                 ),
@@ -3204,9 +3943,6 @@ class _ExCardState extends State<_ExCard>
                     height: 1, indent: AppSpacing.md,
                     endIndent: AppSpacing.md),
                 const SizedBox(height: AppSpacing.sm),
-
-                // ── ▶️ Demo Video Button ──
-                ExerciseDemoButton(exerciseName: ex.name),
 
                 // ── AI weight suggestion ──
                 _AISuggestionBanner(ex: ex, color: widget.color),
@@ -3466,9 +4202,34 @@ class _SetsPanel extends StatelessWidget {
                     fontSize: 9, fontWeight: FontWeight.w700,
                     letterSpacing: 0.3)))
           else const Spacer(),
-          const SizedBox(width: 52),
+          const SizedBox(width: AppSpacing.sm),
+          SizedBox(width: 40, child: Text('RIR',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(color: AppColors.textMuted,
+                  fontSize: 9, fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3))),
+          const SizedBox(width: 36),
         ]),
       ),
+
+      // Last session weight hint
+      if (!isC && !isBW && ex.previousWeight > 0)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, 3),
+          child: Row(children: [
+            const SizedBox(width: 28 + AppSpacing.sm),
+            Icon(Icons.history_rounded,
+                size: 10, color: AppColors.textMuted.withValues(alpha: 0.55)),
+            const SizedBox(width: 3),
+            Text(
+              'Last: ${ex.previousWeight % 1 == 0 ? ex.previousWeight.toInt() : ex.previousWeight} kg',
+              style: GoogleFonts.inter(
+                  color: AppColors.textMuted.withValues(alpha: 0.55),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w500),
+            ),
+          ]),
+        ),
 
       // Set rows
       ...ex.sets.asMap().entries.map((e) => _SetRow(
@@ -3569,6 +4330,24 @@ class _SetRow extends StatelessWidget {
         else const Spacer(),
         const SizedBox(width: AppSpacing.sm),
 
+        // RIR chip — tap to cycle null→5→4→3→2→1→0→null
+        if (!isC && !isBW)
+          _RirChip(
+            rir: set.rir,
+            onTap: () {
+              final next = set.rir == null ? 5
+                  : set.rir! == 0 ? null
+                  : set.rir! - 1;
+              if (next == null) {
+                p.updateSet(idx, ex.id, set.id, clearRir: true);
+              } else {
+                p.updateSet(idx, ex.id, set.id, rir: next);
+              }
+            },
+          )
+        else const SizedBox(width: 40),
+        const SizedBox(width: AppSpacing.sm),
+
         // Done check button
         GestureDetector(
           onTapDown: (_) => set.done ? H.light() : H.medium(),
@@ -3583,9 +4362,6 @@ class _SetRow extends StatelessWidget {
 
             // ✅ FIXED: get prev values from checkPRResult instead of two separate calls
             // checkPRResult reads the same data but in one atomic operation
-            final prevBestWeight = p.getPR(key, ex.unit);
-            final prevBestReps   = p.getPRReps(key);
-
             // ✅ FIXED: safety guard for invalid sets
             if (set.weight < 0 || set.reps <= 0) {
               p.toggleSetDone(idx, ex.id, set.id);
@@ -3597,9 +4373,10 @@ class _SetRow extends StatelessWidget {
             final isCompletedEdit = idx < p.weekPlan.length && p.weekPlan[idx].isCompleted;
             if (!isCompletedEdit && idx != p.todayIndex) {
               H.medium();
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: const Text('Only today\'s workout can be logged'),
-                backgroundColor: AppColors.bgCard,
+              ScaffoldMessenger.of(context).showSnackBar(appSnack(
+                'Only today\'s workout can be logged',
+                icon: Icons.info_outline_rounded,
+                iconColor: AppColors.textMuted,
                 duration: const Duration(seconds: 2),
               ));
               return;
@@ -3717,7 +4494,7 @@ class _SetRow extends StatelessWidget {
             width: 28, height: 28,
             decoration: BoxDecoration(
               gradient: set.done ? const LinearGradient(
-                  colors: [Color(0xFF2E7D32), Color(0xFF388E3C)]) : null,
+                  colors: [AppColors.gold, AppColors.goldSoft]) : null,
               color: set.done ? null : AppColors.bgElevated,
               borderRadius: BorderRadius.circular(9),
               border: Border.all(
@@ -4023,12 +4800,25 @@ class _PickerSheetState extends State<_PickerSheet> {
     final favs = context.read<FavoritesProvider>().favoriteIds;
     final isFavFilter = _cat == 'Favorites';
 
+    // Already-added exercises for this day — exclude from picker
+    final p = context.read<AppProvider>();
+    final wp = p.weekPlan;
+    final Set<String> addedNames = {};
+    if (widget.dayIdx >= 0 && widget.dayIdx < wp.length) {
+      for (final ex in wp[widget.dayIdx].exercises) {
+        addedNames.add(_normalize(ex.name));
+      }
+    }
+
     var result = _all.where((ex) {
       final name      = _normalize((ex['name']      as String? ?? ''));
       final type      = _normalize((ex['type']      as String? ?? ''));
       final muscle    = _normalize((ex['muscle']    as String? ?? ''));
       final id        = (ex['id'] as String? ?? '');
       final equipment = (ex['equipment'] as String? ?? '').toLowerCase();
+
+      // Skip exercises already in this day's plan
+      if (addedNames.contains(name)) return false;
 
       final matchSearch = q.isEmpty
           || name.contains(q) || type.contains(q) || muscle.contains(q);
@@ -4083,8 +4873,9 @@ class _PickerSheetState extends State<_PickerSheet> {
     // volume/favorites computed at sheet-open time. No live updates needed.
     final p    = context.read<AppProvider>();
     final list = _filtered;
+    final mq   = MediaQuery.of(context);
     return Container(
-      height: MediaQuery.of(context).size.height * 0.88,
+      height: mq.size.height * 0.88 - mq.viewInsets.bottom,
       decoration: const BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.modal)),
@@ -4155,7 +4946,8 @@ class _PickerSheetState extends State<_PickerSheet> {
             const SizedBox(height: 10),
             Align(alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () => _showCustom(context, widget.dayIdx),
+                onPressed: () => _showCustom(context, widget.dayIdx,
+                    defaultMuscle: _cat == 'All' || _cat == 'Favorites' ? 'Chest' : _cat),
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('Custom'),
                 style: TextButton.styleFrom(
@@ -4168,7 +4960,12 @@ class _PickerSheetState extends State<_PickerSheet> {
                 ..._filters.map((t) {
                   final sel = _cat == t;
                   return GestureDetector(
-                    onTap: () { H.selection(); setState(() => _cat = t); },
+                    onTap: () {
+                      H.selection();
+                      _debounce?.cancel(); // cancel pending search debounce
+                      FocusScope.of(context).unfocus(); // dismiss keyboard
+                      setState(() => _cat = t);
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 240),
                       margin: const EdgeInsets.only(right: AppSpacing.xs + 2),
@@ -4242,7 +5039,7 @@ class _PickerSheetState extends State<_PickerSheet> {
             : _showGrouped
             ? _buildGroupedList(p)
             : ListView.builder(
-                physics: const BouncingScrollPhysics(),
+                physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(
                     AppSpacing.lg, 4, AppSpacing.lg, AppSpacing.lg),
                 itemCount: list.length,
@@ -4253,7 +5050,7 @@ class _PickerSheetState extends State<_PickerSheet> {
         if (_sel.isNotEmpty) Container(
           padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: AppColors.bgCard,
             border: Border(top: BorderSide(color: AppColors.divider))),
           child: GoldButton(
@@ -4269,7 +5066,11 @@ class _PickerSheetState extends State<_PickerSheet> {
   }
 
   void _add(BuildContext context) {
-    final p = context.read<AppProvider>();
+    final p          = context.read<AppProvider>();
+    // Capture messenger and count before pop — context is invalid after pop.
+    final messenger  = ScaffoldMessenger.of(context);
+    final count      = _sel.length;
+
     for (final key in _sel) {
       final ex = _all.firstWhere(
         (e) => '${e["name"]}_${e["type"]}' == key,
@@ -4296,15 +5097,8 @@ class _PickerSheetState extends State<_PickerSheet> {
     _recentlyUsed = updatedRecent;
     _saveRecent();
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${_sel.length} exercise'
-          '${_sel.length > 1 ? "s" : ""} added',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-      backgroundColor: AppColors.green,
-      behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12)),
+    messenger.showSnackBar(appSnack(
+      '$count exercise${count > 1 ? "s" : ""} added',
     ));
   }
 
@@ -4321,7 +5115,7 @@ class _PickerSheetState extends State<_PickerSheet> {
     final volMap = p.weeklyVolumeByMuscle;
 
     return ListView.builder(
-      physics: const BouncingScrollPhysics(),
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg, 4, AppSpacing.lg, AppSpacing.lg),
       itemCount: orderedKeys.length,
@@ -4574,18 +5368,12 @@ class _PickerSheetState extends State<_PickerSheet> {
       isBodyweight: ex['bodyweight'] as bool? ?? false,
     );
     setState(() {
+      _sel.remove(k); // prevent double-add via multi-select after swipe
       _recentlyUsed = [k, ..._recentlyUsed.where((r) => r != k)].take(8).toList();
     });
     _saveRecent();
     if (ctx.mounted) {
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-        content: Text('$name added',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-        backgroundColor: AppColors.green,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ));
+      ScaffoldMessenger.of(ctx).showSnackBar(appSnack('$name added'));
     }
   }
 
@@ -4653,15 +5441,15 @@ class _PickerSheetState extends State<_PickerSheet> {
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.only(left: 16),
           decoration: BoxDecoration(
-            color: AppColors.green.withValues(alpha: 0.08),
+            color: AppColors.gold.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.add_circle_rounded,
-                color: AppColors.green, size: 18),
+                color: AppColors.gold, size: 18),
             const SizedBox(width: 4),
             Text('Add', style: GoogleFonts.inter(
-                color: AppColors.green, fontSize: 11,
+                color: AppColors.gold, fontSize: 11,
                 fontWeight: FontWeight.w700)),
           ]),
         ),
@@ -4815,14 +5603,14 @@ class _PickerSheetState extends State<_PickerSheet> {
                             if (badge == 'AI Pick')
                               _miniInsightChip(
                                 'IDEAL TODAY',
-                                AppColors.green,
+                                AppColors.gold,
                               ),
 
                             if (badge == 'Recovery Friendly' ||
                                 badge == 'Joint Friendly')
                               _miniInsightChip(
                                 'LOW FATIGUE LOAD',
-                                const Color(0xFF64B5F6),
+                                AppColors.goldSoft,
                               ),
 
                             if (movement == 'compound')
@@ -5048,8 +5836,48 @@ class _PickerSheetState extends State<_PickerSheet> {
                   ),
                   const SizedBox(width: 6),
 
+                  // Demo video play button
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () {
+                      H.light();
+                      ExerciseDemoButton.openFor(context, name);
+                    },
+                    child: Container(
+                      width: 26, height: 26,
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                            color: AppColors.gold.withValues(alpha: 0.22),
+                            width: 0.6),
+                      ),
+                      child: const Icon(Icons.play_arrow_rounded,
+                          color: AppColors.gold, size: 15),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+
                   if (selected)
                     Icon(Icons.check_circle_rounded, color: col, size: 20),
+
+                  // Custom exercise manage button
+                  if (equipment == 'custom') ...[
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () => _showCustomManage(context, ex, p),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgCardLight,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.divider, width: 0.5),
+                        ),
+                        child: const Icon(Icons.more_vert_rounded,
+                            color: AppColors.textMuted, size: 14),
+                      ),
+                    ),
+                  ],
                 ]),
               ),
 
@@ -5476,13 +6304,141 @@ class _PickerSheetState extends State<_PickerSheet> {
 }
 
 // ════════════════════════════════════════════════
+// CUSTOM EXERCISE MANAGE (edit / delete)
+// ════════════════════════════════════════════════
+void _showCustomManage(BuildContext context, Map<String, dynamic> ex, AppProvider p) {
+  final id    = ex['id']       as String? ?? '';
+  final name  = ex['name']     as String? ?? '';
+  final muscle = ex['muscle']  as String? ?? 'Chest';
+  final emoji  = ex['emoji']   as String? ?? '💪';
+  final bw     = ex['bodyweight'] == true;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.modal)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 36),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Center(child: Container(width: 44, height: 4,
+            decoration: BoxDecoration(color: AppColors.textMuted,
+                borderRadius: BorderRadius.circular(AppRadii.pill)))),
+        const SizedBox(height: 16),
+        Row(children: [
+          Text(name, style: GoogleFonts.rajdhani(
+              color: AppColors.textPrimary, fontSize: 18,
+              fontWeight: FontWeight.w700)),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.gold.withValues(alpha: 0.3), width: 0.5),
+            ),
+            child: Text('Custom', style: GoogleFonts.inter(
+                color: AppColors.gold, fontSize: 9, fontWeight: FontWeight.w600)),
+          ),
+        ]),
+        const SizedBox(height: 20),
+        // Edit button
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.edit_rounded, color: AppColors.gold, size: 18),
+          ),
+          title: Text('Edit Exercise', style: GoogleFonts.inter(
+              color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+          subtitle: Text('Change name, muscle group, or emoji',
+              style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 11)),
+          onTap: () {
+            Navigator.pop(context);
+            showModalBottomSheet(
+              context: context, isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => _CustomSheet(
+                dayIdx: -1,
+                editId: id,
+                initialName: name,
+                initialMuscle: muscle,
+                initialEmoji: emoji,
+                initialBodyweight: bw,
+              ),
+            );
+          },
+        ),
+        const Divider(height: 1, color: AppColors.divider),
+        // Delete button
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.red.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.delete_outline_rounded,
+                color: AppColors.red, size: 18),
+          ),
+          title: Text('Delete Exercise', style: GoogleFonts.inter(
+              color: AppColors.red, fontSize: 14, fontWeight: FontWeight.w600)),
+          subtitle: Text('Remove from your custom list permanently',
+              style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 11)),
+          onTap: () async {
+            Navigator.pop(context);
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: AppColors.bgCard,
+                title: Text('Delete "$name"?',
+                    style: GoogleFonts.rajdhani(
+                        color: AppColors.textPrimary, fontSize: 18,
+                        fontWeight: FontWeight.w700)),
+                content: Text('This will remove the custom exercise permanently.',
+                    style: GoogleFonts.inter(
+                        color: AppColors.textMuted, fontSize: 13)),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text('Cancel', style: GoogleFonts.inter(
+                        color: AppColors.textMuted)),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text('Delete', style: GoogleFonts.inter(
+                        color: AppColors.red, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+            );
+            if (confirm == true) {
+              H.medium();
+              p.deleteCustomExercise(id);
+            }
+          },
+        ),
+      ]),
+    ),
+  );
+}
+
+// ════════════════════════════════════════════════
 // CUSTOM EXERCISE SHEET
 // ════════════════════════════════════════════════
-void _showCustom(BuildContext context, int dayIdx) {
+void _showCustom(BuildContext context, int dayIdx, {String defaultMuscle = 'Chest'}) {
   showModalBottomSheet(
     context: context, isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _CustomSheet(dayIdx: dayIdx),
+    builder: (_) => _CustomSheet(dayIdx: dayIdx, defaultMuscle: defaultMuscle),
   );
 }
 
@@ -5573,29 +6529,50 @@ class _ExerciseEmptyState extends StatelessWidget {
 
 class _CustomSheet extends StatefulWidget {
   final int dayIdx;
-  const _CustomSheet({required this.dayIdx});
+  final String defaultMuscle;
+  // Edit mode — if editId is set, we update instead of create
+  final String? editId;
+  final String? initialName;
+  final String? initialMuscle;
+  final String? initialEmoji;
+  final bool    initialBodyweight;
+
+  const _CustomSheet({
+    required this.dayIdx,
+    this.defaultMuscle = 'Chest',
+    this.editId,
+    this.initialName,
+    this.initialMuscle,
+    this.initialEmoji,
+    this.initialBodyweight = false,
+  });
+
   @override State<_CustomSheet> createState() => _CustomSheetState();
 }
 
 class _CustomSheetState extends State<_CustomSheet> {
-  final _name  = TextEditingController();
-  final _emoji = TextEditingController(text: '💪');
+  late final TextEditingController _name;
+  late final TextEditingController _emoji;
 
-  final List<String> _muscles = [
-    'Chest',
-    'Back',
-    'Legs',
-    'Shoulders',
-    'Biceps',
-    'Triceps',
-    'Core',
-    'Cardio',
+  static const _muscles = [
+    'Chest', 'Back', 'Legs', 'Shoulders',
+    'Biceps', 'Triceps', 'Core', 'Cardio',
   ];
 
-  String _selectedMuscle = 'Chest';
-
-  bool _bw = false;
+  late String _selectedMuscle;
+  late bool   _bw;
   String? _err;
+
+  bool get _isEdit => widget.editId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _name  = TextEditingController(text: widget.initialName ?? '');
+    _emoji = TextEditingController(text: widget.initialEmoji ?? '💪');
+    _selectedMuscle = widget.initialMuscle ?? widget.defaultMuscle;
+    _bw = widget.initialBodyweight;
+  }
 
   @override void dispose() {
     _name.dispose();
@@ -5608,13 +6585,24 @@ class _CustomSheetState extends State<_CustomSheet> {
       setState(() => _err = 'Please enter a name'); return;
     }
     H.medium();
-    context.read<AppProvider>().addCustomExercise(
-      dayIndex:     widget.dayIdx,
-      name:         _name.text.trim(),
-      category:     _selectedMuscle,
-      emoji:        _emoji.text.trim().isEmpty ? '💪' : _emoji.text.trim(),
-      isBodyweight: _bw,
-    );
+    final p = context.read<AppProvider>();
+    if (_isEdit) {
+      p.editCustomExercise(
+        id:           widget.editId!,
+        name:         _name.text.trim(),
+        category:     _selectedMuscle,
+        emoji:        _emoji.text.trim().isEmpty ? '💪' : _emoji.text.trim(),
+        isBodyweight: _bw,
+      );
+    } else {
+      p.addCustomExercise(
+        dayIndex:     widget.dayIdx,
+        name:         _name.text.trim(),
+        category:     _selectedMuscle,
+        emoji:        _emoji.text.trim().isEmpty ? '💪' : _emoji.text.trim(),
+        isBodyweight: _bw,
+      );
+    }
     Navigator.pop(context);
   }
 
@@ -5637,9 +6625,10 @@ class _CustomSheetState extends State<_CustomSheet> {
                   borderRadius: BorderRadius.circular(AppRadii.pill)))),
           const SizedBox(height: AppSpacing.lg),
           Row(children: [
-            Text('Custom Exercise', style: GoogleFonts.rajdhani(
-                color: AppColors.textPrimary, fontSize: 20,
-                fontWeight: FontWeight.w700)),
+            Text(_isEdit ? 'Edit Exercise' : 'Custom Exercise',
+                style: GoogleFonts.rajdhani(
+                    color: AppColors.textPrimary, fontSize: 20,
+                    fontWeight: FontWeight.w700)),
             const Spacer(),
             IconButton(icon: const Icon(Icons.close_rounded),
                 onPressed: () => Navigator.pop(context)),
@@ -5669,7 +6658,7 @@ class _CustomSheetState extends State<_CustomSheet> {
 
             Expanded(
               child: DropdownButtonFormField<String>(
-                value: _selectedMuscle,
+                initialValue: _selectedMuscle,
                 dropdownColor: AppColors.bgCardLight,
                 style: GoogleFonts.inter(
                   color: AppColors.textPrimary,
@@ -5706,204 +6695,19 @@ class _CustomSheetState extends State<_CustomSheet> {
               subtitle: Text(_bw ? 'Tracked in reps' : 'Tracked in kg',
                   style: GoogleFonts.inter(
                       color: AppColors.textMuted, fontSize: 12)),
-              activeColor: AppColors.gold,
+              activeThumbColor: AppColors.gold,
             ),
           ),
           const SizedBox(height: 18),
-          GoldButton(text: 'Add Exercise', width: double.infinity,
-              onTap: _submit),
+          GoldButton(
+            text: _isEdit ? 'Save Changes' : 'Add Exercise',
+            width: double.infinity,
+            onTap: _submit,
+          ),
         ],
       )),
     );
   }
-}
-
-
-// ════════════════════════════════════════════════
-// GENERATE PLAN SHEET
-// ════════════════════════════════════════════════
-void _showGeneratePlanSheet(BuildContext context) {
-  String goal = 'Build Muscle';
-  String level = 'Beginner';
-
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: AppColors.bgModal,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.modal)),
-    ),
-    builder: (sheetCtx) => StatefulBuilder(
-      builder: (ctx, setState) => Padding(
-        padding: EdgeInsets.only(
-          left: 20, right: 20, top: 16,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 44, height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.borderMedium,
-                  borderRadius: BorderRadius.circular(AppRadii.pill),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(children: [
-              Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFD4AF37), Color(0xFFA8892C)],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.hub_rounded,
-                    color: Colors.black, size: 26),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('AI PLAN GENERATOR',
-                        style: GoogleFonts.rajdhani(
-                          color: AppColors.gold,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.6,
-                        )),
-                    Text('Build your perfect week',
-                        style: GoogleFonts.rajdhani(
-                          color: AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        )),
-                  ],
-                ),
-              ),
-            ]),
-            const SizedBox(height: 24),
-
-            Text('YOUR GOAL',
-                style: GoogleFonts.rajdhani(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                )),
-            const SizedBox(height: 10),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final g in ['Build Muscle', 'Lose Fat', 'Get Stronger', 'Stay Fit'])
-                _chip(g, goal == g, () => setState(() => goal = g)),
-            ]),
-            const SizedBox(height: 20),
-
-            Text('YOUR LEVEL',
-                style: GoogleFonts.rajdhani(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                )),
-            const SizedBox(height: 10),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final l in ['Beginner', 'Intermediate', 'Advanced'])
-                _chip(l, level == l, () => setState(() => level = l)),
-            ]),
-            const SizedBox(height: 24),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  H.medium();
-                  Navigator.pop(ctx);
-                  final p = context.read<AppProvider>();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Generating your plan...',
-                          style: GoogleFonts.rajdhani(
-                              fontWeight: FontWeight.w700)),
-                      backgroundColor: AppColors.bgCard,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                  try {
-                    await p.workout.generateSmartPlan(goal: goal, level: level);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Plan generated',
-                              style: GoogleFonts.rajdhani(
-                                  fontWeight: FontWeight.w700)),
-                          backgroundColor: AppColors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Something went wrong. Please try again.'),
-                          backgroundColor: AppColors.red,
-                        ),
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.hub_rounded, size: 20),
-                label: Text('Generate Plan',
-                    style: GoogleFonts.rajdhani(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
-                      letterSpacing: 1,
-                    )),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.gold,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-Widget _chip(String label, bool selected, VoidCallback onTap) {
-  return InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(12),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: selected
-            ? AppColors.gold.withValues(alpha: 0.15)
-            : AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: selected ? AppColors.gold : AppColors.borderSoft,
-          width: selected ? 1.5 : 1,
-        ),
-      ),
-      child: Text(label,
-          style: GoogleFonts.rajdhani(
-            color: selected ? AppColors.gold : AppColors.textPrimary,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          )),
-    ),
-  );
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -5964,7 +6768,7 @@ class _OvertrainingBannerState extends State<_OvertrainingBanner> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Workload spike detected',
+                Text('Training load increased',
                     style: GoogleFonts.rajdhani(
                         color: AppColors.textPrimary, fontSize: 14,
                         fontWeight: FontWeight.w800)),
@@ -6050,7 +6854,7 @@ class _InjuryRiskBannerState extends State<_InjuryRiskBanner> {
                     HapticFeedback.lightImpact();
                     _dismiss();
                   },
-                  child: Icon(Icons.close_rounded,
+                  child: const Icon(Icons.close_rounded,
                       color: AppColors.textMuted, size: 16),
                 ),
               ]),
@@ -6144,7 +6948,7 @@ class _WelcomeBackCard extends StatelessWidget {
               _RecoveryPill(
                   icon: Icons.layers_rounded,
                   label: '${s.volumeLabel} volume',
-                  color: AppColors.blue),
+                  color: AppColors.goldSoft),
             ]),
             const SizedBox(height: 10),
             // CTA → recovery sheet
@@ -6243,13 +7047,13 @@ class _RecoverySessionCard extends StatelessWidget {
               _RecoveryPill(
                   icon: Icons.layers_rounded,
                   label: '${s.volumeLabel} volume',
-                  color: AppColors.blue),
+                  color: AppColors.goldSoft),
               if (s.hasSwaps) ...[
                 const SizedBox(width: 6),
                 _RecoveryPill(
                     icon: Icons.swap_horiz_rounded,
                     label: '${s.replacementExercises.length} swaps',
-                    color: AppColors.green),
+                    color: AppColors.gold),
               ],
             ]),
             const SizedBox(height: 10),
@@ -6382,7 +7186,7 @@ class _RecoverySessionSheet extends StatelessWidget {
                   const SizedBox(height: 18),
 
                   // ── Today's adaptations ─────────────────────────
-                  _SheetSection(label: "TODAY'S ADAPTATIONS"),
+                  const _SheetSection(label: "TODAY'S ADAPTATIONS"),
                   const SizedBox(height: 8),
                   _AdaptationRow(
                     icon:  Icons.flash_on_rounded,
@@ -6394,16 +7198,16 @@ class _RecoverySessionSheet extends StatelessWidget {
                   const SizedBox(height: 6),
                   _AdaptationRow(
                     icon:  Icons.layers_rounded,
-                    color: AppColors.blue,
+                    color: AppColors.goldSoft,
                     label: 'Volume',
                     value: s.volumeLabel,
                     note:  'of your planned sets',
                   ),
                   if (s.simplifyWorkout) ...[
                     const SizedBox(height: 6),
-                    _AdaptationRow(
+                    const _AdaptationRow(
                       icon:  Icons.view_agenda_outlined,
-                      color: AppColors.purple,
+                      color: AppColors.textSecondary,
                       label: 'Exercises',
                       value: 'Reduced',
                       note:  'fewer exercises, higher quality',
@@ -6411,9 +7215,9 @@ class _RecoverySessionSheet extends StatelessWidget {
                   ],
                   if (s.reduceAxialLoading) ...[
                     const SizedBox(height: 6),
-                    _AdaptationRow(
+                    const _AdaptationRow(
                       icon:  Icons.vertical_align_center_rounded,
-                      color: AppColors.yellow,
+                      color: AppColors.textMuted,
                       label: 'Loading',
                       value: 'Lighter spine',
                       note:  'axial load reduced today',
@@ -6423,7 +7227,7 @@ class _RecoverySessionSheet extends StatelessWidget {
                   // ── Avoid ────────────────────────────────────────
                   if (s.avoidedExercises.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    _SheetSection(label: 'AVOID TODAY'),
+                    const _SheetSection(label: 'AVOID TODAY'),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6, runSpacing: 6,
@@ -6435,12 +7239,12 @@ class _RecoverySessionSheet extends StatelessWidget {
                   // ── Suggested alternatives ───────────────────────
                   if (s.replacementExercises.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    _SheetSection(label: 'SUGGESTED INSTEAD'),
+                    const _SheetSection(label: 'SUGGESTED INSTEAD'),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6, runSpacing: 6,
                       children: s.replacementExercises.map((e) =>
-                          _ExerciseTag(name: e, color: AppColors.green)).toList(),
+                          _ExerciseTag(name: e, color: AppColors.gold)).toList(),
                     ),
                   ],
 
@@ -6800,10 +7604,64 @@ class _GhostTag extends StatelessWidget {
       ),
       child: Text(
         label,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.ellipsis,
         style: GoogleFonts.inter(
           color: color,
           fontSize: 9,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════
+// RIR CHIP — tap cycles null → 5 → 4 → 3 → 2 → 1 → 0 → null
+// First tap ever shows the RIR hint dialog before cycling.
+// ════════════════════════════════════════════════
+class _RirChip extends StatelessWidget {
+  final int? rir;
+  final VoidCallback onTap;
+  const _RirChip({required this.rir, required this.onTap});
+
+  Color get _color {
+    if (rir == null) return AppColors.textMuted;
+    if (rir! <= 1)   return const Color(0xFFE57373);
+    if (rir! <= 2)   return const Color(0xFFFFB74D);
+    return AppColors.gold;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final logged = rir != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 26,
+        decoration: BoxDecoration(
+          color: logged
+              ? _color.withValues(alpha: 0.10)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: logged
+                ? _color.withValues(alpha: 0.35)
+                : AppColors.borderMedium,
+            width: 0.7,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            logged ? '$rir' : '—',
+            style: GoogleFonts.rajdhani(
+              color: logged ? _color : AppColors.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
     );
@@ -6963,10 +7821,10 @@ class _WorkoutShareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recoveryColor = recovery >= 80
-        ? AppColors.green
+        ? AppColors.gold
         : recovery >= 50
-            ? AppColors.orange
-            : AppColors.red;
+            ? AppColors.goldSoft
+            : AppColors.textSecondary;
 
     return Container(
       width: double.infinity,
@@ -7007,12 +7865,12 @@ class _WorkoutShareCard extends StatelessWidget {
           // ── Stats row ──────────────────────────────
           Row(children: [
             _ShareStat('$exCount', 'exercises'),
-            _ShareStatDivider(),
+            const _ShareStatDivider(),
             _ShareStat('$setCount', 'sets'),
-            _ShareStatDivider(),
+            const _ShareStatDivider(),
             _ShareStat('${duration}m', 'duration'),
             if (volumeKg > 0) ...[
-              _ShareStatDivider(),
+              const _ShareStatDivider(),
               _ShareStat(
                 volumeKg >= 1000
                     ? '${(volumeKg / 1000).toStringAsFixed(1)}t'

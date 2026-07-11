@@ -10,6 +10,7 @@ import '../../models/workout_log.dart';
 import '../../providers/app_provider.dart';
 import '../../services/exercise_video_service.dart';
 import '../../utils/app_constants.dart';
+import '../../utils/app_routes.dart';
 import '../../utils/exercise_icon_mapper.dart';
 import '../../utils/haptics.dart';
 import '../home/muscle_overlay_painter.dart';
@@ -108,6 +109,34 @@ class ExerciseDemoButton extends StatelessWidget {
       ),
     );
   }
+
+  /// Compact static entry-point for picker-list tiles.
+  static void openFor(BuildContext context, String name) {
+    List<String> ids = [];
+    for (final ex in ExerciseData.list) {
+      if ((ex['name'] as String?)?.toLowerCase() == name.toLowerCase()) {
+        final list = ex['youtubeIds'];
+        if (list is List && list.isNotEmpty) { ids = list.cast<String>(); break; }
+        final single = ex['youtubeId'];
+        if (single is String && single.isNotEmpty) { ids = [single]; break; }
+      }
+    }
+    if (ids.isEmpty) {
+      final fb = ExerciseVideos.getVideoId(name);
+      if (fb != null) ids = [fb];
+    }
+    if (ids.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _VideoPickerSheet(
+        videoSet: ExerciseVideoService.find(name),
+        fallbackIds: ids,
+        exerciseName: name,
+      ),
+    );
+  }
 }
 
 class _VideoPickerSheet extends StatelessWidget {
@@ -124,15 +153,12 @@ class _VideoPickerSheet extends StatelessWidget {
   void _open(BuildContext context, String videoId, String trainer, String title) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => _InAppPlayerScreen(
-          videoId: videoId,
-          trainer: trainer,
-          title: title,
-          exerciseName: exerciseName,
-        ),
-      ),
+      slideUpRoute(_InAppPlayerScreen(
+        videoId: videoId,
+        trainer: trainer,
+        title: title,
+        exerciseName: exerciseName,
+      )),
     );
   }
 
@@ -212,17 +238,6 @@ class _VideoPickerSheet extends StatelessWidget {
                     badgeColor: const Color(0xFFD4AF37),
                     isPremium: true,
                   ),
-                if (videoSet!.hindi != null) ...[
-                  const SizedBox(height: 10),
-                  _trainerCard(
-                    context: context,
-                    video: videoSet!.hindi!,
-                    flag: '🇮🇳',
-                    badge: 'HI',
-                    badgeColor: const Color(0xFFFF6B35),
-                    isPremium: false,
-                  ),
-                ],
               ] else if (fallbackIds.isNotEmpty)
                 _fallbackCard(context, fallbackIds.first)
               else
@@ -354,6 +369,7 @@ class _VideoPickerSheet extends StatelessWidget {
   }
 
   Widget _fallbackCard(BuildContext context, String videoId) {
+    final thumbUrl = 'https://img.youtube.com/vi/$videoId/hqdefault.jpg';
     return InkWell(
       onTap: () {
         Navigator.pop(context);
@@ -361,25 +377,74 @@ class _VideoPickerSheet extends StatelessWidget {
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderMedium, width: 1.2),
-        ),
-        child: Row(children: [
-          const Icon(Icons.play_circle_outline, color: Color(0xFFFF0000), size: 36),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text('Open on YouTube',
-                style: GoogleFonts.rajdhani(
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                )),
+          border: Border.all(
+            color: const Color(0xFFD4AF37).withValues(alpha: 0.35),
+            width: 1.2,
           ),
-          const Icon(Icons.open_in_new, color: Color(0xFFD4AF37), size: 20),
-        ]),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // YouTube thumbnail banner
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Image.network(
+                    thumbUrl,
+                    width: double.infinity,
+                    height: 180,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 180,
+                      color: const Color(0xFF1A1A1A),
+                      child: const Center(
+                        child: Icon(Icons.play_circle_outline,
+                            color: Color(0xFFFF0000), size: 52),
+                      ),
+                    ),
+                  ),
+                  // Play button overlay
+                  Container(
+                    width: 52, height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.play_arrow_rounded,
+                        color: Colors.white, size: 30),
+                  ),
+                ],
+              ),
+            ),
+            // Bottom row
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+              child: Row(children: [
+                const Icon(Icons.play_circle_filled,
+                    color: Color(0xFFFF0000), size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(exerciseName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.rajdhani(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      )),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.open_in_new,
+                    color: Color(0xFFD4AF37), size: 18),
+              ]),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -429,24 +494,30 @@ class _InAppPlayerScreenState extends State<_InAppPlayerScreen> {
               "document.body.innerText.includes('configuration error')"
             );
             if (result.toString() == 'true') {
-              if (mounted) setState(() {
+              if (mounted) {
+                setState(() {
                 _hasError = true;
                 _loading = false;
               });
+              }
               await Future.delayed(const Duration(milliseconds: 800));
               if (mounted) _openInYouTube();
             } else {
               // Video is OK - reveal WebView
-              if (mounted) setState(() {
+              if (mounted) {
+                setState(() {
                 _videoVerified = true;
                 _loading = false;
               });
+              }
             }
           } catch (_) {
-            if (mounted) setState(() {
+            if (mounted) {
+              setState(() {
               _videoVerified = true;
               _loading = false;
             });
+            }
           }
         },
         onWebResourceError: (err) {
@@ -885,38 +956,50 @@ class _ExercisePreviewSheetState extends State<ExercisePreviewSheet>
   List<String> get _cues {
     final m = _muscle;
     final eq = _equipment;
-    if (m == 'Chest') return [
+    if (m == 'Chest') {
+      return [
       'Retract scapulae and maintain arch — protect your rotator cuffs',
       'Lower the bar with control; touch sternum not neck',
       'Drive feet into floor and press bar in a slight arc',
     ];
-    if (m == 'Back') return [
+    }
+    if (m == 'Back') {
+      return [
       'Initiate the pull with elbow drive, not biceps',
       'Keep chest tall and avoid rounding the lower back',
       'Full stretch at the bottom; full contraction at the top',
     ];
-    if (m == 'Legs') return [
+    }
+    if (m == 'Legs') {
+      return [
       'Brace core before descent — treat it like a plank',
       'Track knees over toes; don\'t let them cave inward',
       'Drive through the whole foot, not just the heel',
     ];
-    if (m == 'Shoulders') return [
+    }
+    if (m == 'Shoulders') {
+      return [
       'Press in a straight line overhead — not forward',
       'Keep ribs down; avoid excessive lumbar extension',
       'Slow the eccentric — shoulders are injury prone',
     ];
-    if (m == 'Arms') return [
+    }
+    if (m == 'Arms') {
+      return [
       eq == 'cable'
           ? 'Keep upper arm fixed; only the forearm moves'
           : 'Squeeze at peak contraction — 1-second pause',
       'Control the negative; don\'t let gravity do the work',
       'Full range of motion beats partial reps every time',
     ];
-    if (m == 'Core') return [
+    }
+    if (m == 'Core') {
+      return [
       'Exhale on the exertion phase to engage deep core',
       'Neutral spine — don\'t pull on your neck',
       'Slow and controlled beats fast and sloppy',
     ];
+    }
     return [
       'Focus on the target muscle with each rep',
       'Control the eccentric phase (lower slowly)',
@@ -988,7 +1071,7 @@ class _ExercisePreviewSheetState extends State<ExercisePreviewSheet>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('✅ $_name added!',
           style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-      backgroundColor: AppColors.green,
+      backgroundColor: AppColors.gold,
       behavior: SnackBarBehavior.floating,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

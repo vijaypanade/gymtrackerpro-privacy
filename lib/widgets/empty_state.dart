@@ -184,7 +184,7 @@ class EmptyProgress extends StatelessWidget {
       emoji: '📈',
       title: 'No Progress Data Yet',
       subtitle: 'Log your first workout and watch\nyour strength curve climb.',
-      accentColor: AppColors.blue,
+      accentColor: AppColors.goldSoft,
       ctaLabel: onStart != null ? '🏋️ Start First Workout' : null,
       onCta: onStart,
     )),
@@ -202,7 +202,7 @@ class EmptyHistory extends StatelessWidget {
       emoji: '🗓️',
       title: 'History Starts Today',
       subtitle: 'Complete your first session and\nthis page comes alive.',
-      accentColor: AppColors.purple,
+      accentColor: AppColors.textSecondary,
       ctaLabel: onPlan != null ? '📋 Go to Planner' : null,
       onCta: onPlan,
     )),
@@ -216,11 +216,11 @@ class EmptyTodayWorkout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => EmptyState(
-    emoji: '🤖',
+    emoji: '💪',
     title: 'No Workout Today',
-    subtitle: 'Let AI build the perfect plan\nfor your goal in seconds.',
+    subtitle: 'Start with a plan built around your goal.',
     accentColor: AppColors.gold,
-    ctaLabel: onGenerate != null ? '⚡ Generate with AI' : null,
+    ctaLabel: onGenerate != null ? 'Generate Plan' : null,
     onCta: onGenerate,
     compact: true,
   );
@@ -231,7 +231,7 @@ class EmptyMissions extends StatelessWidget {
   const EmptyMissions({super.key});
 
   @override
-  Widget build(BuildContext context) => EmptyState(
+  Widget build(BuildContext context) => const EmptyState(
     emoji: '🎯',
     title: 'No Active Missions',
     subtitle: 'Complete workouts to unlock\ndaily missions and bonus XP.',

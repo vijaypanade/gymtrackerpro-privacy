@@ -13,6 +13,11 @@ class RestTimerService extends ChangeNotifier {
   int _remaining = 0;
   bool _active = false;
 
+  // Wall-clock anchor. Dart timers are suspended while the screen is locked,
+  // so remaining time is always derived from this timestamp — never from
+  // counting ticks. After unlock, the next tick recomputes the true value.
+  DateTime? _endAt;
+
   // Up-next context — set by WorkoutProvider before start()
   String? _nextName;
   String? _nextContext; // e.g. "4 × 10 · 62.5kg"
@@ -47,29 +52,35 @@ class RestTimerService extends ChangeNotifier {
   }
 
   void start({int seconds = 90}) {
-    debugPrint('⏱️ RestTimer.start called - resetting to \$seconds sec');
+    debugPrint('⏱️ RestTimer.start called - resetting to $seconds sec');
     _timer?.cancel();
     _totalSeconds = seconds;
     _remaining = seconds;
+    _endAt = DateTime.now().add(Duration(seconds: seconds));
     _active = true;
     notifyListeners();
 
     final vc = VoiceCoachService();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      _remaining--;
+      final prev = _remaining;
+      final leftMs = _endAt!.difference(DateTime.now()).inMilliseconds;
+      _remaining = leftMs <= 0 ? 0 : (leftMs / 1000).ceil();
+      if (_remaining == prev) return;
       notifyListeners();
 
-      // Voice cues at key milestones (fire-and-forget; no await in timer)
+      // Voice cues fire on threshold crossings, not exact values — after a
+      // screen unlock the remaining time can jump by minutes in one tick.
+      // Cues are skipped when the jump lands past them (no stale countdown).
 
       // Long-rest accountability cue
-      if (_totalSeconds >= 75 && _remaining == 20) {
+      if (_totalSeconds >= 75 && prev > 20 && _remaining <= 20 && _remaining > 10) {
         vc.restTooLong();
       }
 
-      if (_remaining == 10) {
+      if (prev > 10 && _remaining <= 10 && _remaining > 3) {
         vc.restCountdown(10);
-      } else if (_remaining == 3) {
+      } else if (prev > 3 && _remaining <= 3 && _remaining > 0) {
         vc.restCountdown(3);
       }
 
@@ -83,6 +94,7 @@ class RestTimerService extends ChangeNotifier {
     if (!_active) return;
     _remaining += seconds;
     _totalSeconds += seconds;
+    _endAt = _endAt?.add(Duration(seconds: seconds));
     notifyListeners();
   }
 
@@ -96,6 +108,7 @@ class RestTimerService extends ChangeNotifier {
     _timer = null;
     _active = false;
     _remaining = 0;
+    _endAt = null;
     _nextName = null;
     _nextContext = null;
     notifyListeners();

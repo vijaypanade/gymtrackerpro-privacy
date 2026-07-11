@@ -250,9 +250,4 @@ class UserProvider extends ChangeNotifier {
     );
   }
 
-  String get _todayStr {
-    final n = DateTime.now();
-    return '${n.year}-${n.month.toString().padLeft(2, '0')}-'
-           '${n.day.toString().padLeft(2, '0')}';
-  }
 }

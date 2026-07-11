@@ -18,10 +18,10 @@ const _kExercises = <String, List<String>>{
 };
 
 String _intensityLabel(double score) {
-  if (score >= 80) return 'High Intensity — Push your limits today';
-  if (score >= 60) return 'Moderate — Focus on quality reps & form';
-  if (score >= 40) return 'Low Intensity — Light sets, prioritize technique';
-  return 'Active Recovery — Stretching & mobility only';
+  if (score >= 80) return 'Ready for heavy work';
+  if (score >= 60) return 'Moderate — keep reps clean';
+  if (score >= 40) return 'Light sets today';
+  return 'Rest or easy stretching';
 }
 
 class RecoveryBottomSheet {

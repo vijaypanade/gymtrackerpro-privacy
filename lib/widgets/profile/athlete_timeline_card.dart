@@ -94,14 +94,10 @@ class _AthleteTimelineBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.18),
-          width: 0.5,
-        ),
+        color: const Color(0xFF0F0F0F),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(color: const Color(0xFF242424), width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,50 +183,70 @@ class _StatRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          _StatCell(
-            value: '${data.totalWorkouts}',
-            label: 'Sessions',
-            color: AppColors.gold,
-          ),
-          _StatCell(
-            value: '${data.longestStreak}d',
-            label: 'Peak Streak',
-            color: AppColors.orange,
-          ),
-          _StatCell(
-            value: '${data.totalPRs}',
-            label: 'Lifetime PRs',
-            color: AppColors.green,
-          ),
-          _StatCell(
-            value: '${data.milestones.length}',
-            label: 'Milestones',
-            color: AppColors.purple,
-          ),
+          _StatCell(value: '${data.totalWorkouts}',     label: 'Sessions',     delayMs: 0),
+          _StatCell(value: '${data.longestStreak}d',   label: 'Peak Streak',  delayMs: 100),
+          _StatCell(value: '${data.totalPRs}',         label: 'Lifetime PRs', delayMs: 200),
+          _StatCell(value: '${data.milestones.length}', label: 'Milestones',  delayMs: 300),
         ],
       ),
     );
   }
 }
 
-class _StatCell extends StatelessWidget {
+class _StatCell extends StatefulWidget {
   final String value;
   final String label;
-  final Color  color;
-  const _StatCell({required this.value, required this.label, required this.color});
+  final int    delayMs;
+  const _StatCell({required this.value, required this.label, this.delayMs = 0});
+  @override State<_StatCell> createState() => _StatCellState();
+}
+
+class _StatCellState extends State<_StatCell>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double>   _anim;
+
+  // Extract leading integer from value strings like "47", "12d", "3".
+  // Suffix (e.g. "d") is preserved in display.
+  static (int, String) _parse(String v) {
+    final match = RegExp(r'^(\d+)(.*)$').firstMatch(v);
+    if (match == null) return (0, v);
+    return (int.parse(match.group(1)!), match.group(2)!);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700));
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    Future.delayed(Duration(milliseconds: widget.delayMs), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override void dispose() { _ctrl.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
+    final (target, suffix) = _parse(widget.value);
     return Expanded(
-      child: Column(
-        children: [
-          Text(value, style: AppTextStyles.h3.copyWith(color: color)),
-          Text(
-            label,
-            style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-            textAlign: TextAlign.center,
-          ),
-        ],
+      child: AnimatedBuilder(
+        animation: _anim,
+        builder: (_, __) {
+          final shown = (target * _anim.value).round();
+          return Column(
+            children: [
+              Text('$shown$suffix',
+                  style: AppTextStyles.h3.copyWith(color: AppColors.textPrimary)),
+              const SizedBox(height: 2),
+              Text(widget.label,
+                  style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textMuted.withValues(alpha: 0.55)),
+                  textAlign: TextAlign.center),
+            ],
+          );
+        },
       ),
     );
   }
@@ -301,11 +317,11 @@ class _EventList extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   static const _locked = [
-    ('\u{1F4AA}', 'First Workout',   'Log your first session'),
-    ('\u{1F525}', 'First Streak',    '3 sessions in a row'),
-    ('\u{1F3C6}', 'First PR',        'Beat your best weight or reps'),
-    ('\u{1F4C5}', '7-Day Streak',    'Train 7 days in a row'),
-    ('\u{1F4AF}', '50 Workouts',     'Reach 50 logged sessions'),
+    (Icons.fitness_center_rounded,    'First Workout',   'Log your first session'),
+    (Icons.local_fire_department_outlined, 'First Streak', '3 sessions in a row'),
+    (Icons.emoji_events_outlined,     'First PR',        'Beat your best weight or reps'),
+    (Icons.calendar_today_outlined,   '7-Day Streak',    'Train 7 days in a row'),
+    (Icons.bar_chart_rounded,         '50 Workouts',     'Reach 50 logged sessions'),
   ];
 
   @override
@@ -318,7 +334,7 @@ class _EmptyState extends StatelessWidget {
           // Story start prompt
           Row(
             children: [
-              const Text('\u{1F3C1}', style: TextStyle(fontSize: 24)),
+              const Icon(Icons.flag_outlined, size: 24, color: AppColors.goldSoft),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -352,47 +368,50 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           ..._locked.map(
-            (m) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.textMuted.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.textMuted.withValues(alpha: 0.12),
-                        width: 0.5,
+            (m) => Opacity(
+              opacity: 0.55,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.textMuted.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.textMuted.withValues(alpha: 0.08),
+                          width: 0.3,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(m.$1, size: 14, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            m.$2,
+                            style: AppTextStyles.label.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            m.$3,
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    alignment: Alignment.center,
-                    child: Text(m.$1, style: const TextStyle(fontSize: 16)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          m.$2,
-                          style: AppTextStyles.label.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        Text(
-                          m.$3,
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.lock_outline_rounded,
-                      size: 14, color: AppColors.textMuted),
-                ],
+                    const Icon(Icons.lock_outline_rounded,
+                        size: 12, color: AppColors.textMuted),
+                  ],
+                ),
               ),
             ),
           ),

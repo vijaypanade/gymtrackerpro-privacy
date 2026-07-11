@@ -9,13 +9,18 @@ class ExSet {
   int reps;
   double weight;
   bool done;
-  ExSet({required this.id, this.reps = 0, this.weight = 0.0, this.done = false});
-  Map<String, dynamic> toJson() => {'id': id, 'reps': reps, 'weight': weight, 'done': done};
+  int? rir; // Reps In Reserve: 0 (failure) – 5 (very easy). null = not logged.
+  ExSet({required this.id, this.reps = 0, this.weight = 0.0, this.done = false, this.rir});
+  Map<String, dynamic> toJson() => {
+    'id': id, 'reps': reps, 'weight': weight, 'done': done,
+    if (rir != null) 'rir': rir,
+  };
   factory ExSet.fromJson(Map<String, dynamic> j) => ExSet(
     id: j['id'] as String? ?? '',
     reps: j['reps'] as int? ?? 10,
     weight: (j['weight'] as num?)?.toDouble() ?? 20.0,
     done: j['done'] as bool? ?? false,
+    rir: j['rir'] as int?,
   );
 }
 
@@ -166,7 +171,7 @@ class UserProfile {
   String state; // Indian state for local food preferences
 
   UserProfile({
-    this.name = 'Champion', this.age = 25, this.weightKg = 70.0, this.heightCm = 170.0,
+    this.name = 'Athlete', this.age = 25, this.weightKg = 70.0, this.heightCm = 170.0,
     this.goal = 'muscle_gain', this.level = 'beginner', this.gender = 'male',
     this.trainerType = 'friendly', this.activityLevel = 'Moderate',
     this.dietPreference = 'veg',
@@ -236,7 +241,7 @@ class UserProfile {
     if (rawGoal == 'Strength') rawGoal = 'strength';
     String rawLevel = (j['level'] as String? ?? 'beginner').toLowerCase();
     return UserProfile(
-      name: j['name'] as String? ?? 'Champion', age: j['age'] as int? ?? 25,
+      name: j['name'] as String? ?? 'Athlete', age: j['age'] as int? ?? 25,
       weightKg: (j['weightKg'] as num?)?.toDouble() ?? 70.0,
       heightCm: (j['heightCm'] as num?)?.toDouble() ?? 170.0,
       goal: rawGoal, level: rawLevel, gender: j['gender'] as String? ?? 'male',
@@ -449,7 +454,7 @@ class MissionGenerator {
         DailyMission(
           id: 'streak_${date.day}',
           title: '${streak + 1}-Day Streak',
-          description: 'Don\'t break the ${streak}-day chain!',
+          description: 'Don\'t break the $streak-day chain!',
           emoji: '🔥',
           xpReward: XPSystem.xpStreakBonus * (streak ~/ 3 + 1),
           type: MissionType.streak,

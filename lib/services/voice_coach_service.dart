@@ -19,7 +19,7 @@ class VoiceCoachService {
   String _language = 'en'; // 'en', 'hi', 'mr'
   double _volume = 1.0;
   double _speechRate = 0.44;
-  String _trainerPersonality = 'friendly';
+  final String _trainerPersonality = 'friendly';
 
 
   final Random _random = Random();
@@ -418,9 +418,9 @@ class VoiceCoachService {
   /// Workout complete celebration
   Future<void> workoutComplete(int xpEarned) async {
     final lines = {
-      'en': 'Workout complete! Plus $xpEarned XP. Great session!',
-      'hi': 'वर्कआउट पूरा! $xpEarned XP मिले। शानदार!',
-      'mr': 'वर्कआउट संपले! $xpEarned XP मिळाले. उत्तम!',
+      'en': 'Session complete. $xpEarned XP earned.',
+      'hi': 'सेशन पूरा। $xpEarned XP मिले।',
+      'mr': 'सेशन पूर्ण. $xpEarned XP मिळाले.',
     };
     await _speak(lines[_language] ?? lines['en']!);
   }

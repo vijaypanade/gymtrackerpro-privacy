@@ -315,8 +315,9 @@ class AnalyticsProvider extends ChangeNotifier {
 
     if (needsDeload) risk += 30;
 
-    if (overallRecovery < 40)      risk += 25;
-    else if (overallRecovery < 60) risk += 10;
+    if (overallRecovery < 40) {
+      risk += 25;
+    } else if (overallRecovery < 60) risk += 10;
 
     return risk.clamp(0, 95);
   }
@@ -396,14 +397,22 @@ class AnalyticsProvider extends ChangeNotifier {
     if (m.contains('shoulder')) return 'shoulders';
     if (m.contains('leg') || m.contains('glute') ||
         m.contains('hamstring') || m.contains('calf') ||
-        m.contains('quad')) return 'legs';
+        m.contains('quad')) {
+      return 'legs';
+    }
     if (m.contains('chest') || m.contains('pec')) return 'chest';
     if (m.contains('back') || m.contains('lat') ||
-        m.contains('row') || m.contains('deadlift')) return 'back';
+        m.contains('row') || m.contains('deadlift')) {
+      return 'back';
+    }
     if (m.contains('arm') || m.contains('bicep') ||
-        m.contains('tricep') || m.contains('curl')) return 'arms';
+        m.contains('tricep') || m.contains('curl')) {
+      return 'arms';
+    }
     if (m.contains('core') || m.contains('ab') ||
-        m.contains('plank') || m.contains('crunch')) return 'core';
+        m.contains('plank') || m.contains('crunch')) {
+      return 'core';
+    }
     return m.trim();
   }
 

@@ -5,7 +5,6 @@ import '../data/exercise_data.dart';
 import '../providers/favorites_provider.dart';
 import '../utils/app_constants.dart';
 import '../utils/exercise_icon_mapper.dart';
-import '../widgets/planner/planner_video_widgets.dart';
 
 class ExerciseLibraryScreen extends StatefulWidget {
   const ExerciseLibraryScreen({super.key});
@@ -304,10 +303,6 @@ class _ExerciseCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       _Tag(text: (exercise['equipment'] ?? '').toString()),
                     ],
-                  ),
-                  const SizedBox(height: 6),
-                  ExerciseDemoButton(
-                    exerciseName: (exercise['name'] ?? '').toString(),
                   ),
                 ],
               ),

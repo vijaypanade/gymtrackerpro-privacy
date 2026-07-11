@@ -6,11 +6,6 @@
       "Jeff Nippard",
       "Jeremy Ethier",
       "Athlean-X"
-    ],
-    "trainers_hindi": [
-      "Jeet Selal",
-      "Abhinav Mahajan",
-      "Guru Mann"
     ]
   },
   "bench_press": {
@@ -20,13 +15,6 @@
       "youtubeId": "vcBig73ojpE",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Jeet Selal",
-      "title": "7 FIX FOR STRENGTH",
-      "youtubeId": "p5cpmOxYnds",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "incline_bench_press": {
@@ -36,13 +24,6 @@
       "youtubeId": "jPLdzuHckI8",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Jeet Selal",
-      "title": "Inclined Bench Press Mistakes",
-      "youtubeId": "DLg7-VmM1xc",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "decline_bench_press": {
@@ -52,13 +33,6 @@
       "youtubeId": "LfyQBUKR8SE",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Jeet Selal",
-      "title": "decline bench press mistakes",
-      "youtubeId": "BMJJL7NENfY",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "dumbbell_bench_press": {
@@ -68,13 +42,6 @@
       "youtubeId": "QsYre__-aro",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Jeet Selal",
-      "title": "Dumbbell Bench Press",
-      "youtubeId": "g55fWNUi9PY",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "incline_dumbbell_press": {
@@ -84,13 +51,6 @@
       "youtubeId": "hChjZQhX1Ls",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Jeet Selal",
-      "title": "incline_dumbbell_press",
-      "youtubeId": "cEWkkajn0Bg",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "decline_dumbbell_press": {
@@ -100,13 +60,6 @@
       "youtubeId": "Pf1nDoqx_1A",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Jeet Selal",
-      "title": "Decline Dumbbell Press",
-      "youtubeId": "0uvDycOIej0",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "dumbbell_chest_fly": {
@@ -134,13 +87,6 @@
       "youtubeId": "Iwe6AmxVf7o",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Jeet Selal",
-      "title": "Chest Fly Machine",
-      "youtubeId": "S56ZxYRv55w",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "machine_chest_press": {
@@ -168,13 +114,6 @@
       "youtubeId": "IODxDxX7oi4",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Abhinav Mahajan",
-      "title": "Home Workout",
-      "youtubeId": "P_SZpxUx3xw",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "dips": {
@@ -577,7 +516,7 @@
     "english": {
       "trainer": "bodybuilding.com",
       "title": "Hack Squat",
-      "youtubeId": "0tn5K9NlCfo",
+      "youtubeId": "0tn5K9LcKW9fo",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
     }
@@ -1088,7 +1027,7 @@
   },
   "spider_curl": {
     "english": {
-      "trainer": "Men’s Health",
+      "trainer": "Men's Health",
       "title": "Spider Curl",
       "youtubeId": "nvufDW-MSQk",
       "difficulty": "intermediate",
@@ -1115,7 +1054,7 @@
   },
   "skull_crusher": {
     "english": {
-      "trainer": "Men’s Health",
+      "trainer": "Men's Health",
       "title": "Skull Crusher",
       "youtubeId": "NIWKqcmpBug",
       "difficulty": "intermediate",
@@ -1246,13 +1185,6 @@
       "youtubeId": "jPLdzuHckI8",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Jeet Selal",
-      "title": "Inclined Bench Press Mistakes",
-      "youtubeId": "DLg7-VmM1xc",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "decline_barbell_press": {
@@ -1262,13 +1194,6 @@
       "youtubeId": "LfyQBUKR8SE",
       "difficulty": "intermediate",
       "why_selected": "Premium curated form video"
-    },
-    "hindi": {
-      "trainer": "Jeet Selal",
-      "title": "decline bench press mistakes",
-      "youtubeId": "BMJJL7NENfY",
-      "difficulty": "beginner",
-      "why_selected": "Hindi tutorial"
     }
   },
   "bodyweight_lunges": {
@@ -1313,6 +1238,15 @@
       "title": "Tricep Dips",
       "youtubeId": "c3ZGl4pAwZ4",
       "difficulty": "intermediate",
+      "why_selected": "Premium curated form video"
+    }
+  },
+  "dumbbell_shrugs": {
+    "english": {
+      "trainer": "Buff Dudes Workouts",
+      "title": "Dumbbell Shrugs",
+      "youtubeId": "qvvJUKq7_sU",
+      "difficulty": "beginner",
       "why_selected": "Premium curated form video"
     }
   }

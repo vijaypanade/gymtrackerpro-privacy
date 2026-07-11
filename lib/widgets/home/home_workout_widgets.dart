@@ -465,10 +465,10 @@ class _CompletedSummaryCard extends StatelessWidget {
             ],
           )),
           const SizedBox(width: AppSpacing.sm),
-          Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(Icons.edit_rounded, color: AppColors.textMuted, size: 14),
-            const SizedBox(height: 2),
-            const Text('Edit', style: TextStyle(fontFamily: 'Inter',
+          const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.edit_rounded, color: AppColors.textMuted, size: 14),
+            SizedBox(height: 2),
+            Text('Edit', style: TextStyle(fontFamily: 'Inter',
                 color: AppColors.textMuted, fontSize: 8.5,
                 fontWeight: FontWeight.w500)),
           ]),
@@ -586,16 +586,16 @@ class _WorkoutHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.green.withValues(alpha: 0.15),
+                  color: AppColors.gold.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   const Icon(Icons.check_circle_rounded,
-                      color: AppColors.green, size: 12),
+                      color: AppColors.gold, size: 12),
                   const SizedBox(width: 4),
                   Text('DONE',
                       style: GoogleFonts.rajdhani(
-                        color: AppColors.green,
+                        color: AppColors.gold,
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1,
@@ -758,12 +758,12 @@ class _ExerciseRow extends StatelessWidget {
             height: 32,
             decoration: BoxDecoration(
               color: done
-                  ? AppColors.green.withValues(alpha: 0.10)
+                  ? AppColors.gold.withValues(alpha: 0.10)
                   : const Color(0xFF141414),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: done
-                    ? AppColors.green.withValues(alpha: 0.20)
+                    ? AppColors.gold.withValues(alpha: 0.20)
                     : AppColors.borderSoft,
                 width: 0.5,
               ),
@@ -772,7 +772,7 @@ class _ExerciseRow extends StatelessWidget {
               Icons.fitness_center_rounded,
               size: 14,
               color: done
-                  ? AppColors.green.withValues(alpha: 0.65)
+                  ? AppColors.gold.withValues(alpha: 0.65)
                   : AppColors.textMuted,
             ),
           ),
@@ -805,7 +805,7 @@ class _ExerciseRow extends StatelessWidget {
                 ? Icons.check_circle_rounded
                 : Icons.radio_button_unchecked_rounded,
             size: 14,
-            color: done ? AppColors.green : AppColors.borderMedium,
+            color: done ? AppColors.gold : AppColors.borderMedium,
           ),
         ],
       ),
@@ -813,41 +813,3 @@ class _ExerciseRow extends StatelessWidget {
   }
 }
 
-class _CompletedBanner extends StatelessWidget {
-  const _CompletedBanner();
-
-  static const _text = TextStyle(
-    fontFamily: 'Inter',
-    color: AppColors.gold,
-    fontSize: 12,
-    fontWeight: FontWeight.w700,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [
-          AppColors.gold.withValues(alpha: 0.14),
-          AppColors.gold.withValues(alpha: 0.05),
-        ]),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.3),
-          width: 0.8,
-        ),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.check_circle_rounded,
-              color: AppColors.gold, size: 15),
-          SizedBox(width: 6),
-          Text('Session complete — outstanding work.', style: _text),
-        ],
-      ),
-    );
-  }
-}

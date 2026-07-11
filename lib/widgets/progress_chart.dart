@@ -64,7 +64,7 @@ class ProgressChart extends StatelessWidget {
       ),
       child: LineChart(
         LineChartData(
-          clipData: FlClipData.none(),
+          clipData: const FlClipData.none(),
           minX: 0,
           maxX: spots.length > 1 ? spots.length - 1 : 1,
           minY: 0,
@@ -139,8 +139,8 @@ class ProgressChart extends StatelessWidget {
               ),
             ),
 
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles:   AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
 
           borderData: FlBorderData(show: false),

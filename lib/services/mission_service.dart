@@ -58,7 +58,7 @@ class MissionService {
 
     // ── Beginner phase → 3 quality sets ───────────────────
     if (identity.isEarlyPhase) {
-      return CoachMission(
+      return const CoachMission(
         title:       'Complete 3 quality sets.',
         description: 'Focus on form over load. Nervous system adaptation is the goal right now.',
         type:        CoachMissionType.consistency,

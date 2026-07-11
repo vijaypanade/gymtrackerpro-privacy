@@ -90,7 +90,7 @@ const _kPlans = [
 ];
 
 const _kFeatures = [
-  (Icons.all_inclusive_rounded,     'Unlimited AI Coaching',       'Daily limit removed'),
+  (Icons.all_inclusive_rounded,     'Unlimited Coaching',          'Daily limit removed'),
   (Icons.fitness_center_rounded,    'Advanced Workout Plans',      'Periodized & adaptive'),
   (Icons.monitor_heart_rounded,     'Recovery Intelligence',       'Deep fatigue analysis'),
   (Icons.trending_up_rounded,       'Performance Analytics',       'Advanced stats & insights'),
@@ -186,7 +186,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Purchase failed. Please try again.'),
             backgroundColor: AppColors.bgElevated,
           ),
@@ -343,7 +343,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
               // Headline
               Center(
                 child: Text(
-                  'Unlimited AI Coaching',
+                  'Train Without Limits',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.rajdhani(
                     color: AppColors.textPrimary,
@@ -396,8 +396,8 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'You\'ve reached today\'s AI limit. '
-                'Premium removes all caps — unlimited coaching, every day.',
+                'You\'ve used today\'s plan limit. '
+                'Go Premium for unlimited coaching, every day.',
                 style: GoogleFonts.inter(
                   color: AppColors.goldSoft,
                   fontSize: 13,
@@ -653,7 +653,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
       child: Column(
         children: [
           // Divider
-          Divider(color: AppColors.divider, height: 1),
+          const Divider(color: AppColors.divider, height: 1),
           const SizedBox(height: 16),
 
           // Restore + links row
@@ -770,7 +770,7 @@ class _HeroPlanCard extends StatelessWidget {
                   Text(
                     plan.savings!,
                     style: GoogleFonts.inter(
-                      color: AppColors.green,
+                      color: AppColors.gold,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -908,7 +908,7 @@ class _SidePlanCard extends StatelessWidget {
                 child: Text(
                   plan.savings!,
                   style: GoogleFonts.inter(
-                    color: AppColors.green,
+                    color: AppColors.gold,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1056,10 +1056,10 @@ class _HeaderGlowPainter extends CustomPainter {
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
       Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(0, -0.6),
+        ..shader = const RadialGradient(
+          center: Alignment(0, -0.6),
           radius: 1.2,
-          colors: const [
+          colors: [
             Color(0x22D4AF37),
             Color(0x10D4AF37),
             Color(0x00D4AF37),

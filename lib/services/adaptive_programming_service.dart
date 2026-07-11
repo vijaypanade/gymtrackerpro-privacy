@@ -234,7 +234,7 @@ List<_SwapRule> _buildSwapRules() => [
 class AdaptiveProgrammingService {
   AdaptiveProgrammingService._();
 
-  static late final List<_SwapRule> _kSwapRules = _buildSwapRules();
+  static final List<_SwapRule> _kSwapRules = _buildSwapRules();
 
   static AdaptiveWorkoutDecision compute(AdaptiveInput i) {
     if (i.totalWorkouts < 3) return AdaptiveWorkoutDecision.baseline;

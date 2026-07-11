@@ -1,85 +1,95 @@
 // lib/services/meal_log_service.dart
-// ════════════════════════════════════════════════
-// Firestore schema:
-//   /meal_logs/{uid}/days/{YYYY-MM-DD}
-//     logged_meals: {
-//       "1_Breakfast": { meal_type, plan_day, foods, kcal, ... },
-//       "1_Lunch":     { ... },
-//     }
-// ════════════════════════════════════════════════
+// Local-only meal log — stored in SharedPreferences as JSON.
+// Key: "meal_log_YYYY-MM-DD"  →  Map<firestoreKey, entryJson>
 
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/meal_log_model.dart';
 
 class MealLogService {
-  static final _db = FirebaseFirestore.instance;
-
   static String _dateKey(DateTime dt) =>
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-'
       '${dt.day.toString().padLeft(2, '0')}';
 
-  static DocumentReference _ref(String uid, [DateTime? dt]) => _db
-      .collection('meal_logs')
-      .doc(uid)
-      .collection('days')
-      .doc(_dateKey(dt ?? DateTime.now()));
+  static String _prefKey(DateTime dt) => 'meal_log_${_dateKey(dt)}';
 
   // ── Write ──────────────────────────────────────────────────
   static Future<void> logMeal(String uid, MealLogEntry entry) async {
-    await _ref(uid).set({
-      'date':         _dateKey(DateTime.now()),
-      'logged_meals': {entry.firestoreKey: entry.toJson()},
-      'last_updated': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key   = _prefKey(DateTime.now());
+      final raw   = prefs.getString(key);
+      final map   = raw != null
+          ? Map<String, dynamic>.from(json.decode(raw) as Map)
+          : <String, dynamic>{};
+      map[entry.firestoreKey] = entry.toJson();
+      await prefs.setString(key, json.encode(map));
+    } catch (e) {
+      debugPrint('MealLogService.logMeal error: $e');
+    }
   }
 
   static Future<void> unlogMeal(String uid, MealLogEntry entry) async {
-    await _ref(uid).update({
-      'logged_meals.${entry.firestoreKey}': FieldValue.delete(),
-      'last_updated': FieldValue.serverTimestamp(),
-    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key   = _prefKey(DateTime.now());
+      final raw   = prefs.getString(key);
+      if (raw == null) return;
+      final map = Map<String, dynamic>.from(json.decode(raw) as Map);
+      map.remove(entry.firestoreKey);
+      await prefs.setString(key, json.encode(map));
+    } catch (e) {
+      debugPrint('MealLogService.unlogMeal error: $e');
+    }
   }
 
-  // ── Read (one-shot, used on screen open) ───────────────────
+  // ── Read ───────────────────────────────────────────────────
   static Future<DayMealLog> getTodayLog(String uid) async {
-    final date = _dateKey(DateTime.now());
+    return getLogForDate(uid, DateTime.now());
+  }
+
+  static Future<DayMealLog> getLogForDate(String uid, DateTime dt) async {
+    final date = _dateKey(dt);
     try {
-      final snap = await _ref(uid).get();
-      return _parse(date, snap.data() as Map<String, dynamic>?);
+      final prefs = await SharedPreferences.getInstance();
+      final raw   = prefs.getString(_prefKey(dt));
+      return _parse(date, raw);
+    } catch (e) {
+      debugPrint('MealLogService.getLogForDate error: $e');
+      return DayMealLog(date: date, entries: {});
+    }
+  }
+
+  static DayMealLog _parse(String date, String? raw) {
+    if (raw == null) return DayMealLog(date: date, entries: {});
+    try {
+      final map     = Map<String, dynamic>.from(json.decode(raw) as Map);
+      final entries = <String, MealLogEntry>{};
+      for (final kv in map.entries) {
+        try {
+          entries[kv.key] =
+              MealLogEntry.fromJson(kv.value as Map<String, dynamic>);
+        } catch (_) {}
+      }
+      return DayMealLog(date: date, entries: entries);
     } catch (_) {
       return DayMealLog(date: date, entries: {});
     }
   }
 
-  // ── Parse helper ───────────────────────────────────────────
-  static DayMealLog _parse(String date, Map<String, dynamic>? data) {
-    if (data == null) return DayMealLog(date: date, entries: {});
-    final raw = data['logged_meals'] as Map<String, dynamic>? ?? {};
-    final entries = <String, MealLogEntry>{};
-    for (final kv in raw.entries) {
-      try {
-        final e = MealLogEntry.fromJson(kv.value as Map<String, dynamic>);
-        entries[kv.key] = e;
-      } catch (_) {}
-    }
-    return DayMealLog(date: date, entries: entries);
-  }
-
-  // ── Last N days (for pattern analysis — Phase 5) ───────────
+  // ── Last N days (for future analysis) ─────────────────────
   static Future<List<DayMealLog>> getRecentDays(String uid,
       {int days = 7}) async {
-    final logs = <DayMealLog>[];
-    final now  = DateTime.now();
+    final prefs  = await SharedPreferences.getInstance();
+    final now    = DateTime.now();
+    final result = <DayMealLog>[];
     for (int i = 0; i < days; i++) {
       final dt   = now.subtract(Duration(days: i));
       final date = _dateKey(dt);
-      try {
-        final snap = await _ref(uid, dt).get();
-        logs.add(_parse(date, snap.data() as Map<String, dynamic>?));
-      } catch (_) {
-        logs.add(DayMealLog(date: date, entries: {}));
-      }
+      final raw  = prefs.getString(_prefKey(dt));
+      result.add(_parse(date, raw));
     }
-    return logs;
+    return result;
   }
 }

@@ -55,9 +55,9 @@ class BrainCoachMessage {
 
   /// Safe onboarding state — 0 workouts, no history.
   static const BrainCoachMessage onboarding = BrainCoachMessage(
-    title:         'Welcome to LiftOn',
-    subtitle:      "Today's goal isn't intensity. Today's goal is showing up. "
-                   'Complete your first workout to activate your coach.',
+    title:         'Your Coach is Ready.',
+    subtitle:      'Complete one workout and your coach starts learning your body. '
+                   'Recovery, strength, and progress — all personalized to you.',
     primaryAction: 'Start First Workout',
     tone:          CoachMode.guide,
     intent:        CoachIntent.reinforceIdentity,

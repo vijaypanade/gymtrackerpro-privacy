@@ -98,28 +98,46 @@ class WorkoutClassifier {
         n.contains('pushdown') ||
         n.contains('skull') ||
         n.contains('kickback') ||
-        n.contains('extension')) return 'arms';
+        n.contains('extension')) {
+      return 'arms';
+    }
 
     if (n.contains('bench') || n.contains('chest') || n.contains('fly') ||
-        n.contains('pec')) return 'chest';
+        n.contains('pec')) {
+      return 'chest';
+    }
     if (n.contains('squat') || n.contains('leg press') ||
         n.contains('lunge') || n.contains('calf') ||
-        n.contains('hack squat') || n.contains('hip thrust')) return 'legs';
+        n.contains('hack squat') || n.contains('hip thrust')) {
+      return 'legs';
+    }
     if (n.contains('leg curl') || n.contains('hamstring') ||
-        n.contains('rdl') || n.contains('romanian')) return 'legs';
+        n.contains('rdl') || n.contains('romanian')) {
+      return 'legs';
+    }
     if (n.contains('pulldown') || n.contains('pull-up') ||
         n.contains('row') || n.contains('lat ') ||
-        n.contains('back')) return 'back';
+        n.contains('back')) {
+      return 'back';
+    }
     if (n.contains('shoulder') || n.contains('lateral') ||
         n.contains('arnold') || n.contains('overhead press') ||
-        n.contains('front raise')) return 'shoulders';
+        n.contains('front raise')) {
+      return 'shoulders';
+    }
     if (n.contains('curl') || n.contains('bicep') ||
-        n.contains('hammer')) return 'arms';
+        n.contains('hammer')) {
+      return 'arms';
+    }
     if (n.contains('tricep') || n.contains('pushdown') ||
         n.contains('skull') || n.contains('dip') ||
-        n.contains('kickback') || n.contains('extension')) return 'arms';
+        n.contains('kickback') || n.contains('extension')) {
+      return 'arms';
+    }
     if (n.contains('plank') || n.contains('crunch') ||
-        n.contains('ab') || n.contains('core')) return 'core';
+        n.contains('ab') || n.contains('core')) {
+      return 'core';
+    }
 
     return 'other';
   }
@@ -156,7 +174,6 @@ class RestDayPlan {
 
 class RestDayGenerator {
   RestDayGenerator._();
-  static final _rng = Random();
 
   static RestDayPlan generate({
     required int recoveryScore,
@@ -285,8 +302,9 @@ class AIEngine {
       final cVol = curr.weight * curr.reps;
       if (pVol > 0 && cVol < pVol * 0.85) score += 2;
       if (curr.date.difference(prev.date).inHours.abs() < 24) score += 1;
-      if (prev.exercise.split('_').first == curr.exercise.split('_').first)
+      if (prev.exercise.split('_').first == curr.exercise.split('_').first) {
         score += 1;
+      }
     }
     return score >= 4;
   }
@@ -312,13 +330,13 @@ class AIEngine {
     final last3  = history.reversed.take(3).toList();
     final splits = last3.map(_extractSplit).toList();
     if (splits.every((s) => s == splits.first) && splits.first != 'Rest') {
-      return '⚠️ ${splits.first} 3 days straight! Go lighter or you\'ll overtrain.';
+      return '${splits.first} three days in a row. A lighter day would fit well.';
     }
     if (history.length >= 5) {
       if (history.reversed
           .take(5)
           .every((w) => !w.toLowerCase().contains('rest'))) {
-        return '😴 5 straight days — take a recovery session today.';
+        return 'Five sessions in a row. Recovery today will help tomorrow.';
       }
     }
     return '';
@@ -700,7 +718,7 @@ class AIEngine {
             (e['movement'] as String? ?? '').toLowerCase() != 'compound').toList()
           ..shuffle(_rng);
         final safeOrdered = [...safeCompounds, ...safeIsolations];
-        final baseCount = 4;
+        const baseCount = 4;
         final count = (baseCount + _activityVolumeBonus(activityLevel)).clamp(3, 5);
         return safeOrdered.take(count).toList().asMap().entries
             .map((e) => _buildExerciseMap(e.value, goal, isBeginner, e.key,
@@ -1057,16 +1075,20 @@ class AIEngine {
   }) {
     if (logs != null && logs.isNotEmpty) {
       final last = logs.last;
-      if (last.reps >= 12) return _say(trainerType,
+      if (last.reps >= 12) {
+        return _say(trainerType,
         s: '📈 Strong last session. Increase load today.',
         m: '🪖 LAST SESSION DOMINANT. ADD WEIGHT.',
         h: '🔥 YOU CRUSHED LAST WORKOUT! LEVEL UP THE WEIGHT!!',
         f: '🔥 Great last session! Try adding weight today 💪');
-      if (last.reps <= 5 && last.weight > 0) return _say(trainerType,
+      }
+      if (last.reps <= 5 && last.weight > 0) {
+        return _say(trainerType,
         s: '⚠️ Heavy strain detected. Reduce load.',
         m: '🪖 TOO HEAVY. CONTROL THE LOAD.',
         h: '⚡ HEAVY LIFT ALERT! RESET AND COME BACK STRONGER!',
         f: '⚠️ That was heavy! Maybe slightly lighter today 😊');
+      }
     }
 
     if (logs != null && shouldDeload(logs: logs, currentStreak: streak)) {
@@ -1094,25 +1116,31 @@ class AIEngine {
     if (streak == 6)  return '🔥 ONE MORE DAY for a 7-day streak!';
     if (streak == 13) return '🚀 Day 14 tomorrow — Unstoppable badge RIGHT THERE!';
     if (streak == 29) return '⚔️ DAY 30 TOMORROW! Iron Will badge!';
-    if (streak > 0 && streak % 7 == 0) return '👑 ${streak}-day streak! Absolute machine!';
+    if (streak > 0 && streak % 7 == 0) return '👑 $streak-day streak! Absolute machine!';
 
-    if (lastWorkouts.isEmpty && streak == 0) return _say(trainerType,
+    if (lastWorkouts.isEmpty && streak == 0) {
+      return _say(trainerType,
       s: '😈 Day 1. Move.',
       m: '🪖 RECRUIT! First workout TODAY!',
       h: '⚡ TODAY is Day 1! LEGENDS start here!!',
       f: '💪 Welcome! Day 1 starts NOW!');
+    }
 
-    if (_countRest(lastWorkouts) >= 2) return _say(trainerType,
+    if (_countRest(lastWorkouts) >= 2) {
+      return _say(trainerType,
       s: '😈 Enough rest. Iron is waiting.',
       m: '🪖 MOVE IT! 3 rest days = regression.',
       h: '💥 REST IS OVER! Your muscles have been BEGGING for this!',
       f: 'Body\'s recharged — ready to crush it 💪');
+    }
 
-    if (weakMuscle.isNotEmpty) return _say(trainerType,
+    if (weakMuscle.isNotEmpty) {
+      return _say(trainerType,
       s: '🎯 ${_cap(weakMuscle)} lagging. Fix it today.',
       m: '🪖 WEAKNESS: ${_cap(weakMuscle)}. Eliminate.',
       h: '🎯 ${_cap(weakMuscle)} is your kryptonite — DESTROY IT!',
       f: '🎯 Focus on ${_cap(weakMuscle)} today for balance!');
+    }
 
     return _goalMessage(goal, _nextSplit(lastWorkouts), trainerType, streak);
   }
@@ -1127,16 +1155,20 @@ class AIEngine {
       final lastEx = logs.last.exercise;
       final trend  = getStrengthTrend(logs, lastEx);
       final name   = _cap(lastEx.split('_').first);
-      if (trend == 'improving') return _say(trainerType,
+      if (trend == 'improving') {
+        return _say(trainerType,
         s: '📈 $name trending up. Add load.',
         m: '📈 $name PROGRESSING. ADD WEIGHT.',
         h: '🔥 $name ON FIRE! HIT A PR TODAY!',
         f: '📈 $name getting stronger — keep the momentum!');
-      if (trend == 'declining') return _say(trainerType,
+      }
+      if (trend == 'declining') {
+        return _say(trainerType,
         s: '⚠️ $name declining. Reduce load 10%.',
         m: '⚠️ $name dropping. Rebuild the base.',
         h: '⚡ $name dipped — reset and come back STRONGER!',
         f: '⚠️ $name dipping — rest up and come back fresh 🌟');
+      }
     }
 
     if (shouldDeload(logs: logs, currentStreak: currentStreak)) {
@@ -1147,17 +1179,21 @@ class AIEngine {
         f: '😴 Deload week — recovery builds muscle 💡');
     }
 
-    if (mood == MoodType.energetic) return _say(trainerType,
+    if (mood == MoodType.energetic) {
+      return _say(trainerType,
       s: '🔥 High energy — PR attempt today.',
       m: '🪖 FULL POWER MODE! Attack every set!',
       h: '🔥 YOU\'RE FIRED UP!! HIT A PR!!',
       f: '🔥 Great energy — push harder today!');
+    }
 
-    if (mood == MoodType.tired) return _say(trainerType,
+    if (mood == MoodType.tired) {
+      return _say(trainerType,
       s: '😐 Tired — drop intensity 20%.',
       m: '🪖 LOW ENERGY. Discipline anyway.',
       h: '😴 The GREATS train when tired!',
       f: '😴 Keep it light — showing up IS the win 🌟');
+    }
 
     return _say(trainerType,
       s: '💪 Stay consistent. No shortcuts.',
@@ -1176,7 +1212,7 @@ class AIEngine {
     }
     if (streak >= 5) {
       return ['🔥 Don\'t break the streak!',
-              '👑 ${streak}-day streak. Protect it.'][_rng.nextInt(2)];
+              '👑 $streak-day streak. Protect it.'][_rng.nextInt(2)];
     }
     return ['💪 Show up. That\'s enough.',
             '⚡ Your future body is built today.'][_rng.nextInt(2)];
@@ -1301,7 +1337,11 @@ class AIEngine {
 
   static int _countRest(List<String> h) {
     int c = 0;
-    for (final w in h) { if (w.toLowerCase().contains('rest')) c++; else break; }
+    for (final w in h) { if (w.toLowerCase().contains('rest')) {
+      c++;
+    } else {
+      break;
+    } }
     return c;
   }
 

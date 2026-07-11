@@ -68,7 +68,7 @@ class ExerciseVideoService {
       final variants = [
         slug.replaceAll('s_', '_'), // pull_ups → pull_up
         slug.replaceAll('_press', ''), // bench_press → bench
-        slug + 's',
+        '${slug}s',
         slug.replaceAll('barbell_', ''),
         slug.replaceAll('dumbbell_', 'db_'),
       ];

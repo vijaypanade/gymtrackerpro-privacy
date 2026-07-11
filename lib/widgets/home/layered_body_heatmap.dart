@@ -17,7 +17,9 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import '../../data/exercise_data.dart';
 import '../../models/models.dart';
 import '../../utils/app_constants.dart';
 import 'ambient_scan_fx.dart';
@@ -104,6 +106,8 @@ class _LayeredBodyHeatmapState extends State<LayeredBodyHeatmap>
     final rec = _recoveryFor(key);
     if (rec != null) {
       MuscleCommandSheet.show(context, rec);
+    } else {
+      _NewUserMuscleSheet.show(context, key);
     }
 
     // Fade focus highlight after the sheet appears
@@ -123,8 +127,8 @@ class _LayeredBodyHeatmapState extends State<LayeredBodyHeatmap>
       mainAxisSize: MainAxisSize.min,
       children: [
         // ── FRONT / BACK labels — cinematic headspace ───────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 10),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(24, 16, 24, 10),
           child: Row(
             children: [
               Expanded(child: _ViewLabel('FRONT')),
@@ -142,7 +146,7 @@ class _LayeredBodyHeatmapState extends State<LayeredBodyHeatmap>
               const Positioned.fill(child: ColoredBox(color: Color(0xFF000000))),
 
               // Layer 1: Dual radial depth glow — gold core + green halo for 3D pop
-              Positioned.fill(
+              const Positioned.fill(
                 child: IgnorePointer(
                   child: CustomPaint(
                     painter: _DualRadialGlowPainter(),
@@ -175,9 +179,9 @@ class _LayeredBodyHeatmapState extends State<LayeredBodyHeatmap>
                   return Stack(
                     children: [
                       // Pulsing gold core between bodies
-                      Positioned.fill(
+                      const Positioned.fill(
                         child: IgnorePointer(
-                          child: const SizedBox.shrink(),
+                          child: SizedBox.shrink(),
                         ),
                       ),
 
@@ -395,6 +399,215 @@ class _DualRadialGlowPainter extends CustomPainter {
   bool shouldRepaint(_DualRadialGlowPainter old) => false;
 }
 
+// ── New-user muscle sheet ─────────────────────────────────────────────────────
+// Shown when a user taps a muscle group before logging any workouts.
+// No recovery data exists yet — this gives context and surface exercises.
+
+String _prettyMuscle(String key) {
+  const overrides = {
+    'chest': 'Chest',
+    'back': 'Back',
+    'shoulders': 'Shoulders',
+    'arms': 'Arms',
+    'legs': 'Legs',
+    'core': 'Core',
+    'glutes': 'Glutes',
+    'calves': 'Calves',
+    'forearms': 'Forearms',
+    'biceps': 'Biceps',
+    'triceps': 'Triceps',
+  };
+  return overrides[key.toLowerCase()] ??
+      key[0].toUpperCase() + key.substring(1);
+}
+
+List<Map<String, dynamic>> _exercisesFor(String key) {
+  final k = key.toLowerCase();
+  return ExerciseData.list
+      .where((e) {
+        final m = (e['muscle'] as String? ?? '').toLowerCase();
+        if (k == 'arms') return m == 'arms' || m == 'biceps' || m == 'triceps';
+        return m == k;
+      })
+      .take(3)
+      .toList();
+}
+
+class _NewUserMuscleSheet {
+  _NewUserMuscleSheet._();
+
+  static void show(BuildContext context, String muscleKey) {
+    final muscleName = _prettyMuscle(muscleKey);
+    final exercises  = _exercisesFor(muscleKey);
+
+    showModalBottomSheet(
+      context:            context,
+      isScrollControlled: true,
+      backgroundColor:    Colors.transparent,
+      builder: (_) => _NewUserSheetBody(
+        muscleName: muscleName,
+        exercises:  exercises,
+      ),
+    );
+  }
+}
+
+class _NewUserSheetBody extends StatelessWidget {
+  final String muscleName;
+  final List<Map<String, dynamic>> exercises;
+
+  const _NewUserSheetBody({
+    required this.muscleName,
+    required this.exercises,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end:   Alignment.bottomCenter,
+          colors: [Color(0xFF111111), Color(0xFF0A0A0A)],
+        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.14), width: 0.5),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SizedBox(height: 12),
+        Center(
+          child: Container(
+            width: 30, height: 3,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(2)),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 36),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+            // Header
+            Row(children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: [
+                    AppColors.gold.withValues(alpha: 0.18),
+                    AppColors.gold.withValues(alpha: 0.06),
+                  ]),
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.22), width: 0.6),
+                ),
+                child: const Icon(Icons.bolt_rounded,
+                    size: 20, color: AppColors.gold),
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(muscleName,
+                      style: GoogleFonts.rajdhani(
+                          color: AppColors.textPrimary, fontSize: 26,
+                          fontWeight: FontWeight.w800, height: 1.0)),
+                  const SizedBox(height: 3),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: AppColors.gold.withValues(alpha: 0.18), width: 0.5),
+                    ),
+                    child: Text('NO DATA YET',
+                        style: GoogleFonts.inter(
+                            color: AppColors.gold, fontSize: 9,
+                            fontWeight: FontWeight.w700, letterSpacing: 1.0)),
+                  ),
+                ],
+              )),
+            ]),
+            const SizedBox(height: 18),
+
+            // Info card
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.10), width: 0.7),
+              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(Icons.track_changes_rounded,
+                    size: 16, color: AppColors.goldAmber.withValues(alpha: 0.70)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Log your first $muscleName session to unlock recovery tracking, fatigue scores, and smart recommendations for this muscle.',
+                    style: GoogleFonts.inter(
+                        color: AppColors.textSecondary,
+                        fontSize: 12, fontWeight: FontWeight.w400, height: 1.55),
+                  ),
+                ),
+              ]),
+            ),
+
+            // Exercise suggestions (if any)
+            if (exercises.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Row(children: [
+                Text('START HERE',
+                    style: GoogleFonts.inter(
+                        color: AppColors.gold, fontSize: 9,
+                        fontWeight: FontWeight.w700, letterSpacing: 1.0)),
+                const SizedBox(width: 8),
+                Expanded(child: Container(height: 0.5, color: AppColors.gold.withValues(alpha: 0.15))),
+              ]),
+              const SizedBox(height: 10),
+              ...exercises.map((ex) {
+                final name     = ex['name']     as String? ?? '';
+                final movement = ex['movement'] as String? ?? '';
+                final reps     = ex['defaultReps'] as int? ?? 10;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111111),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.06), width: 0.7),
+                    ),
+                    child: Row(children: [
+                      Icon(
+                        movement == 'compound'
+                            ? Icons.fitness_center_rounded
+                            : Icons.bolt_rounded,
+                        size: 14, color: AppColors.gold.withValues(alpha: 0.60),),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(name,
+                          style: GoogleFonts.inter(
+                              color: AppColors.textPrimary,
+                              fontSize: 13, fontWeight: FontWeight.w500))),
+                      Text('$reps reps',
+                          style: GoogleFonts.rajdhani(
+                              color: AppColors.textMuted,
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                );
+              }),
+            ],
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
 // ── View label ────────────────────────────────────────────────────────────────
 
 class _ViewLabel extends StatelessWidget {
@@ -409,9 +622,9 @@ class _ViewLabel extends StatelessWidget {
         children: [
           Container(
             width: 18, height: 0.5,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.transparent, const Color(0x40D4AF37)],
+                colors: [Colors.transparent, Color(0x40D4AF37)],
               ),
             ),
           ),
@@ -430,9 +643,9 @@ class _ViewLabel extends StatelessWidget {
           ),
           Container(
             width: 18, height: 0.5,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [const Color(0x40D4AF37), Colors.transparent],
+                colors: [Color(0x40D4AF37), Colors.transparent],
               ),
             ),
           ),

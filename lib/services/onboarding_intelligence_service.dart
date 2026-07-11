@@ -302,7 +302,9 @@ class OnboardingIntelligenceService {
         .where((h) => h.durationMinutes > 0)
         .map((h) => h.durationMinutes.toDouble()).toList();
     if (durations.length >= 3 &&
-        durations.first < durations.last * 0.55) signals++;
+        durations.first < durations.last * 0.55) {
+      signals++;
+    }
 
     // Consistently very short sessions (< 20 min)
     final shortCount = history.take(5)
@@ -449,12 +451,14 @@ class OnboardingIntelligenceService {
     final sessionsPerWeek = history.length / (daysSinceFirst / 7.0);
 
     int score = 0;
-    if (sessionsPerWeek >= 3.5)      score += 3;
-    else if (sessionsPerWeek >= 2.5) score += 2;
+    if (sessionsPerWeek >= 3.5) {
+      score += 3;
+    } else if (sessionsPerWeek >= 2.5) score += 2;
     else if (sessionsPerWeek >= 1.5) score += 1;
 
-    if (streak.currentStreak >= 7)      score += 2;
-    else if (streak.currentStreak >= 3) score += 1;
+    if (streak.currentStreak >= 7) {
+      score += 2;
+    } else if (streak.currentStreak >= 3) score += 1;
 
     if (history.length >= 5) score += 1;
 
@@ -596,7 +600,7 @@ class OnboardingIntelligenceService {
       case ExperienceTier.developing:
         return 'Movement patterns are solidifying — consistency at this stage drives long-term adaptation.';
       case ExperienceTier.intermediate:
-        return 'You\'re in a productive phase — structured progressive overload will continue driving gains.';
+        return 'You\'re in a productive phase — keep adding weight steadily.';
       case ExperienceTier.advanced:
         return 'Your recovery management and exercise selection reflect developed training intelligence.';
     }

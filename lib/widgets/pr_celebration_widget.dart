@@ -85,8 +85,11 @@ class _GoldConfettiPainter extends CustomPainter {
           for (int i = 0; i < 5; i++) {
             final a1 = (i * 4 * pi / 5) - pi / 2;
             final a2 = a1 + 2 * pi / 5;
-            if (i == 0) path.moveTo(p.size * 0.5 * cos(a1), p.size * 0.5 * sin(a1));
-            else path.lineTo(p.size * 0.5 * cos(a1), p.size * 0.5 * sin(a1));
+            if (i == 0) {
+              path.moveTo(p.size * 0.5 * cos(a1), p.size * 0.5 * sin(a1));
+            } else {
+              path.lineTo(p.size * 0.5 * cos(a1), p.size * 0.5 * sin(a1));
+            }
             path.lineTo(p.size * 0.22 * cos(a2), p.size * 0.22 * sin(a2));
           }
           path.close();
@@ -237,10 +240,10 @@ class _PRScreenState extends State<_PRScreen>
   }
 
   String get _motiveLine {
-    if (widget.weight >= 100) return 'You just joined the century club! 🦁';
-    if (widget.reps >= 20)    return 'Endurance beast! Those reps are insane!';
-    if (widget.weight >= 60)  return 'Getting stronger every single session!';
-    return 'New record, new you. Keep pushing! 🔥';
+    if (widget.weight >= 100) return 'Triple digits. Earned.';
+    if (widget.reps >= 20)    return 'High-rep strength is building.';
+    if (widget.weight >= 60)  return 'Strength is trending up.';
+    return 'A new best. Noted.';
   }
 
   @override
@@ -377,10 +380,10 @@ class _PRScreenState extends State<_PRScreen>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.lg, vertical: 8),
                             decoration: BoxDecoration(
-                              color: AppColors.purple.withValues(alpha: 0.12),
+                              color: AppColors.textSecondary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                  color: AppColors.purple.withValues(
+                                  color: AppColors.textSecondary.withValues(
                                       alpha: 0.35)),
                             ),
                             child: Row(mainAxisSize: MainAxisSize.min,
@@ -390,7 +393,7 @@ class _PRScreenState extends State<_PRScreen>
                               const SizedBox(width: AppSpacing.xs),
                               Text('+${ widget.xpEarned} XP',
                                   style: GoogleFonts.rajdhani(
-                                      color: AppColors.purple,
+                                      color: AppColors.textSecondary,
                                       fontSize: 22,
                                       fontWeight: FontWeight.w900)),
                             ]),
@@ -439,7 +442,7 @@ class _PRScreenState extends State<_PRScreen>
                                   blurRadius: 24,
                                   offset: const Offset(0, 4))],
                             ),
-                            child: Text('Keep Crushing It! 💪',
+                            child: Text('Continue',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.rajdhani(
                                     color: Colors.black, fontSize: 18,

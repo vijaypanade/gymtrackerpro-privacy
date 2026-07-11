@@ -52,7 +52,7 @@ class RecoveryMuscleChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
-      textStyle: TextStyle(fontFamily: 'Inter',color: Colors.white70, fontSize: 11),
+      textStyle: const TextStyle(fontFamily: 'Inter',color: Colors.white70, fontSize: 11),
       child: Container(
         // ── CRITICAL: fixed aspect, no expansion from text ──
         constraints: const BoxConstraints(minHeight: 80),
@@ -86,7 +86,7 @@ class RecoveryMuscleChip extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Inter',
+              style: const TextStyle(fontFamily: 'Inter',
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
                 color: Colors.white54,

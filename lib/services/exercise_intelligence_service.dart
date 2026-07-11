@@ -459,7 +459,9 @@ class ExerciseIntelligenceService {
         lower.contains('ohp') || lower.contains('military press') ||
         lower.contains('barbell row') || lower.contains('bent over') ||
         lower.contains('pendlay') || lower.contains('t-bar') ||
-        lower.contains('tbar')) return true;
+        lower.contains('tbar')) {
+      return true;
+    }
     // Machines, cables, and chest-supported movements remove axial stress
     if (equipment == EquipmentType.cable  ||
         equipment == EquipmentType.machine ||

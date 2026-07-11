@@ -1,7 +1,6 @@
 // lib/screens/ai_setup_screen.dart
 // REPLACE entire file. Do not merge/append.
 import 'package:flutter/material.dart';
-import '../engines/workout_engine.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/ai_engine.dart';
@@ -68,7 +67,7 @@ class _AISetupScreenState extends State<AISetupScreen> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('AI SETUP'),
+        title: const Text('COACH SETUP'),
         leading: _step > 0 && _step < 4
             ? IconButton(icon: const Icon(Icons.arrow_back_ios_rounded),
                 onPressed: () => setState(() => _step--))
@@ -154,7 +153,7 @@ class _StepTrainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _StepWrapper(title: 'Choose your trainer', subtitle: 'How should your AI coach talk to you?',
+    return _StepWrapper(title: 'Choose your trainer', subtitle: 'How should your coach talk to you?',
       child: Column(children: _trainers.map((t) => _OptionCard(
         emoji: t['emoji']!, label: t['label']!, desc: t['desc']!,
         selected: t['key'] == selected, onTap: () => onSelect(t['key']!),
@@ -197,7 +196,7 @@ class _StepWeakMuscle extends StatelessWidget {
         const SizedBox(height: 32),
         // ✅ VoidCallback — no async issues
         GoldButton(
-          text: isGenerating ? 'Generating Plan... ⏳' : '🤖 Generate My Plan',
+          text: isGenerating ? 'Preparing plan...' : 'Generate My Plan',
           width: double.infinity,
          onTap: isGenerating
     ? () {}
@@ -227,7 +226,7 @@ class _RecoveryMuscleChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
       decoration: BoxDecoration(
-        color: selected ? Colors.yellow.withOpacity(0.15) : Colors.black12,
+        color: selected ? Colors.yellow.withValues(alpha: 0.15) : Colors.black12,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: selected ? Colors.yellow : Colors.white24,
@@ -256,7 +255,7 @@ class _StepResults extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (result == null) return const Center(child: CircularProgressIndicator());
+    if (result == null) return const Center(child: CircularProgressIndicator(color: AppColors.gold));
 
     return SafeArea(
   child: ListView(
@@ -264,7 +263,7 @@ class _StepResults extends StatelessWidget {
     children: [
 
       /// 🔥 HEADER
-      Text(
+      const Text(
         'Your Plan is Ready! 🎉',
         style: TextStyle(
           fontFamily: 'Rajdhani',
@@ -278,7 +277,7 @@ class _StepResults extends StatelessWidget {
 
       Text(
         result!.summary,
-        style: TextStyle(
+        style: const TextStyle(
           fontFamily: 'Nunito',
           color: AppColors.textMuted,
           fontSize: 13,
@@ -343,7 +342,7 @@ class _StepResults extends StatelessWidget {
                       ),
                       child: Text(
                         '${entry.value.length}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'Nunito',
                           color: AppColors.gold,
                           fontSize: 11,
@@ -372,7 +371,7 @@ if (!isRest) ...[
             Expanded(
               child: Text(
                 exercise,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'Nunito',
                   color: AppColors.textPrimary,
                   fontSize: 13,
@@ -417,7 +416,7 @@ if (!isRest) ...[
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          child: Text(
+          child: const Text(
             'Regenerate 🔄',
             style: TextStyle(
               fontFamily: 'Rajdhani',
@@ -446,10 +445,10 @@ class _StepWrapper extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: TextStyle(fontFamily: 'Rajdhani',
+        Text(title, style: const TextStyle(fontFamily: 'Rajdhani',
             color: AppColors.textPrimary, fontSize: 26, fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
-        Text(subtitle, style: TextStyle(fontFamily: 'Nunito',color: AppColors.textMuted, fontSize: 14)),
+        Text(subtitle, style: const TextStyle(fontFamily: 'Nunito',color: AppColors.textMuted, fontSize: 14)),
         const SizedBox(height: 24),
         child,
       ]),
@@ -485,7 +484,7 @@ class _OptionCard extends StatelessWidget {
             Text(label, style: TextStyle(fontFamily: 'Rajdhani',
                 color: selected ? AppColors.gold : AppColors.textPrimary,
                 fontSize: 18, fontWeight: FontWeight.w700)),
-            Text(desc, style: TextStyle(fontFamily: 'Nunito',color: AppColors.textMuted, fontSize: 13)),
+            Text(desc, style: const TextStyle(fontFamily: 'Nunito',color: AppColors.textMuted, fontSize: 13)),
           ])),
           if (selected) const Icon(Icons.check_circle_rounded, color: AppColors.gold, size: 22),
         ]),

@@ -17,6 +17,19 @@ import '../services/monetization_service.dart';
 import '../services/split_recommendation_engine.dart';
 import '../utils/app_constants.dart';
 
+// Presentation-layer overrides — model enums are untouched
+String _splitDisplayLabel(SplitStyle s) {
+  if (s == SplitStyle.aiAdaptive) return 'Adaptive Split';
+  return s.label;
+}
+
+String _splitDisplayDescription(SplitStyle s) {
+  if (s == SplitStyle.aiAdaptive) {
+    return 'Your schedule adjusts each week based on recovery and training volume.';
+  }
+  return s.description;
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 class WorkoutSplitPlannerScreen extends StatefulWidget {
   const WorkoutSplitPlannerScreen({super.key});
@@ -53,10 +66,10 @@ class _WorkoutSplitPlannerScreenState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
-          '${p.splitStyle.label} plan applied to your Planner.',
+          '${_splitDisplayLabel(p.splitStyle)} plan applied to your Planner.',
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        backgroundColor: AppColors.green,
+        backgroundColor: const Color(0xFF1E1E1E),
         duration: const Duration(seconds: 3),
       ));
       // Pop back to Home so user sees their new plan in the dashboard
@@ -219,7 +232,7 @@ class _WorkoutSplitPlannerScreenState
                 if (splitStyle != SplitStyle.pushPullLegs) ...[
                   const SizedBox(height: 12),
                   Text(
-                    splitStyle.description,
+                    _splitDisplayDescription(splitStyle),
                     style: GoogleFonts.inter(
                         color: AppColors.textMuted,
                         fontSize: 11,
@@ -312,7 +325,7 @@ class _AIRecommendationCard extends StatelessWidget {
                           const Icon(Icons.psychology_rounded,
                               color: AppColors.gold, size: 10),
                           const SizedBox(width: 4),
-                          Text('AI COACH SUGGESTION',
+                          Text('COACH RECOMMENDATION',
                               style: GoogleFonts.inter(
                                 color: AppColors.gold,
                                 fontSize: 8,
@@ -560,7 +573,7 @@ class _SplitChip extends StatelessWidget {
                     color: AppColors.gold, size: 16),
                 const SizedBox(width: 8),
                 Text(
-                  'AI Adaptive',
+                  'Adaptive Split',
                   style: GoogleFonts.rajdhani(
                     color: AppColors.textPrimary,
                     fontSize: 18,
@@ -579,7 +592,7 @@ class _SplitChip extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'AI Adaptive learns from your recovery, training volume, and consistency. Complete 8 workouts to calibrate your personal training model.',
+                'This split adjusts based on your recovery, volume, and consistency. Complete 8 workouts to unlock it.',
                 style: GoogleFonts.inter(
                   color: AppColors.textSecondary,
                   fontSize: 13,
@@ -652,7 +665,7 @@ class _SplitChip extends StatelessWidget {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  style.label,
+                  _splitDisplayLabel(style),
                   style: GoogleFonts.rajdhani(
                     color: selected
                         ? AppColors.gold
@@ -776,14 +789,14 @@ class _GenerateButtonState extends State<_GenerateButton> {
           ),
           child: widget.loading
               ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  SizedBox(
+                  const SizedBox(
                     width: 14,
                     height: 14,
                     child: CircularProgressIndicator(
                         color: AppColors.gold, strokeWidth: 2),
                   ),
                   const SizedBox(width: 10),
-                  Text('Building your plan...',
+                  Text('Preparing your plan...',
                       style: GoogleFonts.rajdhani(
                           color: AppColors.gold,
                           fontSize: 15,
@@ -796,7 +809,7 @@ class _GenerateButtonState extends State<_GenerateButton> {
                         const Icon(Icons.auto_awesome_rounded,
                             size: 14, color: AppColors.gold),
                         const SizedBox(width: 8),
-                        Text('Unlock Unlimited AI Plans',
+                        Text('Upgrade to Pro',
                             style: GoogleFonts.rajdhani(
                                 color: AppColors.gold,
                                 fontSize: 15,
@@ -809,7 +822,7 @@ class _GenerateButtonState extends State<_GenerateButton> {
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Generate ${widget.splitStyle.label} Plan',
+                        Text('Generate ${_splitDisplayLabel(widget.splitStyle)} Plan',
                             style: GoogleFonts.rajdhani(
                               color: Colors.black,
                               fontSize: 16,
@@ -848,11 +861,11 @@ class _AdaptiveIntelligenceCard extends StatelessWidget {
     final Color confColor;
     final String confLabel;
     if (profile.confidenceScore >= 70) {
-      confColor = AppColors.green;
-      confLabel = 'Highly calibrated';
+      confColor = AppColors.gold;
+      confLabel = 'Well established';
     } else if (profile.confidenceScore >= 30) {
       confColor = AppColors.gold;
-      confLabel = 'Partially calibrated';
+      confLabel = 'Building accuracy';
     } else {
       confColor = AppColors.orange;
       confLabel = 'Learning your recovery patterns';
@@ -886,7 +899,7 @@ class _AdaptiveIntelligenceCard extends StatelessWidget {
                       color: AppColors.gold, size: 11),
                   const SizedBox(width: 5),
                   Text(
-                    'AI ADAPTIVE INTELLIGENCE',
+                    'ADAPTIVE TRAINING',
                     style: GoogleFonts.inter(
                       color: AppColors.gold,
                       fontSize: 9,

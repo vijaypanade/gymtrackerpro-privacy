@@ -41,22 +41,22 @@ class PersonalizationEngine {
     final sorted = List<WorkoutLog>.from(logs)
       ..sort((a, b) => a.date.compareTo(b.date));
 
-    double afterRest = 0, afterRest_n = 0;
-    double normal = 0, normal_n = 0;
+    double afterRest = 0, afterrestN = 0;
+    double normal = 0, normalN = 0;
 
     for (int i = 1; i < sorted.length; i++) {
       final gap = sorted[i].date.difference(sorted[i - 1].date).inDays;
       if (gap >= 2) {
         afterRest += sorted[i].volume;
-        afterRest_n++;
+        afterrestN++;
       } else {
         normal += sorted[i].volume;
-        normal_n++;
+        normalN++;
       }
     }
-    if (afterRest_n < 2 || normal_n < 2) return null;
-    final avgRest   = afterRest / afterRest_n;
-    final avgNormal = normal / normal_n;
+    if (afterrestN < 2 || normalN < 2) return null;
+    final avgRest   = afterRest / afterrestN;
+    final avgNormal = normal / normalN;
     if (avgRest > avgNormal * 1.12) {
       return 'You perform stronger after rest days.';
     }

@@ -70,3 +70,10 @@ build/
 ios/Pods/
 android/.gradle/
 .env
+
+# Secrets & local-only files — never commit
+dart_defines.json
+*.backup
+*.zip
+analyze.txt
+.claude/

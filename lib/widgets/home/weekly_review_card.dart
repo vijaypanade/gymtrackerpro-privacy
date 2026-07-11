@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../review/models/weekly_recommendation.dart';
 import '../../review/models/weekly_review.dart';
+import '../../screens/weekly_story_screen.dart';
 import '../../utils/app_constants.dart';
 
 // ── Data snapshot ──────────────────────────────────────────────────────────────
@@ -126,6 +127,8 @@ class _WeeklyReviewCardBody extends StatelessWidget {
             pGrade:      data.progressGrade,
           ),
           if (data.hasData) ...[
+            const _Divider(),
+            const _WatchStoryButton(),
             const _Divider(),
             _CoachLine(text: data.coachLine),
             const _Divider(),
@@ -274,7 +277,8 @@ class _CoachLine extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('💬 ', style: AppTextStyles.bodySmall),
+          const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: AppColors.textMuted),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               text,
@@ -301,7 +305,8 @@ class _NextWeekFocus extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('🎯 ', style: AppTextStyles.bodySmall),
+          const Icon(Icons.track_changes_rounded, size: 13, color: AppColors.gold),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               text,
@@ -391,7 +396,7 @@ class _OnboardingMessage extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text('\u{1F4C5}', style: TextStyle(fontSize: 13)),
+              const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.textMuted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -407,7 +412,7 @@ class _OnboardingMessage extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Text('\u{1F3AF}', style: TextStyle(fontSize: 13)),
+              const Icon(Icons.track_changes_rounded, size: 13, color: AppColors.gold),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -418,6 +423,52 @@ class _OnboardingMessage extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _WatchStoryButton extends StatelessWidget {
+  const _WatchStoryButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: GestureDetector(
+        onTap: () => openWeeklyStory(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [
+              AppColors.gold.withValues(alpha: 0.14),
+              AppColors.gold.withValues(alpha: 0.05),
+            ]),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.30),
+              width: 0.7,
+            ),
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(
+              width: 22, height: 22,
+              decoration: const BoxDecoration(
+                gradient: AppGradients.gold,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.play_arrow_rounded,
+                  color: Colors.black, size: 15),
+            ),
+            const SizedBox(width: 9),
+            Text('WATCH YOUR WEEK',
+                style: AppTextStyles.label.copyWith(
+                  color: AppColors.gold,
+                  letterSpacing: 1.8,
+                  fontWeight: FontWeight.w800,
+                )),
+          ]),
+        ),
       ),
     );
   }
@@ -436,8 +487,8 @@ class _Divider extends StatelessWidget {
 Color _gradeColor(WeeklyGrade grade) {
   switch (grade) {
     case WeeklyGrade.S: return AppColors.goldHero;
-    case WeeklyGrade.A: return AppColors.green;
-    case WeeklyGrade.B: return AppColors.blue;
+    case WeeklyGrade.A: return AppColors.gold;
+    case WeeklyGrade.B: return AppColors.goldSoft;
     case WeeklyGrade.C: return AppColors.orange;
     case WeeklyGrade.D: return AppColors.red;
   }

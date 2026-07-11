@@ -172,7 +172,7 @@ class AiQuotaService {
           .key;
       _cache.remove(evict);
     }
-    final expiry = DateTime.now().add(Duration(hours: kCacheTtlHours));
+    final expiry = DateTime.now().add(const Duration(hours: kCacheTtlHours));
     _cache[_hash(prompt)] = (response, expiry);
   }
 

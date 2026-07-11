@@ -86,7 +86,7 @@ String _formatLastTrained(String dateStr) {
 }
 
 Color _recoveryColor(int score) {
-  if (score >= 80) return AppColors.green;
+  if (score >= 80) return AppColors.gold;
   if (score >= 50) return AppColors.orange;
   return AppColors.red;
 }
@@ -364,7 +364,7 @@ class _SheetBodyState extends State<_SheetBody> {
 
               // 2. LAST SESSION
               _SectionLabel('LAST SESSION',
-                  sub: lastSess != null ? lastSess.dateLabel : null),
+                  sub: lastSess?.dateLabel),
               const SizedBox(height: 8),
               if (lastSess != null)
                 _LastSessionBlock(session: lastSess)
@@ -651,12 +651,12 @@ class _SuggestionCard extends StatelessWidget {
     final defReps = exercise['defaultReps']as int?    ?? 10;
 
     final borderCol = isInPlan
-        ? AppColors.green.withValues(alpha: 0.18)
+        ? AppColors.gold.withValues(alpha: 0.18)
         : Colors.white.withValues(alpha: 0.07);
     final bgCol   = isInPlan
-        ? AppColors.green.withValues(alpha: 0.04)
+        ? AppColors.gold.withValues(alpha: 0.04)
         : const Color(0xFF111111);
-    final btnCol  = isInPlan ? AppColors.green : AppColors.gold;
+    final btnCol  = isInPlan ? AppColors.gold : AppColors.gold;
 
     return GestureDetector(
       onTap: onToggle,
@@ -734,7 +734,7 @@ class _SuggestionCard extends StatelessWidget {
               Text(
                 movement.isNotEmpty
                     ? '${exercise['muscle']} • ${_cap(movement)} movement'
-                    : '${exercise['muscle']} • ${defReps} reps target',
+                    : '${exercise['muscle']} • $defReps reps target',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
@@ -765,13 +765,13 @@ class _SuggestionCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 ai.fatigueLevel == FatigueLevel.fresh
-                    ? 'AI: peak readiness — performance focus'
+                    ? 'Peak readiness — performance focus'
                     : ai.fatigueLevel == FatigueLevel.fatigued
-                        ? 'AI: fatigue detected — controlled intensity'
+                        ? 'High fatigue — controlled intensity'
                         : ai.weightModifier < 0.95
-                            ? 'AI: recovery-preserving load strategy'
+                            ? 'Recovery-preserving load'
                             : ai.weightModifier > 1.0
-                                ? 'AI: progressive overload recommended'
+                                ? 'Progressive overload recommended'
                                 : ai.dailyCoachMessage,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

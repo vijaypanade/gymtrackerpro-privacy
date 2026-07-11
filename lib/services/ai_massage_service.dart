@@ -26,7 +26,7 @@ class AIMessage {
   // Full message with streak appended if relevant
   String get fullCoachMessage {
     if (showStreak && prStreak >= 2) {
-      return '$coachLine\n🔥 $prStreak PR streak!';
+      return '$coachLine\n$prStreak records in a row.';
     }
     return coachLine;
   }
@@ -86,33 +86,31 @@ class AIMessageService {
   ) {
     switch (outcome) {
       case PROutcome.first:
-        return 'First milestone unlocked 💪\nLet\'s build something strong.';
+        return 'First lift on record.\nEverything builds from here.';
 
       case PROutcome.pr:
       case PROutcome.volumePR:
         // Legendary
         if (pct >= 30) {
-          return '${pct.toStringAsFixed(0)}% jump 😳\nThis is elite level progress 🚀';
+          return 'A big jump.\nWell earned.';
         }
         // Strong
         if (pct >= 15) {
-          return '+${delta.toStringAsFixed(1)}kg progress 🔥\n'
-              '$lastName strength improving fast 💪';
+          return '+${delta.toStringAsFixed(1)}kg.\n$lastName is moving fast.';
         }
         // Normal — with delta
         if (delta > 0.01) {
-          return '+${delta.toStringAsFixed(1)}kg progress 🔥\n'
-              'Consistency is paying off.';
+          return '+${delta.toStringAsFixed(1)}kg.\nConsistency is paying off.';
         }
-        return '$lastName strength improving 🔥\nKeep showing up.';
+        return '$lastName strength improving.\nKeep showing up.';
 
       case PROutcome.repPR:
-        return '$lastName endurance growing 🔥\n'
-            'Same weight, more reps — progressive overload working.';
+        return '$lastName endurance growing.\n'
+            'Same weight, more reps. Progress.';
 
       case PROutcome.match:
-        return 'Consistency builds strength 💪\n'
-            'Same weight matched — push heavier next session.';
+        return 'Matched your best.\n'
+            'Go heavier next session.';
 
       case PROutcome.drop:
         return 'Recovery matters 📈\nCome back stronger next session.';

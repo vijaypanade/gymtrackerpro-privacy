@@ -83,7 +83,9 @@ class _PRWallScreenState extends State<PRWallScreen> {
     if (lower.contains('chest') || lower.contains('push')) return 'Chest';
     if (lower.contains('back')  || lower.contains('pull') || lower.contains('lat')) return 'Back';
     if (lower.contains('leg')   || lower.contains('quad') || lower.contains('hamstring') ||
-        lower.contains('glute') || lower.contains('calf')) return 'Legs';
+        lower.contains('glute') || lower.contains('calf')) {
+      return 'Legs';
+    }
     if (lower.contains('shoulder') || lower.contains('delt')) return 'Shoulders';
     if (lower.contains('bicep') || lower.contains('arm')) return 'Biceps';
     if (lower.contains('tricep')) return 'Triceps';
@@ -98,14 +100,14 @@ class _PRWallScreenState extends State<PRWallScreen> {
   ];
 
   static const _muscleColors = <String, Color>{
-    'Chest':     Color(0xFFEF5350),
-    'Back':      Color(0xFF42A5F5),
-    'Legs':      Color(0xFF66BB6A),
-    'Shoulders': Color(0xFFFF7043),
-    'Biceps':    Color(0xFFAB47BC),
-    'Triceps':   Color(0xFF26C6DA),
-    'Core':      Color(0xFFFFCA28),
-    'Other':     Color(0xFF78909C),
+    'Chest':     AppColors.gold,
+    'Back':      AppColors.gold,
+    'Legs':      AppColors.goldSoft,
+    'Shoulders': AppColors.goldSoft,
+    'Biceps':    AppColors.textSecondary,
+    'Triceps':   AppColors.textSecondary,
+    'Core':      AppColors.textMuted,
+    'Other':     AppColors.textMuted,
   };
 
   Color _colorFor(String muscle) =>
@@ -169,7 +171,7 @@ class _PRWallScreenState extends State<PRWallScreen> {
           else if (filtered.isEmpty)
             SliverFillRemaining(
               child: Center(
-                child: Text('No ${_selectedMuscle} records yet.',
+                child: Text('No $_selectedMuscle records yet.',
                     style: GoogleFonts.inter(
                         color: AppColors.textMuted, fontSize: 14)),
               ),
@@ -312,7 +314,7 @@ class _PRCard extends StatelessWidget {
           ),
           child: Center(
             child: isTop
-                ? Icon(Icons.emoji_events_rounded,
+                ? const Icon(Icons.emoji_events_rounded,
                     color: AppColors.gold, size: 16)
                 : Text('$rank',
                     style: GoogleFonts.rajdhani(

@@ -58,13 +58,13 @@ extension TrainingReadinessX on TrainingReadiness {
   String get coachNote {
     switch (this) {
       case TrainingReadiness.peak:
-        return 'Neuromuscular system is primed. Attack PRs today.';
+        return 'Fully recovered. Go for a record today.';
       case TrainingReadiness.high:
-        return 'Good recovery. Execute the plan with progressive overload.';
+        return 'Good recovery. Push a little heavier.';
       case TrainingReadiness.moderate:
-        return 'Partial recovery. Train at 80% intensity, focus on form.';
+        return 'Partly recovered. Train lighter, focus on form.';
       case TrainingReadiness.low:
-        return 'Accumulated fatigue detected. Light session max — protect your recovery.';
+        return 'Fatigue is building. Keep today light.';
       case TrainingReadiness.deloadNeeded:
         return 'ACWR elevated. 40% volume reduction for 1 week — mandatory for long-term progress.';
     }
@@ -128,8 +128,9 @@ class AnalyticsEngine {
     final ratio = acute / chronic;
 
     String zone;
-    if (ratio < 0.8)        zone = 'underloaded'; // too little → detraining
-    else if (ratio <= 1.1)  zone = 'optimal';     // sweet spot
+    if (ratio < 0.8) {
+      zone = 'underloaded'; // too little → detraining
+    } else if (ratio <= 1.1)  zone = 'optimal';     // sweet spot
     else if (ratio <= 1.3)  zone = 'safe';        // acceptable increase
     else if (ratio <= 1.5)  zone = 'caution';     // elevated risk
     else                    zone = 'danger';       // injury/overtraining zone
@@ -153,8 +154,9 @@ class AnalyticsEngine {
 
     // ── Component 1: ACWR-based fatigue (50% weight) ─────────────
     final acwr = computeACWR(logs: logs);
-    if (acwr.ratio > 1.5)       index += 50;
-    else if (acwr.ratio > 1.3)  index += 30;
+    if (acwr.ratio > 1.5) {
+      index += 50;
+    } else if (acwr.ratio > 1.3)  index += 30;
     else if (acwr.ratio > 1.1)  index += 10;
     else if (acwr.ratio < 0.7)  index += 5; // underloading still has mild effect
 
@@ -168,8 +170,9 @@ class AnalyticsEngine {
         final avgPrev = prev.reduce((a, b) => a + b) / prev.length;
         if (avgPrev > 0) {
           final volDrop = (avgPrev - avgRecent) / avgPrev;
-          if (volDrop > 0.20) index += 20; // 20%+ drop = fatigue signal
-          else if (volDrop > 0.10) index += 10;
+          if (volDrop > 0.20) {
+            index += 20; // 20%+ drop = fatigue signal
+          } else if (volDrop > 0.10) index += 10;
         }
       }
     }
@@ -181,8 +184,9 @@ class AnalyticsEngine {
         gaps.add(recent[i].date.difference(recent[i + 1].date).inHours.abs());
       }
       final avgGap = gaps.reduce((a, b) => a + b) / gaps.length;
-      if (avgGap < 16)     index += 15; // Training twice per day
-      else if (avgGap < 24) index += 8;  // <24h between sessions
+      if (avgGap < 16) {
+        index += 15; // Training twice per day
+      } else if (avgGap < 24) index += 8;  // <24h between sessions
     }
 
     // ── Component 4: Rep quality degradation ─────────────────────
@@ -205,8 +209,9 @@ class AnalyticsEngine {
 
     // ── Component 6: Streak-based cumulative fatigue ──────────────
     // Science: >7 days continuous training = significant CNS fatigue
-    if (streak >= 21) index += 18;
-    else if (streak >= 14) index += 12;
+    if (streak >= 21) {
+      index += 18;
+    } else if (streak >= 14) index += 12;
     else if (streak >= 7)  index += 6;
 
     return index.clamp(0.0, 95.0);
@@ -231,14 +236,16 @@ class AnalyticsEngine {
     score += (1.0 - (fatigue / 100.0)) * 35;
 
     // Mood contribution (15%)
-    if (mood == 'energetic') score += 15;
-    else if (mood == 'normal') score += 8;
+    if (mood == 'energetic') {
+      score += 15;
+    } else if (mood == 'normal') score += 8;
     else score += 2; // tired
 
     // Streak continuity bonus (10%)
     // Optimal sweet spot: 3–6 days streak
-    if (streak >= 3 && streak <= 6)  score += 10;
-    else if (streak >= 7 && streak <= 13) score += 5;
+    if (streak >= 3 && streak <= 6) {
+      score += 10;
+    } else if (streak >= 7 && streak <= 13) score += 5;
     else if (streak >= 14) score += 0; // No bonus — fatigue accumulation
 
     // Deload penalty
@@ -442,10 +449,11 @@ class AnalyticsEngine {
 
     final diff = ((maxVol - minVol) / maxVol) * 100;
 
-    if (diff < 15)      return 'Excellent muscle balance';
-    else if (diff < 30) return '$weakest slightly lagging';
+    if (diff < 15) {
+      return 'Muscle balance looks good';
+    } else if (diff < 30) return '$weakest slightly behind';
     else if (diff < 50) return '$weakest needs attention';
-    else                return 'Significant $weakest imbalance detected';
+    else                return '$weakest is falling behind';
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -485,8 +493,9 @@ class AnalyticsEngine {
       final stdDev = sqrt(variance);
 
       // High variance in training gaps = inconsistent recovery
-      if (stdDev > 48) quality -= 15;
-      else if (stdDev > 24) quality -= 8;
+      if (stdDev > 48) {
+        quality -= 15;
+      } else if (stdDev > 24) quality -= 8;
     }
 
     return quality.clamp(20.0, 100.0);

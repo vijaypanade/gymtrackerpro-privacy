@@ -4,7 +4,6 @@
 // Step 6: Addiction hooks (streak, tier colors)
 // Step 7: Clean architecture
 // Step 8: Null-safe, crash-free
-import 'dart:math';
 
 // ════════════════════════════════════════════════
 // PR RECORD — Step 1: Track previous best
@@ -60,7 +59,7 @@ class PRRecord {
   );
 
   static PRRecord get empty =>
-      PRRecord(weight: 0, reps: 0, volume: 0, date: '', unit: 'kg');
+      const PRRecord(weight: 0, reps: 0, volume: 0, date: '', unit: 'kg');
 }
 
 // ════════════════════════════════════════════════
@@ -257,14 +256,18 @@ class PRService {
     // Weight PR
     if (weight > prevWeight + 0.01) return PROutcome.pr;
     // Rep PR (same weight, more reps)
-    if ((weight - prevWeight).abs() < 0.01 && reps > prevReps)
+    if ((weight - prevWeight).abs() < 0.01 && reps > prevReps) {
       return PROutcome.repPR;
+    }
     // Volume PR (overall volume improvement even if weight same)
     if (currVol > prevVol + 0.5 &&
-        weight >= prevWeight * 0.95) return PROutcome.volumePR;
+        weight >= prevWeight * 0.95) {
+      return PROutcome.volumePR;
+    }
     // Match
-    if ((weight - prevWeight).abs() < 0.01 && reps == prevReps)
+    if ((weight - prevWeight).abs() < 0.01 && reps == prevReps) {
       return PROutcome.match;
+    }
     // Drop
     return PROutcome.drop;
   }
@@ -273,7 +276,9 @@ class PRService {
   static PRTier _classifyTier(double pct, PROutcome outcome) {
     if (outcome == PROutcome.first  ||
         outcome == PROutcome.match  ||
-        outcome == PROutcome.drop)   return PRTier.normal;
+        outcome == PROutcome.drop) {
+      return PRTier.normal;
+    }
     if (pct >= 30) return PRTier.legendary;
     if (pct >= 10) return PRTier.strong;
     return PRTier.normal;

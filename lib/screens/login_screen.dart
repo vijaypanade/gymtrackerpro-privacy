@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../utils/app_constants.dart';
+import '../utils/app_routes.dart';
 import 'onboarding_screen.dart';
 import 'main_shell.dart';
 import 'package:provider/provider.dart';
@@ -141,10 +142,7 @@ class _LoginScreenState extends State<LoginScreen>
       setState(() => _loading = false);
 
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) =>
-              isOnboarded ? const MainShell() : const OnboardingScreen(),
-        ),
+        fadeRoute(isOnboarded ? const MainShell() : const OnboardingScreen()),
       );
     } else {
       setState(() => _loading = false);
@@ -503,7 +501,7 @@ class _TitleSection extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Text(
-                'Train · Track · Dominate',
+                'Train · Track · Progress',
                 style: GoogleFonts.inter(
                   color: const Color(0xFFD4AF37).withValues(alpha: 0.50),
                   fontSize: 9,
@@ -541,11 +539,11 @@ class _FeaturePills extends StatelessWidget {
   final AnimationController ctrl;
 
   static const _features = [
-    (Icons.psychology_rounded,     'AI Workout Coach'),
+    (Icons.psychology_rounded,     'Personalised Coaching'),
     (Icons.calendar_month_rounded, 'Adaptive Weekly Plans'),
-    (Icons.favorite_rounded,       'Smart Recovery Analytics'),
-    (Icons.trending_up_rounded,    'PR Prediction Engine'),
-    (Icons.analytics_rounded,      'Scientific Progress Tracking'),
+    (Icons.favorite_rounded,       'Recovery Insights'),
+    (Icons.trending_up_rounded,    'Personal Records'),
+    (Icons.analytics_rounded,      'Progress Tracking'),
   ];
 
   @override

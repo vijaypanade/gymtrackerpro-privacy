@@ -101,7 +101,7 @@ class _BodyMeasurementScreenState extends State<BodyMeasurementScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('Saved!', style: GoogleFonts.inter()),
-      backgroundColor: AppColors.green,
+      backgroundColor: const Color(0xFF1E1E1E),
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 1),
     ));
@@ -297,7 +297,7 @@ class _TrendChart extends StatelessWidget {
     final deltaGood = isWeight ? !isGain : isGain;
     final deltaColor = delta.abs() < 0.1
         ? AppColors.textMuted
-        : (deltaGood ? AppColors.green : AppColors.red);
+        : (deltaGood ? AppColors.gold : AppColors.red);
 
     final sign = delta >= 0 ? '+' : '';
 
@@ -626,7 +626,7 @@ class _Chip extends StatelessWidget {
     String deltaStr = '';
     if (delta != null && delta.abs() >= 0.1) {
       final good = (isWeight || isWaist) ? delta < 0 : delta > 0;
-      deltaColor = good ? AppColors.green : AppColors.red;
+      deltaColor = good ? AppColors.gold : AppColors.red;
       deltaStr   = '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)}';
     }
 

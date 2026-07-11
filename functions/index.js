@@ -234,7 +234,7 @@ exports.askAI = onRequest(
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature:      0.7,
-              maxOutputTokens:  (type === "plan" || type === "diet") ? 16384 : 512,
+              maxOutputTokens:  (type === "plan" || type === "diet") ? 16384 : 1024,
               responseMimeType: (type === "plan" || type === "diet") ? "application/json" : undefined,
               // Disable thinking for structured JSON types: thinking tokens share
               // the maxOutputTokens budget, leaving <200 tokens for actual output.

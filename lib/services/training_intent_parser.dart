@@ -198,10 +198,14 @@ class TrainingIntentParser {
   static bool _isFullPlan(String t) {
     if (RegExp(
       r'(create|generate|make|build|give)\s*(me\s*)?(a\s*)?(weekly|full|complete|\d+\s*day)?\s*(workout\s*)?(plan|program|routine|schedule)',
-    ).hasMatch(t)) return true;
+    ).hasMatch(t)) {
+      return true;
+    }
     if (RegExp(r'weekly\s*plan|week\s*plan|training\s*plan').hasMatch(t)) return true;
     if (RegExp(r'(ppl|push pull legs|bro split|upper lower|arnold split)\b').hasMatch(t) &&
-        RegExp(r'(create|make|build|generate|give)').hasMatch(t)) return true;
+        RegExp(r'(create|make|build|generate|give)').hasMatch(t)) {
+      return true;
+    }
     return false;
   }
 

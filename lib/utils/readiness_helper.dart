@@ -105,7 +105,7 @@ abstract final class ReadinessHelper {
     final top = volMap.entries.reduce((a, b) => a.value > b.value ? a : b);
     final name = '${top.key[0].toUpperCase()}${top.key.substring(1)}';
     if (daysSince >= 2) return '$name recovered well today.';
-    if (totalVol > 15000) return 'High pulling volume detected this week.';
+    if (totalVol > 15000) return 'Big week so far. Pace yourself.';
     if (totalVol > 8000) return 'Solid training load — stay consistent.';
     return 'Recovery on track — push hard today.';
   }

@@ -25,8 +25,8 @@ class MealLogEntry {
     required this.loggedAt,
   });
 
-  // Firestore key: unique per day per plan-day per meal
-  String get firestoreKey => '${planDay}_$mealType';
+  // Storage key: unique per food entry (includes timestamp)
+  String get firestoreKey => '${planDay}_${mealType}_${loggedAt.microsecondsSinceEpoch}';
 
   Map<String, dynamic> toJson() => {
     'meal_type': mealType,

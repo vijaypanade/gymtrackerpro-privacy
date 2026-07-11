@@ -125,7 +125,7 @@ class CoachInsightOrchestrator {
 
     // High fatigue without a specific limiting muscle
     if (ctx.highFatigue) {
-      return UnifiedCoachInsight(
+      return const UnifiedCoachInsight(
         title:      'Fatigue accumulating across primary muscle groups. '
                     'Controlled, quality movement today outperforms heavy load.',
         secondary:  'Stimulus remains effective — effort governs adaptation, '
@@ -139,7 +139,7 @@ class CoachInsightOrchestrator {
     // ── P3: Momentum signals ──────────────────────────────────────────────
 
     if (momentum.lockedIn) {
-      return UnifiedCoachInsight(
+      return const UnifiedCoachInsight(
         title:      'Consistency is accelerating. Protect the rhythm — '
                     'this is where adaptation compounds.',
         secondary:  'Volume tolerance and recovery efficiency trending upward.',
@@ -150,7 +150,7 @@ class CoachInsightOrchestrator {
     }
 
     if (momentum.rising) {
-      return UnifiedCoachInsight(
+      return const UnifiedCoachInsight(
         title:      'Training momentum is climbing faster than baseline. '
                     'Progressive overload is taking effect.',
         secondary:  'Recovery markers support continued progression.',
@@ -161,7 +161,7 @@ class CoachInsightOrchestrator {
     }
 
     if (momentum.atRisk && !momentum.workedOutToday) {
-      return UnifiedCoachInsight(
+      return const UnifiedCoachInsight(
         title:      'Consistency rhythm has been disrupted. One session today '
                     'restores the adaptation cycle.',
         secondary:  'Momentum responds faster to action than to additional rest.',

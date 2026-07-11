@@ -103,8 +103,8 @@ class _SkeletonStatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: const [
+    return const Row(
+      children: [
         Expanded(
           child: Padding(
             padding: EdgeInsets.only(right: AppSpacing.sm),

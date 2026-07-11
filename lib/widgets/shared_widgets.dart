@@ -75,19 +75,6 @@ class _GoldButtonState extends State<GoldButton> with SingleTickerProviderStateM
               ],
               stops: [0.0, 0.35, 0.75, 1.0],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black87,
-                blurRadius: 24,
-                offset: const Offset(0, 12),
-              ),
-              BoxShadow(
-                color: AppColors.gold.withValues(alpha: 0.20),
-                blurRadius: 10,
-                spreadRadius: 0,
-                offset: const Offset(0, 3),
-              ),
-            ],
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.18),
               width: 0.9,
@@ -101,13 +88,18 @@ class _GoldButtonState extends State<GoldButton> with SingleTickerProviderStateM
                 Icon(widget.icon, color: Colors.black, size: widget.small ? 15 : 18),
                 const SizedBox(width: 7),
               ],
-              Text(widget.text, style: TextStyle(fontFamily: 'Inter',
-                color: Colors.black,
-                fontSize: fontSize,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.1,
-                overflow: TextOverflow.ellipsis,
-              )),
+              Flexible(
+                child: Text(widget.text,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(fontFamily: 'Inter',
+                    color: Colors.black,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.1,
+                    overflow: TextOverflow.ellipsis,
+                  )),
+              ),
             ],
           ),
         ),
@@ -294,7 +286,7 @@ class StatTile extends StatelessWidget {
               child: Icon(icon, color: color, size: 18),
             ),
           const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontFamily: 'Rajdhani',
+          Text(value, style: const TextStyle(fontFamily: 'Rajdhani',
             fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
           const SizedBox(height: 2),
           Text(label, textAlign: TextAlign.center, style: AppTextStyles.caption),
@@ -325,7 +317,7 @@ class SectionHeader extends StatelessWidget {
       if (action != null)
         GestureDetector(
           onTap: onAction,
-          child: Text(action!, style: TextStyle(fontFamily: 'Inter',
+          child: Text(action!, style: const TextStyle(fontFamily: 'Inter',
             color: AppColors.gold, fontSize: 12, fontWeight: FontWeight.w700)),
         ),
     ]);
@@ -390,7 +382,7 @@ class StreakWidget extends StatelessWidget {
       return Row(mainAxisSize: MainAxisSize.min, children: [
         const Text('🔥', style: TextStyle(fontSize: 13)),
         const SizedBox(width: 3),
-        Text('$streak', style: TextStyle(fontFamily: 'Inter',
+        Text('$streak', style: const TextStyle(fontFamily: 'Inter',
           color: AppColors.gold, fontWeight: FontWeight.w800, fontSize: 13)),
       ]);
     }
@@ -399,7 +391,7 @@ class StreakWidget extends StatelessWidget {
       child: Row(children: [
         const Text('🔥', style: TextStyle(fontSize: 22)),
         const SizedBox(width: 10),
-        Text('$streak Day Streak', style: TextStyle(fontFamily: 'Rajdhani',
+        Text('$streak Day Streak', style: const TextStyle(fontFamily: 'Rajdhani',
           color: AppColors.orange, fontSize: 18, fontWeight: FontWeight.w800)),
       ]),
     );
@@ -510,7 +502,7 @@ class InfoChip extends StatelessWidget {
           Text(emoji!, style: const TextStyle(fontSize: 12)),
           const SizedBox(width: 4),
         ],
-        Text(label, style: TextStyle(fontFamily: 'Inter',
+        Text(label, style: const TextStyle(fontFamily: 'Inter',
           color: AppColors.textMuted, fontSize: 11)),
         const SizedBox(width: 4),
         Text(value, style: TextStyle(fontFamily: 'Inter',
@@ -523,6 +515,38 @@ class InfoChip extends StatelessWidget {
 
 // ══════════════════════════════════════════════
 // QUICK STATS ROW — 3 chips
+// ══════════════════════════════════════════════
+// SNACK HELPER
+// ══════════════════════════════════════════════
+SnackBar appSnack(String message, {
+  IconData icon = Icons.check_circle_outline_rounded,
+  Color iconColor = AppColors.gold,
+  Color bg = const Color(0xFF1E1E1E),
+  Duration duration = const Duration(seconds: 3),
+}) {
+  return SnackBar(
+    backgroundColor: bg,
+    duration: duration,
+    behavior: SnackBarBehavior.floating,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+    content: Row(
+      children: [
+        Icon(icon, size: 18, color: iconColor),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(message,
+              style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary)),
+        ),
+      ],
+    ),
+  );
+}
+
 // ══════════════════════════════════════════════
 class QuickStatsRow extends StatelessWidget {
   final List<({String label, String value, String emoji, Color color})> stats;

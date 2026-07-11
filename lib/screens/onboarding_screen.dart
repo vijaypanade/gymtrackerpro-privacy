@@ -319,7 +319,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     ShaderMask(
                       shaderCallback: (r) => AppGradients.gold.createShader(r),
                       blendMode: BlendMode.srcIn,
-                      child: Text('Building Your Plan',
+                      child: Text('Setting Up Your Plan',
                         style: GoogleFonts.rajdhani(
                           color: Colors.white, fontSize: 26,
                           fontWeight: FontWeight.w900, letterSpacing: 1,
@@ -327,7 +327,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text('AI is personalising your first week...',
+                    Text('Preparing your first week...',
                       style: GoogleFonts.inter(
                         color: AppColors.textMuted, fontSize: 13,
                       ),
@@ -355,23 +355,34 @@ class _ProgressBar extends StatelessWidget {
     padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xl, vertical: AppSpacing.sm),
     child: Row(
-      children: List.generate(total, (i) => Expanded(
-        child: Padding(
-          padding: EdgeInsets.only(right: i < total - 1 ? 6 : 0),
-          child: AnimatedContainer(
-            duration: AppDurations.normal,
-            height: 3,
-            decoration: BoxDecoration(
-              gradient: i <= current ? AppGradients.gold : null,
-              color: i <= current ? null : AppColors.bgElevated,
-              borderRadius: BorderRadius.circular(2),
-              boxShadow: i <= current ? [BoxShadow(
-                  color: AppColors.gold.withValues(alpha: 0.4),
-                  blurRadius: 6)] : [],
-            ),
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(total, (i) {
+        final isActive   = i == current;
+        final isComplete = i < current;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeInOut,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width:  isActive ? 28 : 8,
+          height: 8,
+          decoration: BoxDecoration(
+            gradient: isActive ? AppGradients.gold : null,
+            color: isActive
+                ? null
+                : isComplete
+                    ? AppColors.goldAmber
+                    : AppColors.bgElevated,
+            borderRadius: BorderRadius.circular(99),
+            boxShadow: isActive
+                ? [BoxShadow(
+                    color: AppColors.gold.withValues(alpha: 0.45),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  )]
+                : [],
           ),
-        ),
-      )),
+        );
+      }),
     ),
   );
 }
@@ -414,8 +425,8 @@ class _Step1 extends StatelessWidget {
       const SizedBox(height: AppSpacing.xxl),
       ...[
         (Icons.trending_up_rounded,   'Progress every week'),
-        (Icons.psychology_rounded,    'Train with adaptive AI'),
-        (Icons.bolt_rounded,          'Build unstoppable consistency'),
+        (Icons.psychology_rounded,    'Your coach adapts as you train.'),
+        (Icons.bolt_rounded,          'Build lasting consistency'),
       ].map((f) => Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.md),
         child: Row(children: [
@@ -634,7 +645,7 @@ class _Step3 extends StatelessWidget {
           color: AppColors.textPrimary, fontSize: 30,
           fontWeight: FontWeight.w900)),
       const SizedBox(height: AppSpacing.xs),
-      Text('AI will build your plan around these.',
+      Text('Your first week is built around your goals.',
           style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
       const SizedBox(height: AppSpacing.xl),
 
@@ -836,12 +847,12 @@ class _Step4 extends StatelessWidget {
                   Expanded(child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(s.label, style: GoogleFonts.rajdhani(
+                      Text(_displayLabel(s), style: GoogleFonts.rajdhani(
                           color: isSelected ? AppColors.gold : AppColors.textPrimary,
                           fontSize: 15, fontWeight: FontWeight.w800,
                           letterSpacing: 0.4)),
                       const SizedBox(height: 2),
-                      Text(s.description, style: GoogleFonts.inter(
+                      Text(_displayDescription(s), style: GoogleFonts.inter(
                           color: AppColors.textMuted, fontSize: 11, height: 1.35),
                           maxLines: 2, overflow: TextOverflow.ellipsis),
                     ],
@@ -862,6 +873,18 @@ class _Step4 extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
       ]),
     );
+  }
+
+  String _displayLabel(SplitStyle s) {
+    if (s == SplitStyle.aiAdaptive) return 'Coach Adaptive';
+    return s.label;
+  }
+
+  String _displayDescription(SplitStyle s) {
+    if (s == SplitStyle.aiAdaptive) {
+      return 'Your schedule adapts each week based on how your body is recovering.';
+    }
+    return s.description;
   }
 
   IconData _splitIcon(SplitStyle s) {
@@ -914,11 +937,11 @@ class _Step5 extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SizedBox(height: AppSpacing.lg),
-        Text('Any weak point?', style: GoogleFonts.rajdhani(
+        Text('Any muscle to focus on?', style: GoogleFonts.rajdhani(
             color: AppColors.textPrimary, fontSize: 28,
             fontWeight: FontWeight.w900)),
         const SizedBox(height: 6),
-        Text('AI will give this muscle extra attention. Optional.',
+        Text('New to gym? No worries — skip this. We\'ll adjust as you train.',
           style: GoogleFonts.inter(
               color: AppColors.textMuted, fontSize: 14, height: 1.5)),
         const SizedBox(height: AppSpacing.xxl),
@@ -1008,8 +1031,8 @@ class _Step5 extends StatelessWidget {
             child: Center(
               child: Text(
                 selected.isEmpty
-                    ? '✓ Skip — no specific weakness'
-                    : 'Skip — no specific weakness',
+                    ? '✓ Skip — no preference yet'
+                    : 'Skip — no preference yet',
                 style: GoogleFonts.inter(
                     color: selected.isEmpty ? AppColors.gold : AppColors.textMuted,
                     fontSize: 13, fontWeight: FontWeight.w600),

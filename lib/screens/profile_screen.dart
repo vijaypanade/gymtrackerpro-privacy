@@ -8,7 +8,6 @@ import '../services/rest_timer_service.dart';
 import 'login_screen.dart';
 
 import 'package:provider/provider.dart';
-import 'package:percent_indicator/circular_percent_indicator.dart';
 
 import '../providers/app_provider.dart';
 import '../providers/gamification_provider.dart';
@@ -71,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _save() {
     final ap = context.read<AppProvider>();
     ap.updateProfile(ap.profile.copyWith(
-      name:           _name.text.trim().isEmpty ? 'Champion' : _name.text.trim(),
+      name:           _name.text.trim().isEmpty ? 'Athlete' : _name.text.trim(),
       age:            int.tryParse(_age.text)       ?? 25,
       weightKg:       double.tryParse(_weight.text)  ?? 70.0,
       heightCm:       double.tryParse(_height.text)  ?? 170.0,
@@ -82,14 +81,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       bodyType:       _bodyType,
     ));
     setState(() { _editing = false; _detailsExpanded = false; });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: const Text('Profile updated!',
-          style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600)),
-      backgroundColor: AppColors.green,
-      behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      appSnack('Profile updated!'));
   }
 
   Future<void> _resetAllData() async {
@@ -148,7 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red, foregroundColor: Colors.white,
+              backgroundColor: AppColors.red.withValues(alpha: 0.15), foregroundColor: AppColors.red,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -162,7 +155,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) return;
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+      fadeRoute(const OnboardingScreen()),
       (_) => false,
     );
   }
@@ -192,7 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red, foregroundColor: Colors.white,
+              backgroundColor: AppColors.red.withValues(alpha: 0.15), foregroundColor: AppColors.red,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -205,7 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await AuthService.instance.signOut();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        fadeRoute(const LoginScreen()),
         (_) => false,
       );
     }
@@ -279,34 +272,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   actions: [
                     Padding(
                       padding: const EdgeInsets.only(right: AppSpacing.lg),
-                      child: GestureDetector(
+                      child: _EditButton(
+                        editing: _editing,
                         onTap: () {
                           if (_editing) {
                             _save();
                           } else {
+                            H.light();
                             setState(() { _editing = true; _detailsExpanded = true; });
                           }
                         },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: AppColors.gold.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: AppColors.gold.withValues(alpha: 0.30)),
-                          ),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(_editing
-                                ? Icons.check_rounded : Icons.edit_rounded,
-                                color: AppColors.gold, size: 13),
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(_editing ? 'Save' : 'Edit',
-                                style: const TextStyle(fontFamily: 'Inter',
-                                    color: AppColors.gold, fontSize: 12,
-                                    fontWeight: FontWeight.w700)),
-                          ]),
-                        ),
                       ),
                     ),
                   ],
@@ -314,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg, AppSpacing.xs, AppSpacing.lg, 20),
+                      20, AppSpacing.xs, 20, 20),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
 
@@ -326,20 +301,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           longestStreak: d.longestStreak,
                           recoveryScore: d.recoveryScore,
                           lifetimeKg:   d.lifetimeKg)),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: 10),
 
                       // ── P3: ATHLETE TIMELINE ───────────────────────────────
                       const _FI(delay: 60, child: AthleteTimelineCard()),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: 10),
 
                       // ── P4: PREMIUM BENEFITS ────────────────────────────────
                       _FI(delay: 70, child: _SubscriptionCard(isPremium: d.isPremium)),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: 10),
 
                       // ── P4b: TRAINING STYLE ────────────────────────────────
                       _FI(delay: 78, child: _TrainingStyleCard(
                           splitStyle: context.read<AppProvider>().splitStyle)),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: 10),
 
                       // ── P5: HEALTH CONNECT ──────────────────────────────────
                       _FI(delay: 85, child: _HealthConnectCard(
@@ -347,7 +322,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         sleepHours: d.sleepHours,
                         todaySteps: d.todaySteps,
                       )),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: 10),
 
                       // ── P6: PERSONAL DETAILS (COLLAPSIBLE) ─────────────────
                       _ExpandableLabel(
@@ -441,6 +416,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
 // ════════════════════════════════════════════════
 // P1 — ATHLETE IDENTITY HERO
 // ════════════════════════════════════════════════
+// EDIT BUTTON — premium circular icon, animated state transition
+// ════════════════════════════════════════════════
+class _EditButton extends StatefulWidget {
+  final bool editing;
+  final VoidCallback onTap;
+  const _EditButton({required this.editing, required this.onTap});
+
+  @override
+  State<_EditButton> createState() => _EditButtonState();
+}
+
+class _EditButtonState extends State<_EditButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _press;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _press = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 80));
+    _scale = Tween<double>(begin: 1.0, end: 0.88)
+        .animate(CurvedAnimation(parent: _press, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() { _press.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSave = widget.editing;
+
+    return GestureDetector(
+      onTapDown:   (_) => _press.forward(),
+      onTapUp:     (_) { _press.reverse(); widget.onTap(); },
+      onTapCancel: ()  => _press.reverse(),
+      child: AnimatedBuilder(
+        animation: _scale,
+        builder: (_, child) => Transform.scale(scale: _scale.value, child: child),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeInOut,
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isSave
+                ? AppColors.gold.withValues(alpha: 0.12)
+                : const Color(0xFF1C1C1C),
+            border: Border.all(
+              color: isSave
+                  ? AppColors.gold.withValues(alpha: 0.55)
+                  : Colors.white.withValues(alpha: 0.10),
+              width: 1.0,
+            ),
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            transitionBuilder: (child, anim) => ScaleTransition(
+              scale: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+              child: FadeTransition(opacity: anim, child: child),
+            ),
+            child: Icon(
+              isSave ? Icons.check_rounded : Icons.edit_outlined,
+              key: ValueKey(isSave),
+              color: isSave
+                  ? AppColors.gold
+                  : Colors.white.withValues(alpha: 0.40),
+              size: 15,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════
 class _HeroCard extends StatelessWidget {
   final UserProfile p;
   final XPSystem xp;
@@ -453,25 +505,6 @@ class _HeroCard extends StatelessWidget {
     required this.longestStreak, required this.recoveryScore,
     required this.lifetimeKg,
   });
-
-  static String _levelColor(String level) => level == 'advanced'
-      ? 'advanced' : level == 'intermediate' ? 'intermediate' : 'beginner';
-
-  static Color _lc(String level) {
-    switch (level) {
-      case 'intermediate': return AppColors.gold.withValues(alpha: 0.82);
-      case 'advanced':     return AppColors.gold;
-      default:             return AppColors.textSecondary;
-    }
-  }
-
-  static Color _lb(String level) {
-    switch (level) {
-      case 'intermediate': return AppColors.gold.withValues(alpha: 0.10);
-      case 'advanced':     return AppColors.gold.withValues(alpha: 0.12);
-      default:             return AppColors.bgElevated;
-    }
-  }
 
   // Dynamic statement driven by real signals — no hardcoded generic copy.
   static String _statement(int streak, int workouts, int recovScore) {
@@ -500,17 +533,15 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final topPct = _topPct(xp.rank);
-    final level  = _levelColor(p.level);
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0C0C07),
-        borderRadius: BorderRadius.circular(AppSpacing.lg),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.28)),
+        color: const Color(0xFF0C0C0C),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(color: const Color(0xFF242424), width: 0.5),
         boxShadow: [
-          BoxShadow(color: AppColors.gold.withValues(alpha: 0.13), blurRadius: 32),
-          BoxShadow(color: AppColors.gold.withValues(alpha: 0.06), blurRadius: 8, spreadRadius: 1),
+          BoxShadow(color: AppColors.gold.withValues(alpha: 0.07), blurRadius: 28),
         ],
       ),
       child: Column(children: [
@@ -519,112 +550,75 @@ class _HeroCard extends StatelessWidget {
           const SizedBox(width: AppSpacing.md),
           Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(p.name, style: const TextStyle(fontFamily: 'Rajdhani',
-                color: AppColors.textPrimary, fontSize: 22,
-                fontWeight: FontWeight.w900)),
+            // Rank name — primary identity (dynamic, never hardcoded)
+            Text(xp.rank.displayName,
+                style: const TextStyle(fontFamily: 'Rajdhani',
+                    color: AppColors.textPrimary, fontSize: 26,
+                    fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+            // User's name — secondary, muted
+            Text(p.name, style: TextStyle(fontFamily: 'Inter',
+                color: AppColors.textMuted.withValues(alpha: 0.55),
+                fontSize: 12, fontWeight: FontWeight.w400)),
             const SizedBox(height: AppSpacing.xs),
-            // Level chip + Top X% chip inline
-            Row(children: [
+            if (topPct.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: _lb(level),
+                  color: AppColors.gold.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                      color: _lc(level).withValues(alpha: 0.30), width: 0.5)),
-                child: Text(
-                    '${p.level[0].toUpperCase()}${p.level.substring(1)}',
-                    style: TextStyle(fontFamily: 'Inter', color: _lc(level),
-                    fontSize: 10, fontWeight: FontWeight.w600)),
+                      color: AppColors.gold.withValues(alpha: 0.25), width: 0.5)),
+                child: Text(topPct, style: TextStyle(
+                    fontFamily: 'Inter',
+                    color: AppColors.gold.withValues(alpha: 0.85),
+                    fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
               ),
-              if (topPct.isNotEmpty) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.gold.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                        color: AppColors.gold.withValues(alpha: 0.30), width: 0.5)),
-                  child: Text(topPct, style: TextStyle(
-                      fontFamily: 'Inter',
-                      color: AppColors.gold.withValues(alpha: 0.85),
-                      fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
-                ),
-              ],
-            ]),
-            const SizedBox(height: AppSpacing.xs),
-            // Dynamic statement
+              const SizedBox(height: AppSpacing.xs),
+            ],
             Text(
               _statement(currentStreak, totalWorkouts, recoveryScore),
               style: TextStyle(
                 fontFamily: 'Inter',
-                color: AppColors.gold.withValues(alpha: 0.80),
-                fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+                color: AppColors.textMuted.withValues(alpha: 0.55),
+                fontSize: 10, fontWeight: FontWeight.w400, letterSpacing: 0.1),
             ),
           ])),
-          // BMI circle
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            CircularPercentIndicator(
-              radius: 22, lineWidth: 2.5,
-              percent: (p.bmi / 40).clamp(0.0, 1.0),
-              center: Text(p.bmi.toStringAsFixed(1), style: const TextStyle(
-                  fontFamily: 'Rajdhani', fontSize: 9,
-                  fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-              progressColor: p.bmiCategory == 'Normal'    ? const Color(0xFFC8AA6E)
-                  : p.bmiCategory == 'Overweight' ? AppColors.yellow
-                  : AppColors.red,
-              backgroundColor: AppColors.bgElevated,
-              circularStrokeCap: CircularStrokeCap.round,
-            ),
-            const SizedBox(height: 3),
-            Text('BMI', style: TextStyle(fontFamily: 'Inter',
-                color: AppColors.textMuted.withValues(alpha: 0.65), fontSize: 8)),
-          ]),
         ]),
 
         const SizedBox(height: AppSpacing.md),
         const Divider(color: AppColors.divider, height: 1),
         const SizedBox(height: AppSpacing.md),
 
-        // Stat row: Tonnes | Sessions | Best Streak
+        // Stat row: Tonnes | Sessions | Streak | BMI
         IntrinsicHeight(child: Row(children: [
-          _heroStat('${(lifetimeKg / 1000).toStringAsFixed(1)}T',
-              'Lifted', AppColors.gold),
+          _heroStat('${(lifetimeKg / 1000).toStringAsFixed(1)}T', 'Lifted'),
           _heroDiv(),
-          _heroStat('$totalWorkouts', 'Sessions', AppColors.textPrimary),
+          _heroStat('$totalWorkouts', 'Sessions'),
           _heroDiv(),
-          _heroStat('${longestStreak}d', 'Best Streak', AppColors.orange),
+          _heroStat('${longestStreak}d', 'Best Streak'),
+          _heroDiv(),
+          _heroStat(p.bmi.toStringAsFixed(1), 'BMI'),
         ])),
         const SizedBox(height: AppSpacing.md),
         const Divider(color: AppColors.divider, height: 1),
         const SizedBox(height: AppSpacing.md),
 
-        // Rank progression
-        XPProgressBar(progress: xp.rankProgress),
-        const SizedBox(height: AppSpacing.xs),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('${xp.rank.displayName} → ${xp.nextRankName}',
-              style: const TextStyle(fontFamily: 'Inter',
-                  color: AppColors.textMuted, fontSize: 11)),
-          Text('${(xp.rankProgress * 100).toInt()}%',
-              style: const TextStyle(fontFamily: 'Inter',
-                  color: AppColors.gold, fontSize: 11,
-                  fontWeight: FontWeight.w700)),
-        ]),
+        // Rank Journey Strip
+        _RankJourneyStrip(currentRank: xp.rank, progress: xp.rankProgress),
       ]),
     );
   }
 
-  static Widget _heroStat(String value, String label, Color color) => Expanded(
+  static Widget _heroStat(String value, String label) => Expanded(
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Text(value, style: TextStyle(fontFamily: 'Rajdhani', color: color,
-          fontSize: 26, fontWeight: FontWeight.w900, height: 1.0),
-          overflow: TextOverflow.ellipsis),
+      Text(value, style: const TextStyle(fontFamily: 'Rajdhani',
+          color: AppColors.textPrimary,
+          fontSize: 22, fontWeight: FontWeight.w900, height: 1.0),
+          overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
       const SizedBox(height: 3),
       Text(label, style: TextStyle(fontFamily: 'Inter',
-          color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 9,
-          fontWeight: FontWeight.w400, letterSpacing: 0),
+          color: AppColors.textMuted.withValues(alpha: 0.50), fontSize: 9,
+          fontWeight: FontWeight.w400, letterSpacing: 0.2),
           textAlign: TextAlign.center),
     ]),
   );
@@ -636,6 +630,194 @@ class _HeroCard extends StatelessWidget {
 
 
 // ════════════════════════════════════════════════
+// RANK JOURNEY STRIP
+// ════════════════════════════════════════════════
+class _RankJourneyStrip extends StatefulWidget {
+  final UserRank currentRank;
+  final double   progress; // 0.0–1.0 within current tier
+
+  const _RankJourneyStrip({required this.currentRank, required this.progress});
+
+  @override
+  State<_RankJourneyStrip> createState() => _RankJourneyStripState();
+}
+
+class _RankJourneyStripState extends State<_RankJourneyStrip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double>   _fill;
+
+  static const _ranks = UserRank.values; // recruit→warrior→gladiator→champion→legend→beast
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900));
+    _fill = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentIdx = _ranks.indexOf(widget.currentRank);
+
+    return AnimatedBuilder(
+      animation: _fill,
+      builder: (_, __) {
+        return Column(
+          children: [
+            // ── Dot + line strip ─────────────────────────────────────
+            SizedBox(
+              height: 28,
+              child: Row(
+                children: List.generate(_ranks.length, (i) {
+                  final isDone    = i < currentIdx;
+                  final isCurrent = i == currentIdx;
+                  final isLast    = i == _ranks.length - 1;
+
+                  // Segment fill for the connecting line after this dot
+                  double segFill = 0.0;
+                  if (isDone) segFill = 1.0;
+                  if (isCurrent) segFill = _fill.value * widget.progress;
+
+                  return Expanded(
+                    child: Row(children: [
+                      // Dot
+                      _RankDot(
+                        done: isDone,
+                        current: isCurrent,
+                        pulseValue: _fill.value,
+                      ),
+                      // Connecting line (skip after last dot)
+                      if (!isLast)
+                        Expanded(
+                          child: Stack(children: [
+                            // Base line
+                            Container(
+                              height: 1.5,
+                              color: const Color(0xFF2A2A2A),
+                            ),
+                            // Filled portion
+                            FractionallySizedBox(
+                              widthFactor: segFill,
+                              child: Container(
+                                height: 1.5,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.gold.withValues(alpha: 0.9),
+                                      AppColors.gold.withValues(alpha: 0.4),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ]),
+                        ),
+                    ]),
+                  );
+                }),
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            // ── Rank labels ──────────────────────────────────────────
+            Row(
+              children: List.generate(_ranks.length, (i) {
+                final isCurrent = i == _ranks.indexOf(widget.currentRank);
+                final isDone    = i < _ranks.indexOf(widget.currentRank);
+                return Expanded(
+                  child: Text(
+                    _ranks[i].displayName,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 8,
+                      fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w400,
+                      color: isCurrent
+                          ? AppColors.gold
+                          : isDone
+                              ? AppColors.textMuted.withValues(alpha: 0.55)
+                              : AppColors.textMuted.withValues(alpha: 0.25),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RankDot extends StatelessWidget {
+  final bool   done;
+  final bool   current;
+  final double pulseValue; // 0.0–1.0 from animation
+
+  const _RankDot({required this.done, required this.current, required this.pulseValue});
+
+  @override
+  Widget build(BuildContext context) {
+    if (done) {
+      return Container(
+        width: 8, height: 8,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.gold,
+        ),
+      );
+    }
+    if (current) {
+      // Pulsing outline dot
+      return Container(
+        width: 10, height: 10,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.transparent,
+          border: Border.all(
+            color: AppColors.gold.withValues(alpha: 0.6 + 0.4 * pulseValue),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.gold.withValues(alpha: 0.15 * pulseValue),
+              blurRadius: 6,
+            ),
+          ],
+        ),
+        child: Center(
+          child: Container(
+            width: 4, height: 4,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.gold,
+            ),
+          ),
+        ),
+      );
+    }
+    // Future rank — empty grey circle
+    return Container(
+      width: 8, height: 8,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.transparent,
+        border: Border.all(color: const Color(0xFF2A2A2A), width: 1.5),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════
 // P4 — PREMIUM
 // ════════════════════════════════════════════════
 class _SubscriptionCard extends StatelessWidget {
@@ -643,8 +825,8 @@ class _SubscriptionCard extends StatelessWidget {
   const _SubscriptionCard({required this.isPremium});
 
   static const _features = [
-    'AI Coach',
-    'Recovery Intelligence',
+    'Coaching',
+    'Recovery Insights',
     'Exercise Mastery',
     'Advanced Analytics',
     'PR Tracking',
@@ -658,12 +840,11 @@ class _SubscriptionCard extends StatelessWidget {
 
   Widget _buildPremiumActive(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0C0C07),
-        borderRadius: BorderRadius.circular(AppSpacing.lg),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.20), width: 0.8),
+        color: const Color(0xFF0F0F0F),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(color: const Color(0xFF242424), width: 0.5),
       ),
       child: Row(children: [
         Container(width: 3, height: 14, decoration: BoxDecoration(
@@ -682,13 +863,8 @@ class _SubscriptionCard extends StatelessWidget {
                 'https://play.google.com/store/account/subscriptions');
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           },
-          child: const Text('Manage', style: TextStyle(
-            fontFamily: 'Inter',
-            color: AppColors.textMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w400,
-            decoration: TextDecoration.underline,
-          )),
+          child: Icon(Icons.chevron_right_rounded,
+              color: AppColors.textMuted.withValues(alpha: 0.45), size: 18),
         ),
       ]),
     );
@@ -698,13 +874,11 @@ class _SubscriptionCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.push(context, slideRoute(const PremiumScreen())),
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
         decoration: BoxDecoration(
-          color: const Color(0xFF0C0C07),
-          borderRadius: BorderRadius.circular(AppSpacing.lg),
-          border: Border.all(color: AppColors.gold.withValues(alpha: 0.28), width: 0.8),
-          boxShadow: [BoxShadow(
-              color: AppColors.gold.withValues(alpha: 0.08), blurRadius: 22)],
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(AppRadii.xl),
+          border: Border.all(color: const Color(0xFF242424), width: 0.5),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
@@ -775,13 +949,11 @@ class _TrainingStyleCard extends StatelessWidget {
         shell?.changeTab(3);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF0C0C0C),
-          borderRadius: BorderRadius.circular(AppSpacing.lg),
-          border: Border.all(
-              color: AppColors.gold.withValues(alpha: 0.14), width: 0.8),
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(AppRadii.xl),
+          border: Border.all(color: const Color(0xFF242424), width: 0.5),
         ),
         child: Row(children: [
           Container(width: 3, height: 14, decoration: BoxDecoration(
@@ -794,17 +966,17 @@ class _TrainingStyleCard extends StatelessWidget {
                 fontFamily: 'Inter', color: AppColors.textMuted,
                 fontSize: 11, fontWeight: FontWeight.w400)),
               const SizedBox(height: 2),
-              Text(splitStyle.label, style: const TextStyle(
-                fontFamily: 'Inter', color: AppColors.textPrimary,
-                fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(
+                splitStyle == SplitStyle.aiAdaptive
+                    ? 'Adaptive Split'
+                    : splitStyle.label,
+                style: const TextStyle(
+                  fontFamily: 'Inter', color: AppColors.textPrimary,
+                  fontSize: 13, fontWeight: FontWeight.w600)),
             ],
           )),
-          const Text('Change', style: TextStyle(
-            fontFamily: 'Inter', color: AppColors.gold,
-            fontSize: 11, fontWeight: FontWeight.w500)),
-          const SizedBox(width: 4),
           Icon(Icons.chevron_right_rounded,
-              color: AppColors.gold.withValues(alpha: 0.60), size: 16),
+              color: AppColors.textMuted.withValues(alpha: 0.45), size: 18),
         ]),
       ),
     );
@@ -845,17 +1017,16 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
     final hasSteps = widget.todaySteps > 0;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(AppSpacing.lg),
-        border: Border.all(
-            color: AppColors.borderSoft.withValues(alpha: 0.18), width: 0.5),
+        color: const Color(0xFF0F0F0F),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(color: const Color(0xFF242424), width: 0.5),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(width: 2, height: 12, decoration: BoxDecoration(
-            color: const Color(0xFF66BB6A).withValues(alpha: 0.70),
+            color: AppColors.gold.withValues(alpha: 0.70),
             borderRadius: BorderRadius.circular(2))),
           const SizedBox(width: 7),
           const Text('Health connect', style: TextStyle(
@@ -865,32 +1036,32 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: const Color(0xFF66BB6A).withValues(alpha: 0.08),
+              color: AppColors.gold.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                  color: const Color(0xFF66BB6A).withValues(alpha: 0.20), width: 0.5)),
+                  color: AppColors.gold.withValues(alpha: 0.20), width: 0.5)),
             child: Text('Connected', style: TextStyle(
               fontFamily: 'Inter',
-              color: const Color(0xFF66BB6A).withValues(alpha: 0.85),
+              color: AppColors.gold.withValues(alpha: 0.85),
               fontSize: 9, fontWeight: FontWeight.w700)),
           ),
         ]),
         const SizedBox(height: AppSpacing.md),
         if (!hasSleep && !hasSteps)
-          const Text('No recent health data',
+          Text('Syncing health data…',
               style: TextStyle(fontFamily: 'Inter',
-                  color: AppColors.textMuted, fontSize: 12))
+                  color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 12))
         else
           IntrinsicHeight(child: Row(children: [
             if (hasSleep) Expanded(child: _HealthCell(
               label: 'Sleep', value: '${widget.sleepHours.toStringAsFixed(1)}h',
-              icon: Icons.bedtime_rounded, color: const Color(0xFF9B8DC4))),
+              icon: Icons.bedtime_outlined)),
             if (hasSleep && hasSteps) Container(
               width: 0.5, margin: const EdgeInsets.symmetric(horizontal: 4),
-              color: AppColors.divider.withValues(alpha: 0.45)),
+              color: AppColors.divider.withValues(alpha: 0.35)),
             if (hasSteps) Expanded(child: _HealthCell(
               label: 'Steps', value: _formatSteps(widget.todaySteps),
-              icon: Icons.directions_walk_rounded, color: AppColors.gold)),
+              icon: Icons.directions_walk_rounded)),
           ])),
       ]),
     );
@@ -910,12 +1081,11 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
         }
       },
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
         decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(AppSpacing.lg),
-          border: Border.all(
-              color: AppColors.borderSoft.withValues(alpha: 0.18), width: 0.5),
+          color: const Color(0xFF0F0F0F),
+          borderRadius: BorderRadius.circular(AppRadii.xl),
+          border: Border.all(color: const Color(0xFF242424), width: 0.5),
         ),
         child: Row(children: [
           Container(
@@ -934,7 +1104,7 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
               fontFamily: 'Inter', color: AppColors.textSecondary,
               fontSize: 13, fontWeight: FontWeight.w600)),
             SizedBox(height: 2),
-            Text('Connect to unlock sleep + recovery intelligence',
+            Text('Connect to track sleep and recovery',
               style: TextStyle(
                 fontFamily: 'Inter', color: AppColors.textMuted,
                 fontSize: 11, fontWeight: FontWeight.w400)),
@@ -957,24 +1127,21 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
 class _HealthCell extends StatelessWidget {
   final String label, value;
   final IconData icon;
-  final Color color;
-  const _HealthCell({
-    required this.label, required this.value,
-    required this.icon, required this.color,
-  });
+  const _HealthCell({required this.label, required this.value, required this.icon});
 
   @override
   Widget build(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, color: color.withValues(alpha: 0.65), size: 16),
+      Icon(icon, color: AppColors.textMuted.withValues(alpha: 0.45), size: 15),
       const SizedBox(height: 4),
-      Text(value, style: TextStyle(fontFamily: 'Rajdhani',
-          color: color, fontSize: 22, fontWeight: FontWeight.w900, height: 1.0)),
+      Text(value, style: const TextStyle(fontFamily: 'Rajdhani',
+          color: AppColors.textPrimary, fontSize: 22,
+          fontWeight: FontWeight.w900, height: 1.0)),
       const SizedBox(height: 2),
       Text(label, style: TextStyle(fontFamily: 'Inter',
-          color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 9,
-          fontWeight: FontWeight.w400, letterSpacing: 0)),
+          color: AppColors.textMuted.withValues(alpha: 0.50), fontSize: 9,
+          fontWeight: FontWeight.w400, letterSpacing: 0.1)),
     ],
   );
 }
@@ -1008,11 +1175,11 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(AppSpacing.lg),
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
     decoration: BoxDecoration(
       color: const Color(0xFF0F0F0F),
-      borderRadius: BorderRadius.circular(AppSpacing.lg),
-      border: Border.all(color: AppColors.gold.withValues(alpha: 0.12), width: 0.8),
+      borderRadius: BorderRadius.circular(AppRadii.xl),
+      border: Border.all(color: const Color(0xFF242424), width: 0.5),
     ),
     child: Column(children: [
       Row(children: [
@@ -1128,7 +1295,7 @@ class _EditForm extends StatelessWidget {
         items: const ['beginner', 'intermediate', 'advanced'],
         onChanged: onLevel),
     const SizedBox(height: AppSpacing.sm),
-    _DD(label: 'AI Trainer Style', value: trainer,
+    _DD(label: 'Coach Style', value: trainer,
         items: const ['friendly', 'strict', 'military', 'motivational'],
         labels: const {'friendly': 'Friendly', 'strict': 'Strict',
           'military': 'Military', 'motivational': 'Hype'},
@@ -1138,7 +1305,7 @@ class _EditForm extends StatelessWidget {
         items: const ['Sedentary', 'Light', 'Moderate', 'High', 'Very High'],
         onChanged: onActivity),
 
-    const SizedBox(height: AppSpacing.lg),
+    const SizedBox(height: 10),
     GoldButton(text: 'Save Profile', width: double.infinity, onTap: onSave),
   ]);
 }

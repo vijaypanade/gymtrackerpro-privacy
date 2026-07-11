@@ -108,18 +108,12 @@ class NotificationService {
     final String title;
     final String body;
 
-    if (currentStreak >= 30) {
-      title = '$currentStreak days. Don\'t stop now.';
-      body  = 'One session protects everything you\'ve built, $userName.';
-    } else if (currentStreak >= 14) {
-      title = 'Streak at risk — $currentStreak days on the line.';
-      body  = 'It only takes 20 minutes. Your body is ready, $userName.';
-    } else if (currentStreak >= 7) {
-      title = '$currentStreak-day habit in progress.';
-      body  = 'This is the window where habits form. Train today.';
+    if (currentStreak >= 7) {
+      title = '$currentStreak days so far.';
+      body  = 'A short session keeps it going.';
     } else {
-      title = 'Training window closing.';
-      body  = 'Protect your $currentStreak-day streak. Even a short session counts.';
+      title = 'No session yet today.';
+      body  = 'Twenty minutes is enough.';
     }
 
     await _scheduleExact(
@@ -148,19 +142,19 @@ class NotificationService {
     switch (streak) {
       case 7:
         title = '7 days straight.';
-        body  = 'Research shows habits start forming here. Keep going, $userName.';
+        body  = 'A full week of training.';
       case 14:
-        title = '14 days. That\'s a system.';
-        body  = 'Two weeks of consistent training — you\'re building something real.';
+        title = '14 days straight.';
+        body  = 'Two weeks, unbroken.';
       case 30:
-        title = '30 days. One month.';
-        body  = 'Automatic behavior threshold reached. This is who you are now, $userName.';
+        title = '30 days straight.';
+        body  = 'A full month of showing up.';
       case 60:
-        title = '60 days of showing up.';
-        body  = 'Most people quit in week two. You\'re still here. That\'s the difference.';
+        title = '60 days straight.';
+        body  = 'Two months. Steady work.';
       case 100:
-        title = '100 days. Top 1%.';
-        body  = 'Consistency at this level is rare. $userName, this is elite.';
+        title = '100 days straight.';
+        body  = 'One hundred sessions of showing up.';
       default:
         return;
     }
@@ -192,8 +186,8 @@ class NotificationService {
 
     await _scheduleExact(
       id:      NotifIds.inactivity,
-      title:   'Three days without training.',
-      body:    'Your body is recovered. It\'s waiting, $userName. Come back today.',
+      title:   'Three days off.',
+      body:    'You\'re rested. A light session today works.',
       time:    fire,
       payload: 'inactivity',
     );
@@ -220,20 +214,15 @@ class NotificationService {
     final String title;
     final String body;
 
-    if (workoutsThisWeek >= 5) {
-      title = 'Elite week.';
-      body  = '$workoutsThisWeek sessions, ${volumeThisWeek.toStringAsFixed(0)}kg lifted. '
-              'Rest up — next week we push further.';
-    } else if (workoutsThisWeek >= 4) {
+    if (workoutsThisWeek >= 4) {
       title = 'Strong week.';
-      body  = '$workoutsThisWeek workouts done, ${volumeThisWeek.toStringAsFixed(0)}kg moved. '
-              'Consistency is compounding.';
+      body  = '$workoutsThisWeek sessions, ${volumeThisWeek.toStringAsFixed(0)}kg lifted. Rest well.';
     } else if (workoutsThisWeek >= 2) {
       title = 'Week complete.';
-      body  = '$workoutsThisWeek sessions logged. Next week, aim for ${workoutsThisWeek + 1}.';
+      body  = '$workoutsThisWeek sessions logged.';
     } else {
-      title = 'New week starts now.';
-      body  = 'Four sessions builds the habit. This is the week to do it.';
+      title = 'New week.';
+      body  = 'One session starts it.';
     }
 
     await _scheduleExact(
@@ -258,7 +247,7 @@ class NotificationService {
     await _plugin.show(
       NotifIds.prCelebration,
       'New record — $exerciseName.',
-      '${weight}kg × $reps reps. Stronger than ever.',
+      '${weight}kg × $reps reps.',
       _notifDetails(),
     );
   }
@@ -286,7 +275,7 @@ class NotificationService {
     await _scheduleExact(
       id:      NotifIds.recoveryCoach,
       title:   '$muscle needs more time.',
-      body:    'At $lowestScore% recovery, $userName — train something fresh today and return tomorrow.',
+      body:    'Train something else today.',
       time:    fire,
       payload: 'recovery_coach',
     );
@@ -314,11 +303,11 @@ class NotificationService {
     final String body;
 
     if (readiness >= 5) {
-      title = 'Body primed. Today is a PR day.';
-      body  = 'Full recovery, $userName. Push harder than usual — conditions are optimal.';
+      title = 'Fully recovered.';
+      body  = 'Good day to push.';
     } else {
-      title = 'Recovery complete.';
-      body  = 'You\'re ready to train at full intensity today, $userName.';
+      title = 'Recovery looks good.';
+      body  = 'Today\'s workout fits.';
     }
 
     await _scheduleExact(
@@ -351,11 +340,11 @@ class NotificationService {
     final String body;
 
     if (planTitle.isNotEmpty) {
-      title = '$planTitle is on today.';
-      body  = 'Your window is open, $userName. Get it done.';
+      title = '$planTitle today.';
+      body  = 'The plan is ready.';
     } else {
       title = 'Training day.';
-      body  = 'Your session is ready, $userName. Let\'s go.';
+      body  = 'The session is ready when you are.';
     }
 
     await _scheduleExact(
@@ -388,18 +377,17 @@ class NotificationService {
     final String body;
 
     if (daysMissed >= 4) {
-      title = 'Inactivity is becoming a pattern.';
-      body  = 'Rebuild before the gap normalizes. Even 20 minutes resets the rhythm.';
+      title = 'A few days off.';
+      body  = 'One session resets the rhythm.';
     } else if (previousStreak >= 7 && daysMissed >= 2) {
-      title = 'Momentum dipped — not lost.';
-      body  = 'One session today recovers faster than a full reset. '
-          'Your $previousStreak-day history doesn\'t disappear.';
+      title = 'Missed a couple of days.';
+      body  = 'Let\'s continue today.';
     } else if (consistencyScore >= 60) {
       title = 'You usually train around now.';
-      body  = 'Two missed days is typically where rhythm breaks for you. Get it done today.';
+      body  = 'A short session fits.';
     } else {
-      title = 'Training window open.';
-      body  = 'Short session beats no session. Consistency matters more than duration.';
+      title = 'No session yet.';
+      body  = 'A short one counts.';
     }
 
     await _scheduleExact(
@@ -453,45 +441,28 @@ class NotificationService {
 
     await cancelSilentDayNotifications();
 
-    final name = userName.isEmpty ? 'Champion' : userName;
-
-    // Day 5 — first real concern signal
+    // Day 5 — calm check-in
     final day5 = DateTime(lastWorkoutDate.year, lastWorkoutDate.month,
         lastWorkoutDate.day + 5, 9, 0);
     if (day5.isAfter(DateTime.now())) {
-      final String t5, b5;
-      if (streak >= 14) {
-        t5 = 'Five days. Your streak is waiting.';
-        b5 = 'You built $streak days of consistency. Don\'t let this be the gap.';
-      } else {
-        t5 = 'Five days without training.';
-        b5 = 'The hardest part is starting again, $name. One session fixes this.';
-      }
-      await _scheduleExact(id: NotifIds.silentDay5, title: t5, body: b5,
-          time: day5, payload: 'silent_day_5');
-    }
-
-    // Day 6 — elevated urgency
-    final day6 = DateTime(lastWorkoutDate.year, lastWorkoutDate.month,
-        lastWorkoutDate.day + 6, 9, 0);
-    if (day6.isAfter(DateTime.now())) {
       await _scheduleExact(
-        id:      NotifIds.silentDay6,
-        title:   'Six days. Your body is ready.',
-        body:    'Fully recovered and waiting, $name. Today is the perfect day to come back.',
-        time:    day6,
-        payload: 'silent_day_6',
+        id:      NotifIds.silentDay5,
+        title:   'Five days off.',
+        body:    'A light session restarts it.',
+        time:    day5,
+        payload: 'silent_day_5',
       );
     }
 
-    // Day 7 — one-week mark, calm but direct
+    // Day 7 — one-week mark, calm and factual.
+    // Day 6 intentionally silent — daily pings read as pressure.
     final day7 = DateTime(lastWorkoutDate.year, lastWorkoutDate.month,
         lastWorkoutDate.day + 7, 9, 0);
     if (day7.isAfter(DateTime.now())) {
       await _scheduleExact(
         id:      NotifIds.silentDay7,
-        title:   'One week. LiftOn misses you.',
-        body:    'Every comeback starts with one session, $name. Open the app — your plan is ready.',
+        title:   'One week off.',
+        body:    'You\'re fully rested. Start lighter than you think.',
         time:    day7,
         payload: 'silent_day_7',
       );

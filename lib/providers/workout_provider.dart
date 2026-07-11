@@ -14,7 +14,7 @@
 //   ❌ DayCompletionResult was nested inside class
 //   ❌ Missing helpers _buildDefaultWeek, _isValidDayIndex, _calcVolume,
 //      _splitTypeForDay, _parseDayIndex, _typeFromNames, _validateAndFixWeekPlan,
-//      _getCategoryFromName, _getEmojiFromName
+//      _getEmojiFromName
 
 import 'dart:async';
 import 'dart:convert';
@@ -104,9 +104,9 @@ class WorkoutProvider extends ChangeNotifier {
   /// Age scaling for recovery: older lifters recover slower.
   /// Sources: Häkkinen 1995, Petrella 2005, NSCA position stand.
   static double _ageRecoveryMultiplier(int age) {
-    if (age < 25) return 0.85;  // faster recovery
-    if (age < 35) return 1.00;  // baseline
-    if (age < 45) return 1.15;  // 15% more recovery time
+    if (age < 25) { return 0.85; }  // faster recovery
+    if (age < 35) { return 1.00; }  // baseline
+    if (age < 45) { return 1.15; }  // 15% more recovery time
     return 1.30;                // 30% more recovery time
   }
 
@@ -182,7 +182,7 @@ class WorkoutProvider extends ChangeNotifier {
   bool get isBeginnerPhase => _streak.totalWorkouts < 7;
 
   int get daysSinceLastWorkout {
-    if (_history.isEmpty) return 0;
+    if (_history.isEmpty) { return 0; }
     try {
       final last = DateTime.parse(_history.first.date);
       return DateTime.now().difference(last).inDays;
@@ -192,20 +192,20 @@ class WorkoutProvider extends ChangeNotifier {
   bool get isInactive => daysSinceLastWorkout >= 3;
 
   DayPlan get todayPlan {
-    if (_weekPlan.isEmpty) return _buildDefaultWeek().first;
+    if (_weekPlan.isEmpty) { return _buildDefaultWeek().first; }
     final i = todayIndex;
-    if (i >= _weekPlan.length) return _weekPlan.last;
+    if (i >= _weekPlan.length) { return _weekPlan.last; }
     return _weekPlan[i];
   }
 
   /// Returns yesterday's DayPlan if it was missed (not completed, not rest, has exercises).
   DayPlan? get yesterdayMissedPlan {
     final yesterdayIdx = (todayIndex - 1 + 7) % 7;
-    if (!_isValidDayIndex(yesterdayIdx)) return null;
+    if (!_isValidDayIndex(yesterdayIdx)) { return null; }
     final yesterday = _weekPlan[yesterdayIdx];
-    if (yesterday.isCompleted) return null;
-    if (yesterday.isRestDay) return null;
-    if (yesterday.exercises.isEmpty) return null;
+    if (yesterday.isCompleted) { return null; }
+    if (yesterday.isRestDay) { return null; }
+    if (yesterday.exercises.isEmpty) { return null; }
     return yesterday;
   }
 
@@ -242,14 +242,14 @@ class WorkoutProvider extends ChangeNotifier {
 
   String get weakestMuscleByLogs {
     final freq = muscleTrainingFrequency;
-    if (freq.isEmpty) return '';
+    if (freq.isEmpty) { return ''; }
     return (freq.entries.toList()..sort((a, b) => a.value.compareTo(b.value)))
         .first.key;
   }
 
   String get topMuscleGroup {
     final m = muscleGroupFrequency;
-    if (m.isEmpty) return 'None';
+    if (m.isEmpty) { return 'None'; }
     return m.entries.reduce((a, b) => a.value > b.value ? a : b).key;
   }
 
@@ -267,6 +267,22 @@ class WorkoutProvider extends ChangeNotifier {
       );
 
   bool get needsDeload => needsDeloadByVolume;
+
+  /// Scales all kg set weights to 60 % of current value (nearest 0.5 kg).
+  /// Applies to every non-rest day in the current week plan.
+  void applyDeloadWeights() {
+    for (final day in _weekPlan) {
+      if (day.isRestDay) continue;
+      for (final ex in day.exercises) {
+        if (ex.unit != 'kg') continue;
+        for (final s in ex.sets) {
+          final reduced = (s.weight * 0.60 * 2).roundToDouble() / 2;
+          s.weight = reduced.clamp(0, 500);
+        }
+      }
+    }
+    _notify();
+  }
 
   List<String> get skippedMuscleGroups {
     const muscles = ['chest', 'back', 'legs', 'shoulders', 'arms'];
@@ -641,6 +657,19 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     _notify();
   }
 
+  // Clears all exercises from the week plan — used when switching to My Own Way
+  Future<void> clearWeekPlan() async {
+    _weekPlan = List.generate(7, (i) => DayPlan(
+      id: 'day_$i',
+      dayIndex: i,
+      title: _dayNames[i],
+      exercises: [],
+      isRestDay: false,
+    ));
+    await _saveWeekPlan();
+    _notify();
+  }
+
   Future<void> toggleRestDay(int i) async {
     if (!_isValidDayIndex(i)) return;
     final day = _weekPlan[i];
@@ -664,10 +693,10 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
   /// _modifier > 1.04 → fresh/improving → adds +2.5kg progressive overload.
   /// _modifier < 1.0  → fatigued/deload → reduces by modifier factor.
   double _progressiveWeight(String name, {String equipment = 'dumbbell'}) {
-    if (_logs.isEmpty) return WeightRounder.round(20.0, equipment);
+    if (_logs.isEmpty) { return WeightRounder.round(20.0, equipment); }
     final key = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
     final matches = _logs.where((l) => l.exercise == key && l.weight > 0).toList();
-    if (matches.isEmpty) return WeightRounder.round(20.0, equipment);
+    if (matches.isEmpty) { return WeightRounder.round(20.0, equipment); }
     matches.sort((a, b) => b.weight.compareTo(a.weight));
     final best = matches.first.weight;
     final raw  = _modifier >= 1.04
@@ -692,9 +721,9 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
   }
 
   PlannedExercise? _findEx(int dayIndex, String exId) {
-    if (!_isValidDayIndex(dayIndex)) return null;
+    if (!_isValidDayIndex(dayIndex)) { return null; }
     final list = _weekPlan[dayIndex].exercises;
-    if (list.isEmpty) return null;
+    if (list.isEmpty) { return null; }
     try {
       return list.firstWhere((e) => e.id == exId);
     } catch (_) {
@@ -800,6 +829,39 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     _notify();
   }
 
+  Future<void> deleteCustomExercise(String id) async {
+    _customExercises.removeWhere((e) => (e['id'] as String? ?? '') == id);
+    await StorageService.instance.setJson(StorageKeys.customExercises, _customExercises);
+    // Also remove from any day plan that still has it
+    for (int i = 0; i < _weekPlan.length; i++) {
+      _weekPlan[i].exercises.removeWhere((e) => e.baseId == id);
+    }
+    await _saveWeekPlan();
+    _notify();
+  }
+
+  Future<void> editCustomExercise({
+    required String id,
+    required String name,
+    required String category,
+    required String emoji,
+    required bool isBodyweight,
+  }) async {
+    final idx = _customExercises.indexWhere((e) => (e['id'] as String? ?? '') == id);
+    if (idx == -1) return;
+    _customExercises[idx] = {
+      ..._customExercises[idx],
+      'name':      name.trim(),
+      'muscle':    category,
+      'emoji':     emoji.isEmpty ? '💪' : emoji,
+      'type':      isBodyweight ? 'Bodyweight' : 'Custom',
+      'bodyweight': isBodyweight,
+      'unit':      isBodyweight ? 'reps' : 'kg',
+    };
+    await StorageService.instance.setJson(StorageKeys.customExercises, _customExercises);
+    _notify();
+  }
+
   // ═════════════════════════════════════════════════════════
   // SET OPERATIONS
   // ═════════════════════════════════════════════════════════
@@ -831,6 +893,8 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     String setId, {
     int?    reps,
     double? weight,
+    int?    rir,
+    bool    clearRir = false,
   }) async {
     // Only today's reps/weight can be logged
     if (dayIndex != todayIndex) return;
@@ -847,6 +911,11 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     if (weight != null) {
       if (weight > 500) return;
       s.weight = weight.clamp(0, 500);
+    }
+    if (clearRir) {
+      s.rir = null;
+    } else if (rir != null) {
+      s.rir = rir.clamp(0, 5);
     }
 
     final wasDone = s.done;
@@ -1096,7 +1165,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
 
     final dateStr = day.completionDate;
     final histIdx = _history.indexWhere((h) {
-      if (dateStr != null && h.date != dateStr) return false;
+      if (dateStr != null && h.date != dateStr) { return false; }
       return h.workoutName == day.title;
     });
 
@@ -1125,25 +1194,25 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
   // MUSCLE RECOVERY
   // ═════════════════════════════════════════════════════════
   double getMuscleRecovery(String muscle) {
-    if (muscle.trim().isEmpty) return 97;
+    if (muscle.trim().isEmpty) { return 97; }
     final key = normalizeMuscle(muscle);
-    if (key.isEmpty) return 97;
+    if (key.isEmpty) { return 97; }
 
     final last = _lastMuscleTrained[key];
-    if (last == null) return 97;
+    if (last == null) { return 97; }
 
     final hours = DateTime.now().difference(last).inHours;
     // Age-adjusted max recovery window: older users need longer recovery.
     final ageMult  = _ageRecoveryMultiplier(_userAge);
     final maxHours = ((_muscleRecoveryHours[key] ?? 48) * ageMult).round();
-    if (maxHours <= 0) return 97;
+    if (maxHours <= 0) { return 97; }
 
     double recovery = ((hours / maxHours) * 100).clamp(0.0, 100.0).roundToDouble();
 
     final streak = _streak.currentStreak;
-    if (streak >= 21)      recovery *= 0.90;
-    else if (streak >= 10) recovery *= 0.94;
-    else if (streak >= 5)  recovery *= 0.97;
+    if (streak >= 21)      { recovery *= 0.90; }
+    else if (streak >= 10) { recovery *= 0.94; }
+    else if (streak >= 5)  { recovery *= 0.97; }
 
     return recovery.clamp(5, 97);
   }
@@ -1160,8 +1229,8 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
 
   int getOverallRecovery({MoodType? mood}) {
     const muscles = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
-    final total = muscles.fold<double>(0.0, (sum, muscle) {
-      return sum + (mood != null
+    final total = muscles.fold<double>(0.0, (total, muscle) {
+      return total + (mood != null
           ? getMuscleRecoveryWithMood(muscle, mood)
           : getMuscleRecovery(muscle));
     });
@@ -1212,7 +1281,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
   /// Returns '' when fewer than 4 sessions logged (insufficient data).
   String getExerciseTrend(String baseId) {
     final logs = getLogsForExercise(baseId);
-    if (logs.length < 4) return '';
+    if (logs.length < 4) { return ''; }
     final trend = AIEngine.getStrengthTrend(logs, baseId);
     return trend == 'insufficient_data' ? '' : trend;
   }
@@ -1326,8 +1395,6 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
               l.date.day   == today.day))
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
-    final prev = history.isNotEmpty ? history.first : null;
-
     // ALL-TIME best across all past sessions — prevents false "NEW PR" vs stale baseline
     // e.g. user hit 40kg 2 months ago, recent sessions at 20kg → don't show "NEW PR" at 30kg
     final allTimeBest = history.isNotEmpty
@@ -1349,7 +1416,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     }
 
     // ── PRIORITY 2: No sets done yet — show PLANNED target as preview ──
-    if (ex.sets.isEmpty) return null;
+    if (ex.sets.isEmpty) { return null; }
     final planned = ex.sets.first;
 
     if (allTimeBest != null) {
@@ -1378,15 +1445,15 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       nextW = planned.weight;
       nextR = planned.reps;
     } else if (reps < 6) {
-      msg = '💪 Heavy day — ${reps} reps · build strength';
+      msg = '💪 Heavy day — $reps reps · build strength';
       nextW = planned.weight;
       nextR = reps;
     } else if (reps > 12) {
-      msg = '🔥 High volume — ${reps} reps · endurance focus';
+      msg = '🔥 High volume — $reps reps · endurance focus';
       nextW = planned.weight;
       nextR = reps;
     } else {
-      msg = '🎯 Hypertrophy zone — ${reps} reps · control & tempo';
+      msg = '🎯 $reps reps — control the tempo';
       nextW = planned.weight;
       nextR = reps;
     }
@@ -1404,7 +1471,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
 
   double adaptiveNextWeight(String exerciseKey, {bool isOnPlateau = false}) {
     final logs = _logs.where((l) => l.exercise == exerciseKey).toList();
-    if (logs.isEmpty) return 20;
+    if (logs.isEmpty) { return 20; }
     logs.sort((a, b) => b.date.compareTo(a.date));
     final last = logs.first;
     if (isOnPlateau) {
@@ -1418,9 +1485,9 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     required int    reps,
     required int    targetReps,
   }) {
-    if (currentWeight <= 0) return 20;
-    if (reps >= targetReps + 2) return (currentWeight + 2.5).clamp(0, 500);
-    if (reps <= targetReps - 3) return (currentWeight - 2.5).clamp(0, 500);
+    if (currentWeight <= 0) { return 20; }
+    if (reps >= targetReps + 2) { return (currentWeight + 2.5).clamp(0, 500); }
+    if (reps <= targetReps - 3) { return (currentWeight - 2.5).clamp(0, 500); }
     return currentWeight.clamp(0, 500);
   }
 
@@ -1429,15 +1496,24 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
   // ═════════════════════════════════════════════════════════
   Future<DayCompletionResult> markDayComplete(
       int dayIndex, int durationMin) async {
-    if (!_isValidDayIndex(dayIndex)) return DayCompletionResult.empty();
+    if (!_isValidDayIndex(dayIndex)) { return DayCompletionResult.empty(); }
 
     final day = _weekPlan[dayIndex];
-    if (day.isCompleted) return DayCompletionResult.empty();
+    if (day.isCompleted) { return DayCompletionResult.empty(); }
 
     // Only today's plan can be newly completed.
-    // A non-today day may only finish if it reached isPendingReview
-    // (all sets confirmed) before the calendar day rolled over.
-    if (dayIndex != todayIndex && !day.isPendingReview) {
+    // A non-today day may finish if it reached isPendingReview (all sets
+    // confirmed before the day rolled over), OR if it is yesterday and has
+    // logged sets — the athlete trained but forgot to press Complete.
+    // Done sets are the evidence; days without them stay incomplete.
+    final yesterdayIdx = (todayIndex - 1 + 7) % 7;
+    final hasDoneSets  =
+        day.exercises.any((e) => e.sets.any((s) => s.done));
+    final isForgottenYesterday =
+        dayIndex == yesterdayIdx && hasDoneSets;
+    if (dayIndex != todayIndex &&
+        !day.isPendingReview &&
+        !isForgottenYesterday) {
       return DayCompletionResult.empty();
     }
 
@@ -1512,7 +1588,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
           if (doneSets.isEmpty) continue;
           final best = doneSets.reduce((a, b) => a.weight >= b.weight ? a : b);
           final vol  = doneSets.fold<double>(
-              0, (sum, s) => sum + (s.weight * s.reps));
+              0, (total, s) => total + (s.weight * s.reps));
           if (vol <= 0) continue;
           topExercises.add(ExerciseMemory(
             name:        ex.name,
@@ -1568,7 +1644,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
   // _averageEffortFromPlan defined ONCE
   double _averageEffortFromPlan() {
     final completed = _weekPlan.where((d) => d.isCompleted).toList();
-    if (completed.isEmpty) return 0;
+    if (completed.isEmpty) { return 0; }
 
     double totalEffort = 0;
     int    countDays   = 0;
@@ -1580,7 +1656,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       totalEffort += ((done / planned) * 100).clamp(0, 100);
       countDays++;
     }
-    if (countDays == 0) return 0;
+    if (countDays == 0) { return 0; }
     return (totalEffort / countDays).clamp(0, 100);
   }
 
@@ -1610,7 +1686,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     final pos = _streak.totalWorkouts % 16;
     if (pos < 4)  return 1;
     if (pos < 8)  return 2;
-    if (pos < 12) return 3;
+    if (pos < 12) { return 3; }
     return 4; // deload
   }
 
@@ -1645,7 +1721,6 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
           _logs.map((e) => e.exercise.split('_').first).toList();
       final newPlan  = <DayPlan>[];
       final modifier = _modifier;
-      final sets     = _recSets;
 
       // Derive the per-day type list from the same split AIEngine used so
       // that bro-split / arnold-split / any override is honoured correctly.
@@ -1966,13 +2041,23 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       );
     }
 
-    _weekPlan[dayIndex] = DayPlan(
+    final old = _weekPlan[dayIndex];
+    // Preserve any completed day — including today. A replan fired right
+    // after finishing a session must not erase that session's completion.
+    final wasCompleted = old.isCompleted && dayIndex <= todayIndex;
+    final newDay = DayPlan(
       id: IdHelper.uuid(),
       dayIndex: dayIndex,
-      title: workout['focus']?.toString() ?? 'AI Workout',
+      title: workout['focus']?.toString() ?? 'Workout',
       exercises: exercises,
       isRestDay: exercises.isEmpty,
     );
+    if (wasCompleted) {
+      newDay.isCompleted     = true;
+      newDay.completionDate  = old.completionDate;
+      newDay.durationMinutes = old.durationMinutes;
+    }
+    _weekPlan[dayIndex] = newDay;
 
     _validateAndFixWeekPlan();
     await _saveWeekPlan();
@@ -1994,6 +2079,9 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       debugPrint('❌ Invalid plan structure');
       return;
     }
+
+    // Snapshot existing completion state so past-day completions survive a plan replace
+    final oldPlan = List<DayPlan>.from(_weekPlan);
 
     final newPlan = <DayPlan>[];
 
@@ -2017,7 +2105,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       }
 
       final exercises = rawExercises.map<PlannedExercise?>((e) {
-        if (e is! Map) return null;
+        if (e is! Map) { return null; }
         final ex = Map<String, dynamic>.from(e);
 
         final exerciseId =
@@ -2034,7 +2122,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
             (ex['name'] as String?)?.trim() ??
             '';
 
-        if (name.isEmpty) return null;
+        if (name.isEmpty) { return null; }
 
         // Detect bodyweight via flag OR by exercise name
         final isBW = ex['bodyweight'] == true || _isBodyweightByName(name);
@@ -2067,13 +2155,23 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       }).whereType<PlannedExercise>().toList();
 
       final focus = (dayMap['focus'] as String?)?.trim();
-      newPlan.add(DayPlan(
+      // Preserve completion state for past days AND today so the planner
+      // still shows ✓ — a replan after today's session must not erase it.
+      final old = i < oldPlan.length ? oldPlan[i] : null;
+      final wasCompleted = old?.isCompleted == true && i <= todayIndex;
+      final newDay = DayPlan(
         id:        IdHelper.uuid(),
         dayIndex:  i,
         title:     (focus != null && focus.isNotEmpty) ? focus : 'Workout',
         exercises: exercises,
         isRestDay: exercises.isEmpty,
-      ));
+      );
+      if (wasCompleted) {
+        newDay.isCompleted    = true;
+        newDay.completionDate = old!.completionDate;
+        newDay.durationMinutes = old.durationMinutes;
+      }
+      newPlan.add(newDay);
     }
 
     while (newPlan.length < 7) {
@@ -2149,7 +2247,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
 
   /// Helper for AIProvider
   List<ExerciseMemory> buildExerciseHistory() {
-    if (_logs.isEmpty) return [];
+    if (_logs.isEmpty) { return []; }
     final cutoff = DateTime.now().subtract(const Duration(days: 21));
 
     final byExercise = <String, List<WorkoutLog>>{};
@@ -2170,7 +2268,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       final best = logs.first;
       if (best.weight == 0 && best.reps == 0) continue;
       final totalVol = logs.fold<double>(
-          0, (sum, l) => sum + (l.weight * (l.reps > 0 ? l.reps : 1)));
+          0, (total, l) => total + (l.weight * (l.reps > 0 ? l.reps : 1)));
 
       memories.add(ExerciseMemory(
         name: entry.key
@@ -2283,19 +2381,19 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
   Future<bool> tryRestoreLogsFromCloud() async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) return false;
+      if (uid == null) { return false; }
       final doc = await FirebaseFirestore.instance
           .collection('workout_history')
           .doc(uid)
           .get()
           .timeout(const Duration(seconds: 10));
-      if (!doc.exists) return false;
+      if (!doc.exists) { return false; }
       final data = doc.data();
-      if (data == null || data['logs'] == null) return false;
+      if (data == null || data['logs'] == null) { return false; }
       final cloudLogs = (data['logs'] as List)
           .map((e) => WorkoutLog.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
-      if (cloudLogs.isEmpty) return false;
+      if (cloudLogs.isEmpty) { return false; }
       _logs = cloudLogs;
       _logs.sort((a, b) => a.date.compareTo(b.date));
       final storage = StorageService.instance;
@@ -2376,32 +2474,32 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       return 'back';
     }
 
-    if (m.contains('shoulder') || m.contains('delt')) return 'shoulders';
+    if (m.contains('shoulder') || m.contains('delt')) { return 'shoulders'; }
 
-    if (m == 'calves' || m == 'calf') return 'calves';
+    if (m == 'calves' || m == 'calf') { return 'calves'; }
 
     if (m.contains('leg') || m.contains('glute') ||
         m.contains('hamstring') || m.contains('calf') ||
-        m.contains('quad')) return 'legs';
+        m.contains('quad')) { return 'legs'; }
 
-    if (m.contains('chest') || m.contains('pec')) return 'chest';
+    if (m.contains('chest') || m.contains('pec')) { return 'chest'; }
 
     if (m.contains('back') || m.contains('lat') ||
         m.contains('row') || m.contains('deadlift') ||
         m.contains('pull') || m.contains('trap') ||
-        m.contains('rhomboid')) return 'back';
+        m.contains('rhomboid')) { return 'back'; }
 
     // Biceps and triceps tracked separately (different recovery cycles)
-    if (m.contains('bicep')) return 'biceps';
-    if (m.contains('tricep')) return 'triceps';
-    if (m.contains('forearm')) return 'arms';
+    if (m.contains('bicep')) { return 'biceps'; }
+    if (m.contains('tricep')) { return 'triceps'; }
+    if (m.contains('forearm')) { return 'arms'; }
 
     // Generic 'arms' or curl → biceps (most curls are bicep-dominant)
-    if (m.contains('curl') || m.contains('arm')) return 'biceps';
+    if (m.contains('curl') || m.contains('arm')) { return 'biceps'; }
 
     if (m.contains('core') || m.contains('abs') ||
         m.contains('plank') || m.contains('crunch') ||
-        m.contains('oblique')) return 'core';
+        m.contains('oblique')) { return 'core'; }
     return 'other';
   }
 
@@ -2410,11 +2508,11 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
 
     // Rear delt exercises → back (pull family)
     if (e.contains('rear delt') || e.contains('reverse fly') ||
-        e.contains('face pull')) return 'back';
+        e.contains('face pull')) { return 'back'; }
 
     if (e.contains('bench') || e.contains('chest') ||
         e.contains('pushup') || e.contains('push-up') ||
-        e.contains('fly') && !e.contains('reverse')) return 'chest';
+        e.contains('fly') && !e.contains('reverse')) { return 'chest'; }
     if (e.contains('pull') || e.contains('row') || e.contains('lat')) {
       return 'back';
     }
@@ -2423,19 +2521,19 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       return 'legs';
     }
     if (e.contains('lateral raise') || e.contains('shoulder') ||
-        e.contains('overhead press')) return 'shoulders';
+        e.contains('overhead press')) { return 'shoulders'; }
 
     // Tricep exercises (separate from biceps)
     if (e.contains('tricep') || e.contains('skull') ||
         e.contains('pushdown') || e.contains('dip') ||
-        e.contains('close grip') || e.contains('kickback')) return 'triceps';
+        e.contains('close grip') || e.contains('kickback')) { return 'triceps'; }
 
     // Bicep exercises
     if (e.contains('curl') || e.contains('bicep') ||
-        e.contains('chin-up') || e.contains('hammer')) return 'biceps';
+        e.contains('chin-up') || e.contains('hammer')) { return 'biceps'; }
 
     if (e.contains('abs') || e.contains('crunch') ||
-        e.contains('plank') || e.contains('oblique')) return 'core';
+        e.contains('plank') || e.contains('oblique')) { return 'core'; }
     return 'other';
   }
 
@@ -2534,27 +2632,17 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       'wide grip pull', 'sissy squat',
     ];
     for (final k in bwKeywords) {
-      if (n.contains(k)) return true;
+      if (n.contains(k)) { return true; }
     }
     return false;
   }
 
-  String _getCategoryFromName(String name) {
-    final n = name.toLowerCase();
-    if (n.contains('bench') || n.contains('push')) return 'Chest';
-    if (n.contains('pull') || n.contains('row')) return 'Back';
-    if (n.contains('squat') || n.contains('leg')) return 'Legs';
-    if (n.contains('curl')) return 'Biceps';
-    if (n.contains('tricep')) return 'Triceps';
-    return 'General';
-  }
-
   String _getEmojiFromName(String name) {
     final n = name.toLowerCase();
-    if (n.contains('bench') || n.contains('push')) return '💪';
-    if (n.contains('pull') || n.contains('row')) return '🏋️';
-    if (n.contains('leg') || n.contains('squat')) return '🦵';
-    if (n.contains('cardio')) return '🔥';
+    if (n.contains('bench') || n.contains('push')) { return '💪'; }
+    if (n.contains('pull') || n.contains('row')) { return '🏋️'; }
+    if (n.contains('leg') || n.contains('squat')) { return '🦵'; }
+    if (n.contains('cardio')) { return '🔥'; }
     return '🏋️';
   }
 
@@ -2646,7 +2734,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
   // ═════════════════════════════════════════════════════════
   double estimatedE1RM(String exerciseKey) {
     final logs = _logs.where((l) => l.exercise == exerciseKey).toList();
-    if (logs.isEmpty) return 0;
+    if (logs.isEmpty) { return 0; }
     double best = 0;
     for (final l in logs) {
       if (l.weight <= 0 || l.reps <= 0) continue;

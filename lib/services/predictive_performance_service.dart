@@ -322,8 +322,9 @@ class PredictivePerformanceService {
   }) {
     int signals = 0;
     if (overreachingLevel >= 2)       signals += 2;
-    if (fatigueTrend >= 3)            signals += 2; // suppressed
-    else if (fatigueTrend >= 2)       signals++;    // accumulating
+    if (fatigueTrend >= 3) {
+      signals += 2; // suppressed
+    } else if (fatigueTrend >= 2)       signals++;    // accumulating
     if (highFatigue)                  signals++;
     if (overTrainingRisk > 65)        signals++;
     if (recoveryScore < 45)           signals++;
@@ -378,10 +379,12 @@ class PredictivePerformanceService {
     required int burnout,
   }) {
     int signals = 0;
-    if (fragility >= 3)    signals += 2; // critical
-    else if (fragility >= 2) signals++; // fragile
-    if (motivTrend >= 3)   signals += 2; // dropping
-    else if (motivTrend >= 2) signals++; // dipping
+    if (fragility >= 3) {
+      signals += 2; // critical
+    } else if (fragility >= 2) signals++; // fragile
+    if (motivTrend >= 3) {
+      signals += 2; // dropping
+    } else if (motivTrend >= 2) signals++; // dipping
     if (daysSince >= 3)    signals++;
     if (intimidation >= 2) signals++;
     if (burnout >= 2)      signals++;

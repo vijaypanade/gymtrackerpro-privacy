@@ -251,20 +251,19 @@ class _CelebrationScreenState extends State<_CelebrationScreen>
   }
 
   String get _headline {
-    if (widget.hasPR)           return 'NEW RECORD! 🏆';
-    if (widget.duration >= 90)  return 'ABSOLUTE BEAST! 🦁';
-    if (widget.duration >= 60)  return 'CRUSHED IT! 🔥';
-    if (widget.duration >= 30)  return 'WORKOUT DONE! 💪';
-    return 'SESSION COMPLETE!';
+    if (widget.hasPR)           return 'NEW RECORD';
+    if (widget.duration >= 90)  return 'LONG SESSION. WELL DONE.';
+    if (widget.duration >= 60)  return 'STRONG SESSION';
+    return 'SESSION COMPLETE';
   }
 
   String get _streakLine {
-    if (widget.streak >= 30) return '🌟 30-day legend status';
-    if (widget.streak >= 14) return '⚡ 2-week warrior achieved!';
-    if (widget.streak >= 7)  return '🔥 Week streak is FIRE!';
-    if (widget.streak >= 3)  return '💪 ${widget.streak} days in a row!';
-    if (widget.streak == 1)  return '🏁 First step taken. Keep going.';
-    return '🚀 Building a habit. Day ${widget.streak}!';
+    if (widget.streak >= 30) return '30 days straight.';
+    if (widget.streak >= 14) return '14 days straight.';
+    if (widget.streak >= 7)  return 'A full week, unbroken.';
+    if (widget.streak >= 3)  return '${widget.streak} days in a row.';
+    if (widget.streak == 1)  return 'Day one. Come back tomorrow.';
+    return 'Day ${widget.streak}.';
   }
 
   @override
@@ -341,7 +340,7 @@ class _CelebrationScreenState extends State<_CelebrationScreen>
                             _Bubble(emoji: '⚡',
                                 value: '+${widget.xp}',
                                 label: 'XP Earned',
-                                color: AppColors.purple),
+                                color: AppColors.textSecondary),
                             _VDivider(),
                             _Bubble(emoji: '🔥',
                                 value: '${widget.streak}d',
@@ -351,7 +350,7 @@ class _CelebrationScreenState extends State<_CelebrationScreen>
                             _Bubble(emoji: '⏱️',
                                 value: '${widget.duration}m',
                                 label: 'Duration',
-                                color: AppColors.blue),
+                                color: AppColors.goldSoft),
                           ]),
                         ),
 

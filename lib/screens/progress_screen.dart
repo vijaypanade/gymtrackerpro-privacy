@@ -39,7 +39,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: Text('Progress 📊', style: TextStyle(fontFamily: 'Rajdhani',fontWeight: FontWeight.w700)),
+        title: const Text('Progress', style: TextStyle(fontFamily: 'Rajdhani',fontWeight: FontWeight.w700)),
         backgroundColor: AppColors.bg,
       ),
       body: Padding(
@@ -60,7 +60,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             const SizedBox(height: 20),
 
             // ✅ FIX: Exercise selector dropdown
-            Text('Select Exercise', style: TextStyle(fontFamily: 'Rajdhani',
+            const Text('Select Exercise', style: TextStyle(fontFamily: 'Rajdhani',
               fontSize: 14, fontWeight: FontWeight.w700,
               color: AppColors.textMuted, letterSpacing: 1,
             )),
@@ -77,7 +77,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 isExpanded: true,
                 dropdownColor: AppColors.bgCard,
                 underline: const SizedBox(),
-                style: TextStyle(fontFamily: 'Inter',color: AppColors.textPrimary, fontSize: 14),
+                style: const TextStyle(fontFamily: 'Inter',color: AppColors.textPrimary, fontSize: 14),
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedExercise = val);
                 },
@@ -92,7 +92,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
             Text(
               '$_selectedExercise Progress',
-              style: TextStyle(fontFamily: 'Rajdhani',
+              style: const TextStyle(fontFamily: 'Rajdhani',
                 fontSize: 18, fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
@@ -110,9 +110,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           const Icon(Icons.show_chart, color: AppColors.gold, size: 48),
                           const SizedBox(height: 12),
                           Text('No data for $_selectedExercise yet',
-                              style: TextStyle(fontFamily: 'Inter',color: AppColors.textMuted)),
+                              style: const TextStyle(fontFamily: 'Inter',color: AppColors.textMuted)),
                           const SizedBox(height: 4),
-                          Text('Log this exercise in Planner to see progress',
+                          const Text('Log this exercise in Planner to see progress',
                               style: TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 12)),
                         ],
                       ),
@@ -131,7 +131,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                               showTitles: true,
                               getTitlesWidget: (value, meta) => Text(
                                 '${value.toInt()}',
-                                style: TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 10),
+                                style: const TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 10),
                               ),
                             ),
                           ),
@@ -140,7 +140,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                               showTitles: true,
                               getTitlesWidget: (value, meta) => Text(
                                 '#${value.toInt() + 1}',
-                                style: TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 10),
+                                style: const TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 10),
                               ),
                             ),
                           ),
@@ -190,9 +190,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
       ),
       child: Column(
         children: [
-          Text(title, style: TextStyle(fontFamily: 'Inter',fontSize: 11, color: AppColors.textMuted)),
+          Text(title, style: const TextStyle(fontFamily: 'Inter',fontSize: 11, color: AppColors.textMuted)),
           const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontFamily: 'Rajdhani',
+          Text(value, style: const TextStyle(fontFamily: 'Rajdhani',
             fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary,
           )),
         ],

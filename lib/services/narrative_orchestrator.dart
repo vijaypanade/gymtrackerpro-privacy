@@ -100,6 +100,10 @@ class NarrativeContext {
   final double previousVolumeKg;  // last same-name session volume; 0.0 = not found
   final bool   hasPreviousSession; // true when previousVolumeKg is meaningful
 
+  // Protein habit memory — ProteinIntelligence finisher source, already
+  // confidence-gated and cooldown-gated by AppProvider. '' = stay silent.
+  final String proteinFinisher;
+
   const NarrativeContext({
     required this.phase,
     required this.recoverySuppressed,
@@ -123,6 +127,7 @@ class NarrativeContext {
     this.sessionSetCount    = 0,
     this.previousVolumeKg   = 0.0,
     this.hasPreviousSession = false,
+    this.proteinFinisher    = '',
   });
 
   NarrativeContext copyWith({
@@ -148,6 +153,7 @@ class NarrativeContext {
     int? sessionSetCount,
     double? previousVolumeKg,
     bool? hasPreviousSession,
+    String? proteinFinisher,
   }) => NarrativeContext(
     phase:              phase              ?? this.phase,
     recoverySuppressed: recoverySuppressed ?? this.recoverySuppressed,
@@ -171,6 +177,7 @@ class NarrativeContext {
     sessionSetCount:    sessionSetCount    ?? this.sessionSetCount,
     previousVolumeKg:   previousVolumeKg   ?? this.previousVolumeKg,
     hasPreviousSession: hasPreviousSession ?? this.hasPreviousSession,
+    proteinFinisher:    proteinFinisher    ?? this.proteinFinisher,
   );
 }
 
@@ -178,6 +185,14 @@ class NarrativeContext {
 
 class NarrativeOrchestrator {
   NarrativeOrchestrator._();
+
+  // Day-rotated wording — the same situation on consecutive days should
+  // never read identically. Rotation index changes daily.
+  static int get _day =>
+      DateTime.now().difference(DateTime(2024)).inDays;
+
+  static String _daily(List<String> variants) =>
+      variants[_day % variants.length];
 
   /// Main entry. Call this from AppProvider — returns the phase-appropriate message.
   static NarrativeMessage build(NarrativeContext ctx) {
@@ -218,12 +233,18 @@ class NarrativeOrchestrator {
   static NarrativeMessage _postWorkout(NarrativeContext ctx) {
     final trained = ctx.trainedToday;
 
+    // Remembered protein habit — provider passes it only when the habit is
+    // reliable and the cooldown allows. Never invented, often silent.
+    final habit = ctx.proteinFinisher;
+    final proteinNote = habit.isNotEmpty
+        ? '${_cap(habit)} usually finishes your day. That still fits today.'
+        : '';
+
     // PR achieved today — acknowledge specifically, then recovery
     if (ctx.prToday && trained.isNotEmpty) {
       return NarrativeMessage(
         label: 'Session Complete',
-        body: '${_cap(trained.first)} PR locked in. Recovery cycle started — '
-            'sleep and protein consolidate the adaptation.',
+        body: '${_cap(trained.first)} PR locked in. Protein and sleep tonight.',
         tone: NarrativeTone.celebrate,
         phase: NarrativePhase.postWorkout,
       );
@@ -234,8 +255,7 @@ class NarrativeOrchestrator {
       final names = trained.take(2).map(_cap).join(' + ');
       return NarrativeMessage(
         label: 'Recovery Window',
-        body: '$names session complete. Recovery demand elevated — '
-            'protein synthesis is active for the next 24–48h.',
+        body: '$names done. Eat well, sleep well.',
         tone: NarrativeTone.recover,
         phase: NarrativePhase.postWorkout,
       );
@@ -245,8 +265,9 @@ class NarrativeOrchestrator {
     if (trained.length == 1) {
       return NarrativeMessage(
         label: 'Recovery Window',
-        body: '${_cap(trained.first)} recovery cycle initiated. '
-            'Adaptation builds in the next 24–48h — sleep and nutrition complete it.',
+        body: proteinNote.isNotEmpty
+            ? '${_cap(trained.first)} done. $proteinNote'
+            : '${_cap(trained.first)} worked hard today. Rest and protein finish the job.',
         tone: NarrativeTone.recover,
         phase: NarrativePhase.postWorkout,
       );
@@ -256,17 +277,17 @@ class NarrativeOrchestrator {
     if (ctx.recoverySuppressed) {
       return const NarrativeMessage(
         label: 'Recovery Window',
-        body: 'Training stress recorded. Recovery is the active phase now — '
-            'restoration drives the adaptation.',
+        body: 'Session done. Recovery is the work now.',
         tone: NarrativeTone.recover,
         phase: NarrativePhase.postWorkout,
       );
     }
 
-    return const NarrativeMessage(
+    return NarrativeMessage(
       label: 'Recovery Window',
-      body: 'Session complete. Adaptation is underway — '
-          'protect it with quality sleep and adequate protein tonight.',
+      body: proteinNote.isNotEmpty
+          ? 'Session complete. $proteinNote'
+          : 'Session complete. Sleep and protein tonight.',
       tone: NarrativeTone.recover,
       phase: NarrativePhase.postWorkout,
     );
@@ -284,8 +305,11 @@ class NarrativeOrchestrator {
     if (limiting.isNotEmpty && ctx.overallRecovery < 50) {
       return NarrativeMessage(
         label: 'Recovery',
-        body: '${_cap(limiting)} recovery remains elevated from yesterday. '
-            'Alternative loading today protects the adaptation.',
+        body: _daily([
+          '${_cap(limiting)} is still recovering. Train around it today.',
+          '${_cap(limiting)} needs one more day. Work something else.',
+          '${_cap(limiting)} is almost back. Not yet, though.',
+        ]),
         tone: NarrativeTone.stabilize,
         phase: NarrativePhase.nextDay,
       );
@@ -295,8 +319,11 @@ class NarrativeOrchestrator {
     if (limiting.isNotEmpty) {
       return NarrativeMessage(
         label: 'Recovery',
-        body: '${_cap(limiting)} fatigue still present. '
-            'A different stimulus today keeps progression moving without overloading recovery.',
+        body: _daily([
+          '${_cap(limiting)} needs another day. Work something else.',
+          '${_cap(limiting)} is close. Give it one more day.',
+          'Leave ${limiting.toLowerCase()} alone today. Everything else is open.',
+        ]),
         tone: NarrativeTone.stabilize,
         phase: NarrativePhase.nextDay,
       );
@@ -307,8 +334,7 @@ class NarrativeOrchestrator {
       final names = ctx.suppressedMuscles.take(2).map(_cap).join(' and ');
       return NarrativeMessage(
         label: 'Recovery',
-        body: '$names still rebuilding from yesterday. '
-            'A different focus today keeps momentum without overloading recovery.',
+        body: '$names still rebuilding. Shift focus today.',
         tone: NarrativeTone.stabilize,
         phase: NarrativePhase.nextDay,
       );
@@ -318,8 +344,7 @@ class NarrativeOrchestrator {
     if (ctx.overallRecovery >= 75) {
       return const NarrativeMessage(
         label: 'Ready',
-        body: 'Recovery is solid after yesterday\'s session. '
-            'Progressive loading is appropriate today.',
+        body: 'Recovery looks good. Ready to push today.',
         tone: NarrativeTone.push,
         phase: NarrativePhase.nextDay,
       );
@@ -341,8 +366,11 @@ class NarrativeOrchestrator {
     if (limiting.isNotEmpty && ctx.overallRecovery < 40) {
       return NarrativeMessage(
         label: 'Recovery',
-        body: '${_cap(limiting)} fatigue is elevated. '
-            'Reducing axial loading today protects recovery quality and long-term adaptation.',
+        body: _daily([
+          '${_cap(limiting)} is still recovering. Go easy on it today.',
+          '${_cap(limiting)} needs more time. Keep it light.',
+          'Still early for ${limiting.toLowerCase()}. Go easy there.',
+        ]),
         tone: NarrativeTone.protect,
         phase: NarrativePhase.preWorkout,
       );
@@ -352,8 +380,11 @@ class NarrativeOrchestrator {
     if (limiting.isNotEmpty && ctx.overallRecovery < 60) {
       return NarrativeMessage(
         label: 'Recovery',
-        body: '${_cap(limiting)} recovery still elevated. '
-            'A different stimulus today keeps progression moving without overloading the tissue.',
+        body: _daily([
+          '${_cap(limiting)} needs more time. Train around it.',
+          '${_cap(limiting)} is getting there. One more easy day.',
+          '${_cap(limiting)} is almost ready. Not today.',
+        ]),
         tone: NarrativeTone.stabilize,
         phase: NarrativePhase.preWorkout,
       );
@@ -361,10 +392,13 @@ class NarrativeOrchestrator {
 
     // High fatigue across multiple muscles
     if (ctx.highFatigue) {
-      return const NarrativeMessage(
+      return NarrativeMessage(
         label: 'Recovery Focus',
-        body: 'Fatigue is building across primary muscle groups. '
-            'Controlled, technical training today maintains momentum safely.',
+        body: _daily([
+          'Fatigue is building. Keep today controlled.',
+          'The body is asking for less. Listen to it today.',
+          'Still carrying fatigue. Lighter work today.',
+        ]),
         tone: NarrativeTone.protect,
         phase: NarrativePhase.preWorkout,
       );
@@ -374,8 +408,7 @@ class NarrativeOrchestrator {
     if (ctx.needsDeload) {
       return const NarrativeMessage(
         label: 'Recovery Focus',
-        body: 'Training load has been accumulating. '
-            'A lighter session today lets the body consolidate the gains from recent weeks.',
+        body: 'You\'ve been pushing for weeks. Go lighter today.',
         tone: NarrativeTone.stabilize,
         phase: NarrativePhase.preWorkout,
       );
@@ -385,8 +418,7 @@ class NarrativeOrchestrator {
     if (ctx.readyMuscles.isNotEmpty && ctx.overallRecovery >= 82) {
       return NarrativeMessage(
         label: 'Progression',
-        body: '${_cap(ctx.readyMuscles.first)} is fully recovered — '
-            'good conditions for a progressive loading session today.',
+        body: '${_cap(ctx.readyMuscles.first)} is fresh. Good day to push it.',
         tone: NarrativeTone.push,
         phase: NarrativePhase.preWorkout,
       );
@@ -396,8 +428,7 @@ class NarrativeOrchestrator {
     if (ctx.isLockedIn) {
       return const NarrativeMessage(
         label: 'Momentum',
-        body: 'Consistency is accelerating. '
-            'Each session compounds — protect the rhythm.',
+        body: 'You\'re in a rhythm. Protect it.',
         tone: NarrativeTone.coach,
         phase: NarrativePhase.preWorkout,
       );
@@ -407,7 +438,7 @@ class NarrativeOrchestrator {
     if (ctx.isRising && ctx.prToday) {
       return const NarrativeMessage(
         label: 'Momentum',
-        body: 'Momentum is climbing. Recent PRs and consistent volume are working.',
+        body: 'Momentum is climbing. It\'s working.',
         tone: NarrativeTone.coach,
         phase: NarrativePhase.preWorkout,
       );
@@ -425,8 +456,7 @@ class NarrativeOrchestrator {
     if (ctx.isLockedIn) {
       return const NarrativeMessage(
         label: 'Rest Day',
-        body: 'Strategic recovery is part of the training plan. '
-            'Muscles adapt and strengthen during rest — this session counts.',
+        body: 'Rest day. Muscles grow now — this counts.',
         tone: NarrativeTone.coach,
         phase: NarrativePhase.restDay,
       );
@@ -435,17 +465,19 @@ class NarrativeOrchestrator {
     if (ctx.recoverySuppressed) {
       return const NarrativeMessage(
         label: 'Rest Day',
-        body: 'Recovery systems active. '
-            'Tissue is rebuilding — sleep and nutrition are the work today.',
+        body: 'Body is rebuilding. Sleep and food are the work today.',
         tone: NarrativeTone.recover,
         phase: NarrativePhase.restDay,
       );
     }
 
-    return const NarrativeMessage(
+    return NarrativeMessage(
       label: 'Rest Day',
-      body: 'Adaptation happens between sessions. '
-          'Strategic rest improves long-term progression — the plan accounts for it.',
+      body: _daily([
+        'Rest day. The plan accounts for it.',
+        'Rest day. Nothing to do here.',
+        'Scheduled rest. It counts as training.',
+      ]),
       tone: NarrativeTone.recover,
       phase: NarrativePhase.restDay,
     );
@@ -461,8 +493,7 @@ class NarrativeOrchestrator {
     if (days >= 10) {
       return const NarrativeMessage(
         label: 'Comeback',
-        body: 'Recovery capacity is fully restored. '
-            'A controlled return today — start lighter than you think you need to.',
+        body: 'You\'re fully rested. Start lighter than you think.',
         tone: NarrativeTone.coach,
         phase: NarrativePhase.comeback,
       );
@@ -471,8 +502,7 @@ class NarrativeOrchestrator {
     if (days >= 7) {
       return const NarrativeMessage(
         label: 'Comeback',
-        body: 'Training rhythm can restart today. '
-            'A single session resets the pattern — controlled effort beats catching up aggressively.',
+        body: 'One session resets the rhythm. Don\'t try to catch up.',
         tone: NarrativeTone.coach,
         phase: NarrativePhase.comeback,
       );
@@ -481,8 +511,7 @@ class NarrativeOrchestrator {
     // 4–6 days
     return const NarrativeMessage(
       label: 'Comeback',
-      body: 'One session today rebuilds the rhythm. '
-          'Consistency compounds — the gap is smaller than it feels.',
+      body: 'The gap is smaller than it feels. One session today.',
       tone: NarrativeTone.coach,
       phase: NarrativePhase.comeback,
     );
@@ -530,20 +559,16 @@ class NarrativeOrchestrator {
       statLine = '$sets sets completed';
     }
 
-    // Injects stat line between the session-name line and the recovery note.
-    // No stat line → messages collapse to the original 1-line format.
-    String body(String header, String recovery) => statLine.isNotEmpty
-        ? '$header\n$statLine.\n$recovery'
-        : '$header $recovery';
+    // Planner owns "what changed" — session stats only.
+    // Recovery/protein guidance lives on the home narrative (single owner).
+    String body(String header) =>
+        statLine.isNotEmpty ? '$header\n$statLine.' : header;
 
     // ── PR locked in — acknowledge first ─────────────────────────────────
     if (ctx.prToday && trained.isNotEmpty) {
       return NarrativeMessage(
         label: 'Session Complete',
-        body: body(
-          '${_cap(trained.first)} PR locked in.',
-          'Recovery cycle started — sleep and protein consolidate the adaptation.',
-        ),
+        body: body('${_cap(trained.first)} PR locked in.'),
         tone: NarrativeTone.celebrate,
         phase: NarrativePhase.postWorkout,
       );
@@ -553,11 +578,8 @@ class NarrativeOrchestrator {
     if (trained.length >= 2) {
       final names = trained.take(2).map(_cap).join(' + ');
       return NarrativeMessage(
-        label: 'Recovery Window',
-        body: body(
-          '$names complete.',
-          'Recovery demand elevated — prioritize protein intake and quality sleep tonight.',
-        ),
+        label: 'Session Complete',
+        body: body('$names complete.'),
         tone: NarrativeTone.recover,
         phase: NarrativePhase.postWorkout,
       );
@@ -566,36 +588,16 @@ class NarrativeOrchestrator {
     // ── Single muscle group ───────────────────────────────────────────────
     if (trained.length == 1) {
       return NarrativeMessage(
-        label: 'Recovery Window',
-        body: body(
-          '${_cap(trained.first)} session logged.',
-          'Protein synthesis elevated — sleep and nutrition complete the adaptation.',
-        ),
-        tone: NarrativeTone.recover,
-        phase: NarrativePhase.postWorkout,
-      );
-    }
-
-    // ── Session done but muscle category unknown ──────────────────────────
-    if (ctx.recoverySuppressed) {
-      return NarrativeMessage(
-        label: 'Recovery Window',
-        body: body(
-          'High training load accumulated.',
-          'Recovery window active — sleep and nutrition are the work now.',
-        ),
+        label: 'Session Complete',
+        body: body('${_cap(trained.first)} session logged.'),
         tone: NarrativeTone.recover,
         phase: NarrativePhase.postWorkout,
       );
     }
 
     return NarrativeMessage(
-      label: 'Recovery Window',
-      body: body(
-        'Session complete.',
-        'Recovery window active for the next 24–48h — '
-        'protein synthesis elevated. Prioritize sleep and nutrition.',
-      ),
+      label: 'Session Complete',
+      body: body('Session complete.'),
       tone: NarrativeTone.recover,
       phase: NarrativePhase.postWorkout,
     );
@@ -609,15 +611,17 @@ class NarrativeOrchestrator {
 
     // Sleep helpers — only used when HC data is present and plausible.
     final bool sleepKnown  = ctx.hasSleepData && ctx.sleepHours >= 1.0;
-    final String sleepStr  = sleepKnown ? ctx.sleepHours.toStringAsFixed(1) : '';
     final bool poorSleep   = sleepKnown && ctx.sleepHours < 6.0;
     final bool strongSleep = sleepKnown && ctx.sleepHours >= 8.0;
 
     if (limiting.isNotEmpty && ctx.overallRecovery < 40) {
       return NarrativeMessage(
         label: 'Recovery',
-        body: '${_cap(limiting)} fatigue is elevated — '
-            'reducing axial loading today protects adaptation quality.',
+        body: _daily([
+          '${_cap(limiting)} is working through it. Keep it out of today\'s plan.',
+          'Skip heavy ${limiting.toLowerCase()} work today.',
+          '${_cap(limiting)} sits this one out.',
+        ]),
         tone: NarrativeTone.protect,
         phase: NarrativePhase.preWorkout,
       );
@@ -626,8 +630,11 @@ class NarrativeOrchestrator {
     if (limiting.isNotEmpty && ctx.overallRecovery < 60) {
       return NarrativeMessage(
         label: 'Recovery',
-        body: '${_cap(limiting)} still recovering. '
-            'Alternative loading maintains progression without overloading the tissue.',
+        body: _daily([
+          'Plan around ${limiting.toLowerCase()} today.',
+          '${_cap(limiting)} gets a lighter role today.',
+          'Keep ${limiting.toLowerCase()} easy in today\'s plan.',
+        ]),
         tone: NarrativeTone.stabilize,
         phase: NarrativePhase.preWorkout,
       );
@@ -636,8 +643,7 @@ class NarrativeOrchestrator {
     if (ctx.highFatigue) {
       return const NarrativeMessage(
         label: 'Readiness',
-        body: 'Fatigue accumulating across primary muscle groups. '
-            'Volume management today protects training quality and adaptation.',
+        body: 'Fatigue is building. Keep today controlled.',
         tone: NarrativeTone.protect,
         phase: NarrativePhase.preWorkout,
       );
@@ -646,8 +652,7 @@ class NarrativeOrchestrator {
     if (ctx.needsDeload) {
       return const NarrativeMessage(
         label: 'Load Management',
-        body: 'Accumulated training stress suggests a lighter session. '
-            'Quality movement over maximal load today.',
+        body: 'You\'ve earned a lighter day. Keep it clean.',
         tone: NarrativeTone.stabilize,
         phase: NarrativePhase.preWorkout,
       );
@@ -658,15 +663,12 @@ class NarrativeOrchestrator {
       final readyList = ctx.readyMuscles.take(2).toList();
       final muscles   = readyList.map(_cap).join(' and ');
       final plural    = readyList.length > 1 ? 'are' : 'is';
-      final score     = ctx.overallRecovery.round();
 
       if (poorSleep) {
         // Good recovery score but sleep limits neurological peak — soften push.
-        return NarrativeMessage(
+        return const NarrativeMessage(
           label: 'Readiness',
-          body: 'Sleep logged at ${sleepStr}h. '
-              'Recovery supports productive training — '
-              'focus on execution quality over maximal loading today.',
+          body: 'Short sleep last night. Keep quality high, loads moderate.',
           tone: NarrativeTone.stabilize,
           phase: NarrativePhase.preWorkout,
         );
@@ -676,17 +678,14 @@ class NarrativeOrchestrator {
         if (strongSleep) {
           return NarrativeMessage(
             label: 'Prime Window',
-            body: 'Sleep at $sleepStr h. $muscles $plural fully recovered at $score% — '
-                'strong recovery foundation supports full training intensity today.',
+            body: 'Sleep helped. $muscles $plural ready — good day to push.',
             tone: NarrativeTone.push,
             phase: NarrativePhase.preWorkout,
           );
         }
         return NarrativeMessage(
           label: 'Prime Window',
-          body: '$muscles $plural fully recovered at $score%. '
-              'Add 1 extra set on your main movement — '
-              'recovery markers support full training intensity today.',
+          body: '$muscles $plural ready. Add a set on your main lift.',
           tone: NarrativeTone.push,
           phase: NarrativePhase.preWorkout,
         );
@@ -695,17 +694,14 @@ class NarrativeOrchestrator {
       if (strongSleep) {
         return NarrativeMessage(
           label: 'Progression',
-          body: 'Sleep at ${sleepStr}h. $muscles $plural recovered well — '
-              'good conditions for consistent loading today.',
+          body: 'Sleep helped today. $muscles $plural ready to work.',
           tone: NarrativeTone.push,
           phase: NarrativePhase.preWorkout,
         );
       }
       return NarrativeMessage(
         label: 'Progression',
-        body: '$muscles $plural recovered well. '
-            'Good conditions for consistent loading — '
-            'push where form allows and keep quality high.',
+        body: '$muscles $plural recovered well. Push where form allows.',
         tone: NarrativeTone.push,
         phase: NarrativePhase.preWorkout,
       );
@@ -713,10 +709,9 @@ class NarrativeOrchestrator {
 
     // Sub-75% recovery with poor sleep — surface the sleep signal as the dominant note.
     if (poorSleep) {
-      return NarrativeMessage(
+      return const NarrativeMessage(
         label: 'Readiness',
-        body: 'Sleep logged at ${sleepStr}h. '
-            'Recovery supports training — focus on execution quality today.',
+        body: 'Short sleep last night. Keep today clean and controlled.',
         tone: NarrativeTone.stabilize,
         phase: NarrativePhase.preWorkout,
       );
@@ -730,8 +725,7 @@ class NarrativeOrchestrator {
     if (ctx.highFatigue) {
       return const NarrativeMessage(
         label: 'Execution',
-        body: 'Pacing this session protects performance quality. '
-            'Prioritise technique and controlled effort over maximal load.',
+        body: 'Pace yourself today. Technique over load.',
         tone: NarrativeTone.stabilize,
         phase: NarrativePhase.preWorkout,
       );
@@ -740,8 +734,7 @@ class NarrativeOrchestrator {
     if (ctx.recoverySuppressed) {
       return const NarrativeMessage(
         label: 'Execution',
-        body: 'Monitor effort closely — tissue is still in recovery phase. '
-            'Quality reps over failure sets today.',
+        body: 'Still recovering. Quality reps, no failure sets.',
         tone: NarrativeTone.protect,
         phase: NarrativePhase.preWorkout,
       );
@@ -750,8 +743,7 @@ class NarrativeOrchestrator {
     if (ctx.readyMuscles.isNotEmpty) {
       return NarrativeMessage(
         label: 'Execution',
-        body: '${_cap(ctx.readyMuscles.first)} is loaded and ready — '
-            'push the intensity on key compound sets.',
+        body: '${_cap(ctx.readyMuscles.first)} is ready. Push the big sets.',
         tone: NarrativeTone.push,
         phase: NarrativePhase.preWorkout,
       );
@@ -759,8 +751,7 @@ class NarrativeOrchestrator {
 
     return const NarrativeMessage(
       label: 'Execution',
-      body: 'Focus on execution quality. '
-          'Controlled tempo and effort compound over time.',
+      body: 'Clean reps. Controlled tempo. That\'s the session.',
       tone: NarrativeTone.coach,
       phase: NarrativePhase.preWorkout,
     );

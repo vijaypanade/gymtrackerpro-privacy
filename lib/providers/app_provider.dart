@@ -64,6 +64,7 @@ import '../services/predictive_performance_service.dart';
 import '../services/adaptive_programming_service.dart';
 import '../services/exercise_intelligence_service.dart';
 import '../services/athlete_memory_service.dart';
+import '../services/observation_engine.dart';
 import '../brain/services/athlete_brain_service.dart';
 import '../brain/models/decision_context.dart';
 import '../brain/models/environment_context.dart';
@@ -71,6 +72,7 @@ import '../brain/models/workout_context.dart';
 import '../services/progression_timeline_service.dart';
 import '../services/weekly_evolution_service.dart';
 import '../services/onboarding_intelligence_service.dart';
+import '../services/protein_intelligence_service.dart';
 import '../services/recovery_prediction_service.dart';
 import '../services/behavioral_pattern_service.dart';
 import '../services/health_connect_service.dart';
@@ -145,6 +147,11 @@ class AppProvider extends ChangeNotifier {
   DateTime?                  _recoveryComputedAt;
   RecoverySessionSuggestion? _cachedRecoverySuggestion;
 
+  // ── Protein signal — lightweight nutrition input to RecoveryEngine ────
+  double?   _todayProteinAdherence;      // % of goal; null = no data yet
+  DateTime? _proteinSignalLoadedAt;
+  bool      _proteinSignalLoading = false;
+
   // ── TrainingAdjustment cache — invalidated with recovery ─────────────
   TrainingAdjustment?   _cachedAdjustment;
   DateTime?             _adjustmentComputedAt;
@@ -213,6 +220,9 @@ class AppProvider extends ChangeNotifier {
   WeeklyReview?  _cachedWeeklyReviewResult;
   DateTime?      _weeklyReviewResultComputedAt;
 
+  // ── Weekly Story viewed state — keyed by ISO week ───────────────────────
+  String _weeklyStoryViewedWeek = '';
+
   // ── TimelineSnapshot — 5-minute TTL ──────────────────────────────────────
   TimelineSnapshot? _cachedTimelineSnapshot;
   DateTime?         _timelineSnapshotComputedAt;
@@ -277,6 +287,15 @@ class AppProvider extends ChangeNotifier {
         ai.load(),
       ]);
 
+      // My Own Way — user builds from scratch, never auto-populate
+      // If the loaded plan is the default fallback (has exercises but style is myOwnWay),
+      // clear it so the planner starts empty as intended.
+      if (settings.splitStyle == SplitStyle.myOwnWay &&
+          workout.weekPlan.any((d) => d.exercises.isNotEmpty) &&
+          workout.streak.totalWorkouts == 0) {
+        await workout.clearWeekPlan();
+      }
+
       // ── Streak health check (with travel mode freeze) ──
       await workout.checkStreakHealth(
         travelModeActive: settings.travelMode,
@@ -293,6 +312,10 @@ class AppProvider extends ChangeNotifier {
 
       // Compute initial analytics + AI insight
       await _recomputeAll();
+
+      // Load weekly-story-viewed state
+      _weeklyStoryViewedWeek = await StorageService.instance
+          .getString(StorageKeys.weeklyStoryViewed) ?? '';
 
       // Load athlete memory (persisted across sessions)
       await loadAthleteMemory();
@@ -565,6 +588,15 @@ class AppProvider extends ChangeNotifier {
     }
     _cachedNarrative = NarrativeOrchestrator.build(_buildNarrativeContext());
     _narrativeCacheTime = now;
+    // The post-workout habit mention consumes its cooldown only when it
+    // actually reached the screen.
+    if (_proteinFinisherHabit.isNotEmpty &&
+        _cachedNarrative!.body.contains(_proteinFinisherHabit)) {
+      final obs = _pendingFinisherObs;
+      _proteinFinisherHabit = '';
+      _pendingFinisherObs   = null;
+      if (obs != null) ObservationEngine.markSeen(obs);
+    }
     return _cachedNarrative!;
   }
 
@@ -672,6 +704,7 @@ class AppProvider extends ChangeNotifier {
       sessionSetCount:    sessionSetCount,
       previousVolumeKg:   previousVolumeKg,
       hasPreviousSession: hasPreviousSession,
+      proteinFinisher:    _proteinFinisherHabit,
     );
   }
 
@@ -715,6 +748,7 @@ class AppProvider extends ChangeNotifier {
       return _cachedRecoveryState!;
     }
     final hs = _latestHealthSnapshot;
+    _maybeRefreshProteinSignal();
     _cachedRecoveryState = RecoveryEngine.compute(
       RecoveryEngineInput(
         lastMuscleTrained:    workout.lastTrainedByMuscle,
@@ -727,10 +761,142 @@ class AppProvider extends ChangeNotifier {
         now:                  now,
         sleepHours:    hs.hasSleepData ? hs.sleepHours   : null,
         todayStepCount: hs.hasStepsData ? hs.todaySteps   : null,
+        proteinAdherencePct:  _effectiveProteinAdherence(now),
       ),
     );
     _recoveryComputedAt = now;
     return _cachedRecoveryState!;
+  }
+
+  // ═════════════════════════════════════════════════════════
+  // PROTEIN SIGNAL — one lightweight input to RecoveryEngine
+  // ═════════════════════════════════════════════════════════
+
+  /// Today's protein target in grams, from the same AIEngine math the
+  /// Daily Protein card uses. Single source of truth — no duplication.
+  int get proteinGoalG {
+    final macros = AIEngine.getMacros(
+      tdee:     tdee,
+      weightKg: user.weightKg,
+      goal:     user.goal,
+    );
+    return macros['protein']!.round();
+  }
+
+  /// Adherence passed to the engine. Before evening, a low percentage just
+  /// means the day isn't over — only neutral/positive values are forwarded
+  /// so an unfinished morning never suppresses recovery.
+  double? _effectiveProteinAdherence(DateTime now) {
+    final pct = _todayProteinAdherence;
+    if (pct == null) return null;
+    if (now.hour < 18 && pct < 80.0) return null;
+    return pct;
+  }
+
+  // Fire-and-forget refresh, at most every 30 minutes.
+  void _maybeRefreshProteinSignal() {
+    if (_proteinSignalLoading) return;
+    final loaded = _proteinSignalLoadedAt;
+    if (loaded != null &&
+        DateTime.now().difference(loaded).inMinutes < 30 &&
+        loaded.day == DateTime.now().day) {
+      return;
+    }
+    refreshProteinSignal();
+  }
+
+  // Reliable protein finisher habit for the post-workout narrative.
+  // '' when the habit is weak (confidence gate) or recently mentioned
+  // (cooldown gate). Cleared once spoken.
+  String _proteinFinisherHabit = '';
+  Observation? _pendingFinisherObs;
+
+  // Today's picked observation for the coach card. Max one per day;
+  // cooldown consumed when the coach message actually carries it.
+  Observation? _dailyObservation;
+  String _dailyObservationDate = '';
+
+  /// All reliable observations, most personal first. Read-only snapshot —
+  /// the ObservationEngine owns confidence gates, callers own display.
+  List<Observation> observationCandidates({ProteinMemory? proteinMemory}) =>
+      ObservationEngine.candidates(
+        logs:           workout.logs,
+        history:        workout.history,
+        streak:         workout.streak,
+        memorySnapshot: athleteMemorySnapshot,
+        proteinMemory:  proteinMemory,
+        recentPRs:      workout.recentPRs,
+      );
+
+  /// Reload today's protein adherence. Called lazily by [recoveryState]
+  /// and explicitly by the Daily Protein card after each log change.
+  Future<void> refreshProteinSignal() async {
+    if (_proteinSignalLoading) return;
+    _proteinSignalLoading = true;
+    try {
+      final pct =
+          await ProteinIntelligenceService.todayAdherencePct(proteinGoalG);
+
+      // Habit memory for the post-workout narrative — reuse ProteinIntelligence,
+      // speak only with a reliable signal and an open engine cooldown.
+      final memory = await ProteinIntelligenceService.getMemory();
+      _pendingFinisherObs = null;
+      _proteinFinisherHabit = '';
+      if (memory.hasSignal && memory.finisherSource.isNotEmpty) {
+        final obs = Observation(
+          id:     'protein_finisher:'
+              '${memory.finisherSource.toLowerCase().replaceAll(' ', '_')}',
+          text:   memory.finisherSource,
+          source: 'protein',
+        );
+        if (await ObservationEngine.pick([obs]) != null) {
+          _pendingFinisherObs   = obs;
+          _proteinFinisherHabit = memory.finisherSource;
+        }
+      }
+
+      // Coach observation — one pick per day, engine-gated. Protein-sourced
+      // observations stay with the protein surfaces (narrative + hub) so the
+      // coach and the fuel line never say the same thing on the same day.
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      if (_dailyObservationDate != today) {
+        _dailyObservationDate = today;
+        _dailyObservation = await ObservationEngine.pick(
+            observationCandidates()
+                .where((o) => o.source != 'protein')
+                .toList());
+      }
+      final bandChanged = _proteinBand(pct) != _proteinBand(_todayProteinAdherence);
+      _todayProteinAdherence = pct;
+      _proteinSignalLoadedAt = DateTime.now();
+      if (bandChanged) {
+        // Only recompute recovery when the modifier would actually change.
+        _cachedRecoveryState = null;
+        _recoveryComputedAt  = null;
+        notifyListeners();
+      }
+    } finally {
+      _proteinSignalLoading = false;
+    }
+  }
+
+  static int _proteinBand(double? pct) {
+    if (pct == null) return 0;
+    if (pct >= 95) return 1;
+    if (pct >= 80) return 2;
+    if (pct >= 60) return 3;
+    return 4;
+  }
+
+  /// One explanatory recovery insight when today's protein is well below
+  /// target late in the day. Explains the likely limiter — never a penalty.
+  /// Empty string when not applicable.
+  String get proteinRecoveryInsight {
+    final pct = _todayProteinAdherence;
+    if (pct == null) return '';
+    if (DateTime.now().hour < 18) return '';
+    if (pct >= 60.0) return '';
+    return 'Recovery is building. Protein will help tonight.';
   }
 
   /// Current adaptive scheduling profile — null when not using AI Adaptive.
@@ -1204,9 +1370,63 @@ class AppProvider extends ChangeNotifier {
         now.difference(_coachMessageComputedAt!).inSeconds < 300) {
       return _cachedCoachMessage!;
     }
-    _cachedCoachMessage     = const CoachBrainService().generate(_buildCoachContext());
+    _cachedCoachMessage     = _withDailyObservation(_withMondayOpener(
+        const CoachBrainService().generate(_buildCoachContext())));
     _coachMessageComputedAt = now;
     return _cachedCoachMessage!;
+  }
+
+  /// One quiet observation per day, appended to routine coach messages.
+  /// Never attached to warnings (P3+), never on Mondays (the weekly opener
+  /// already speaks there). Cooldown is consumed here — the coach card is
+  /// always on the home screen, so an attached observation is a seen one.
+  BrainCoachMessage _withDailyObservation(BrainCoachMessage msg) {
+    final obs = _dailyObservation;
+    if (obs == null ||
+        msg.priority > 2 ||
+        DateTime.now().weekday == DateTime.monday) {
+      return msg;
+    }
+    _dailyObservation = null;
+    ObservationEngine.markSeen(obs);
+    return BrainCoachMessage(
+      title:         msg.title,
+      subtitle:      '${msg.subtitle} ${obs.text}',
+      primaryAction: msg.primaryAction,
+      tone:          msg.tone,
+      intent:        msg.intent,
+      priority:      msg.priority,
+      hasWarning:    msg.hasWarning,
+      isCelebration: msg.isCelebration,
+    );
+  }
+
+  /// Weekly continuity — on Monday the coach references last week's outcome
+  /// once, closing the Weekly Story loop. Skipped for safety-priority
+  /// messages (P3+) so warnings are never diluted.
+  BrainCoachMessage _withMondayOpener(BrainCoachMessage msg) {
+    final now = DateTime.now();
+    if (now.weekday != DateTime.monday || msg.priority > 2) return msg;
+
+    final thisMonday = DateTime(now.year, now.month, now.day);
+    final lastMonday = thisMonday.subtract(const Duration(days: 7));
+    final n = history.where((h) {
+      final d = DateTime.tryParse(h.date);
+      return d != null && !d.isBefore(lastMonday) && d.isBefore(thisMonday);
+    }).length;
+    if (n == 0) return msg;
+
+    final opener = n == 1 ? 'Last week: 1 session.' : 'Last week: $n sessions.';
+    return BrainCoachMessage(
+      title:         msg.title,
+      subtitle:      '$opener ${msg.subtitle}',
+      primaryAction: msg.primaryAction,
+      tone:          msg.tone,
+      intent:        msg.intent,
+      priority:      msg.priority,
+      hasWarning:    msg.hasWarning,
+      isCelebration: msg.isCelebration,
+    );
   }
   // ── WeeklyReview (rich engine output) — 5-minute TTL ─────────────────────
 
@@ -2770,8 +2990,9 @@ class AppProvider extends ChangeNotifier {
   void removeSet(int dayIndex, String exId, String setId) =>
       workout.removeSet(dayIndex, exId, setId);
   void updateSet(int dayIndex, String exId, String setId,
-      {int? reps, double? weight}) =>
-      workout.updateSet(dayIndex, exId, setId, reps: reps, weight: weight);
+      {int? reps, double? weight, int? rir, bool clearRir = false}) =>
+      workout.updateSet(dayIndex, exId, setId,
+          reps: reps, weight: weight, rir: rir, clearRir: clearRir);
   void toggleSetDone(int dayIndex, String exId, String setId) =>
       workout.toggleSetDone(dayIndex, exId, setId);
   void applyAISuggestion(int dayIndex, List<String> suggestions) =>
@@ -2790,6 +3011,7 @@ class AppProvider extends ChangeNotifier {
   Map<String, String> get todayExerciseTrends => workout.todayExerciseTrends;
   int  get mesocycleWeek => workout.mesocycleWeek;
   bool get isDeloadWeek  => workout.isDeloadWeek;
+  void applyDeloadWeights() => workout.applyDeloadWeights();
   int    getPRReps(String key)            => workout.getPRReps(key);
   String? getPRDate(String key, String unit) => workout.getPRDate(key, unit);
   bool   isNewPR(String key, double weight, int reps, String unit,
@@ -2855,11 +3077,11 @@ class AppProvider extends ChangeNotifier {
   String get fatigueMessage => isPremium
       ? ai.insight.fatigueMessage
       : (ai.insight.fatigueLevel == FatigueLevel.fatigued
-          ? 'High fatigue detected — consider an extra rest day.'
+          ? 'Fatigue is high. Take an extra rest day.'
           : 'Recovery looks good. Ready to train today.');
   String get weightSuggestionMessage => isPremium
       ? ai.insight.weightMessage
-      : 'Focus on progressive overload — small weekly increases add up.';
+      : 'Small weekly increases add up.';
   String get weakMuscleInsight {
     if (!isPremium) return 'Complete more sessions to reveal muscle patterns.';
     final w = ai.insight.weakMuscleGroup;
@@ -3343,4 +3565,22 @@ class AppProvider extends ChangeNotifier {
 
   // Generic name expected by some old screens
   String get aiCoachMessage => dailyCoachMessage;
+
+  // ── Weekly Story viewed tracking ────────────────────────────────────────
+  static String _isoWeekKey(DateTime d) {
+    final mon = d.subtract(Duration(days: d.weekday - 1));
+    return '${mon.year}-${mon.month.toString().padLeft(2, '0')}-${mon.day.toString().padLeft(2, '0')}';
+  }
+
+  bool get weeklyStoryViewedThisWeek =>
+      _weeklyStoryViewedWeek == _isoWeekKey(DateTime.now());
+
+  Future<void> markWeeklyStoryViewed() async {
+    final key = _isoWeekKey(DateTime.now());
+    if (_weeklyStoryViewedWeek == key) return;
+    _weeklyStoryViewedWeek = key;
+    notifyListeners();
+    await StorageService.instance
+        .setString(StorageKeys.weeklyStoryViewed, key);
+  }
 }

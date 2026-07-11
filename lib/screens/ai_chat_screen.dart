@@ -17,7 +17,9 @@ import '../services/training_intent_parser.dart';
 import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../services/monetization_service.dart';
+import '../services/observation_engine.dart';
 import '../utils/app_constants.dart';
+import '../utils/app_routes.dart';
 import 'ai_workout_screen.dart';
 
 // Workout generation removed from AI chat.
@@ -33,11 +35,11 @@ class AIChatScreen extends StatefulWidget {
 
   // ✅ static on widget class — accessible via AIChatScreen._quickQuestions
   static const quickQuestions = [
-    "Training guidance",
-    "Recovery analysis",
-    "Protein target",
-    "Fat loss strategy",
-    "Improve consistency",
+    "What should I train today?",
+    "How's my recovery?",
+    "How much protein do I need?",
+    "Help me lose fat",
+    "Help me stay consistent",
   ];
 
   @override
@@ -66,11 +68,14 @@ class _AIChatScreenState extends State<AIChatScreen>
         final p = context.read<AppProvider>();
         final isTravel = p.settings.travelMode;
         final seed = widget.seedContext;
+        final streak = p.streak.currentStreak;
         final opening = (seed != null && seed.isNotEmpty)
             ? seed
             : isTravel
-                ? "Travel mode active.\n\nBodyweight-focused guidance is ready."
-                : "Ready to help with training, recovery, and progress. Ask anything.";
+                ? "Traveling? Bodyweight work still counts.\n\nWhat do you want to train?"
+                : streak >= 3
+                    ? "Good to see you. $streak days straight.\n\nWhat's on for today?"
+                    : "Good to see you.\n\nWhat are you training today?";
         setState(() {
           _messages.add({'role': 'ai', 'text': opening});
         });
@@ -193,8 +198,8 @@ class _AIChatScreenState extends State<AIChatScreen>
       // ═══════════════════════════════════════════════
       // LAYER 1: IDENTITY — Indian Elite Trainer
       // ═══════════════════════════════════════════════
-      buf.writeln('You are LiftOn AI Coach — an elite Indian fitness mentor.');
-      buf.writeln('Personality: Confident, direct, like a senior who trained hundreds. NO fluff, NO lecture.');
+      buf.writeln('You are LiftOn Coach — a calm, experienced Indian strength coach.');
+      buf.writeln('Personality: quiet confidence, like a coach who has trained hundreds. NO fluff, NO lecture, NO report tone.');
       buf.writeln();
       buf.writeln('COMMUNICATION STYLE:');
       buf.writeln('- Sound like a calm, premium Indian fitness coach.');
@@ -243,13 +248,28 @@ class _AIChatScreenState extends State<AIChatScreen>
         final wordLimit = nEx >= 5 ? 300 : (nEx >= 3 ? 220 : 150);
         buf.writeln('- Total reply MUST fit in $wordLimit words.');
         buf.writeln('- Match user level — never overload beginners.');
-        buf.writeln('- Use progressive overload + recovery data for prescription.');
+        buf.writeln('- Progress weights gradually using the recovery data below.');
       } else {
         buf.writeln('EXPERTISE MODE: Conversational Coaching');
-        buf.writeln('- Reply in MAX 3 short sentences. NO long paragraphs.');
-        buf.writeln('- Coach voice: short, direct, action-first.');
+        buf.writeln('- Length: simple questions under 40 words; normal replies '
+            '40-90 words; complex topics max 150 words. Never walls of text.');
+        buf.writeln('- Coach voice: short, direct, action-first. Natural paragraph breaks.');
+        buf.writeln('- CLARIFY BEFORE ASSUMING: if the user sends only 1-2 words '
+            '("bench", "protein", "legs"), do NOT prescribe — ask one short '
+            'clarifying question first ("Planning to train bench today?").');
+        buf.writeln('- FOLLOW-UP VARIETY: end MOST replies (~70%) with one short '
+            'question. Sometimes (~20%) close with a quiet line instead '
+            '("See how that feels.", "I\'d start there."). Occasionally (~10%) '
+            'no follow-up at all. Never ask two questions in one reply.');
         buf.writeln('- Use bullets only if listing 3+ items.');
         buf.writeln('- If you don\'t know, say so — never invent science.');
+        buf.writeln('- BANNED WORDS (never use): optimal, hypertrophy, progressive '
+            'overload, adaptation, muscle synthesis, active recovery, '
+            '"fatigue detected", readiness, "recovery score".');
+        buf.writeln('- NEVER quote scores, percentages or numbers from the data '
+            'below unless the user explicitly asks for numbers.');
+        buf.writeln('- Speak conclusions, not metrics: say "your body needs a '
+            'lighter day", never "readiness is 46/100".');
       }
       buf.writeln();
 
@@ -373,13 +393,14 @@ class _AIChatScreenState extends State<AIChatScreen>
         buf.writeln('- Treat as fresh start: suggest beginner-friendly form-first workout.');
         buf.writeln('- Encourage them to log workouts so AI learns their body.');
       } else {
-        buf.writeln('SCIENTIFIC RECOVERY & READINESS DATA:');
+        buf.writeln('RECOVERY DATA (INTERNAL ONLY — inform your advice, '
+            'NEVER quote these numbers or terms to the user):');
         buf.writeln('- Recovery Score: ${p.recoveryScore.toStringAsFixed(0)}/100');
         buf.writeln('- Training Readiness: ${p.readinessScore.toStringAsFixed(0)}/100');
-        buf.writeln('  → 85+ = peak (PR attempts OK)');
+        buf.writeln('  → 85+ = good day to push hard');
         buf.writeln('  → 60-84 = normal training');
-        buf.writeln('  → 30-59 = light/technique day');
-        buf.writeln('  → <30 = deload or rest');
+        buf.writeln('  → 30-59 = keep it light, focus on form');
+        buf.writeln('  → <30 = suggest rest');
         buf.writeln('- Volume Trend: ${p.needsDeloadByVolume ? "DROPPING — recommend deload" : "Stable/growing"}');
 
         // ── Fix 1: Per-muscle recovery ──────────────────
@@ -420,17 +441,44 @@ class _AIChatScreenState extends State<AIChatScreen>
       buf.writeln('- If readiness 85+ → green light for PR attempt or heavy day.');
       buf.writeln('- If needsDeload = true → MANDATORY mention deload this week.');
       buf.writeln('- If weakMuscle is set → prioritize it 2x/week, mention by name.');
-      buf.writeln('- Always reference user data ("Bhai, your recovery is at X today...").');
+      buf.writeln('- Let the data shape your advice silently — the user should '
+          'feel understood, not measured.');
       buf.writeln();
 
       final contextBlock = _compressedConversationContext(history, p, text);
       if (contextBlock.isNotEmpty) buf.writeln(contextBlock);
 
+      // Continuity — this is one ongoing conversation, not a fresh session.
+      if (history.isNotEmpty) {
+        buf.writeln('ONGOING CONVERSATION RULES:');
+        buf.writeln('- Do NOT greet again. Answer directly.');
+        buf.writeln('- Carry earlier context forward: if the user mentioned pain, '
+            'an injury, a constraint or a goal above, factor it into this '
+            'answer and reference it briefly when relevant '
+            '("Yesterday you mentioned your shoulder...").');
+        buf.writeln('- Never contradict advice you gave earlier in this conversation.');
+        buf.writeln();
+      }
+
+      // One remembered habit — engine-gated (high confidence + 7-day cooldown
+      // shared with every other surface). Absent = stay silent, never invent.
+      final memoryObs = await ObservationEngine.pick(p.observationCandidates());
+      if (memoryObs != null) {
+        buf.writeln('COACH MEMORY (real, verified): "${memoryObs.text}"');
+        buf.writeln('- You MAY weave this in naturally, at most once, and only '
+            'if it fits the user\'s message. Otherwise ignore it silently.');
+        buf.writeln('- Never present it as analysis ("according to data...") — '
+            'just say it like a coach who remembers.');
+        buf.writeln();
+        ObservationEngine.markSeen(memoryObs);
+      }
+
       buf.writeln('User just asked: "$text"');
 
       final reply = await ApiService.askAI(
         buf.toString(),
-        timeout: const Duration(seconds: 60),
+        timeout:   const Duration(seconds: 60),
+        isPremium: p.isPremium,
       );
 
       // Record chat message usage (independent from workout AI limit)
@@ -698,10 +746,7 @@ class _AIChatScreenState extends State<AIChatScreen>
     if (daysList != null && daysList.isNotEmpty) {
       debugPrint("🟡 PREVIEW FIRST DAY: ${daysList.first}");
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => AIWorkoutScreen(plan: plan)),
-    );
+    Navigator.push(context, slideUpRoute(AIWorkoutScreen(plan: plan)));
   }
 
   void _showPaywallSheet() {

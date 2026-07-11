@@ -29,7 +29,7 @@ class AIWorkoutScreen extends StatelessWidget {
             'exercises': plan['exercises'] ?? [],
           }
         ];
-    final workoutName  = plan['workout_name'] as String? ?? 'AI Workout Plan';
+    final workoutName  = plan['workout_name'] as String? ?? 'Training Plan';
     final totalEx      = days.fold<int>(0, (sum, d) {
       final exList = (d['exercises'] as List?) ?? [];
       return sum + exList.length;
@@ -45,7 +45,7 @@ class AIWorkoutScreen extends StatelessWidget {
               color: AppColors.textSecondary, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('AI Plan Preview',
+        title: Text('Plan Preview',
             style: GoogleFonts.rajdhani(
                 color: AppColors.textPrimary,
                 fontSize: 18, fontWeight: FontWeight.w800)),
@@ -61,7 +61,7 @@ class AIWorkoutScreen extends StatelessWidget {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.auto_awesome_rounded, color: AppColors.gold, size: 13),
               const SizedBox(width: 4),
-              Text('Gemini AI', style: GoogleFonts.inter(
+              Text('Generated', style: GoogleFonts.inter(
                   color: AppColors.gold, fontSize: 10, fontWeight: FontWeight.w700)),
             ]),
           ),
@@ -87,7 +87,7 @@ class AIWorkoutScreen extends StatelessWidget {
                   width: 44, height: 44,
                   decoration: const BoxDecoration(
                       shape: BoxShape.circle, gradient: AppGradients.gold),
-                  child: const Center(child: Text('🤖', style: TextStyle(fontSize: 20))),
+                  child: const Center(child: Icon(Icons.fitness_center_rounded, color: Colors.black, size: 22)),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -153,7 +153,7 @@ class _DayCard extends StatelessWidget {
     switch (intensity.toLowerCase()) {
       case 'hard':    return AppColors.red;
       case 'deload':  return AppColors.textMuted;
-      case 'light':   return AppColors.green;
+      case 'light':   return AppColors.gold;
       default:        return AppColors.orange;
     }
   }
@@ -277,7 +277,7 @@ class _ActionBar extends StatelessWidget {
     final normalizedPlan = plan['days'] != null
         ? plan
         : {
-            'workout_name': plan['workout_name'] ?? 'AI Workout',
+            'workout_name': plan['workout_name'] ?? 'Training Plan',
             'days': List.generate(7, (i) {
               final todayIndex = DateTime.now().weekday - 1;
 
@@ -325,7 +325,7 @@ class _ActionBar extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('🚀 Plan applied! Open Planner to start.',
             style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-        backgroundColor: AppColors.green,
+        backgroundColor: const Color(0xFF1E1E1E),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -362,9 +362,9 @@ class _ActionBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.bgSurface,
-        border: const Border(top: BorderSide(color: AppColors.divider))),
+        border: Border(top: BorderSide(color: AppColors.divider))),
       child: Row(children: [
         Expanded(child: OutlinedButton(
           style: OutlinedButton.styleFrom(

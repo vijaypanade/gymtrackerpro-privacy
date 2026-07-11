@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../utils/app_constants.dart';
 import '../engines/pr_engine.dart';
+import 'pr_certificate.dart';
 
 // ════════════════════════════════════════════════
 // RARITY ENUM
@@ -62,14 +63,6 @@ class _RT {
       case PRRarity.normal:    return 'Progress Recorded';
     }
   }
-  static String xpLabel(PRRarity r) {
-    switch (r) {
-      case PRRarity.legendary: return 'Elite Bonus';
-      case PRRarity.elite:     return 'Performance Bonus';
-      case PRRarity.strong:    return 'Strength Bonus';
-      case PRRarity.normal:    return 'PR Bonus';
-    }
-  }
   static List<Color> confetti(PRRarity r) {
     switch (r) {
       case PRRarity.legendary:
@@ -110,16 +103,6 @@ class _RT {
 // ════════════════════════════════════════════════
 // PUBLIC API
 // ════════════════════════════════════════════════
-
-// Helper: convert classification string to PRRarity enum
-PRRarity _toRarity(String? classification) {
-  if (classification == null) return PRRarity.normal;
-  if (classification.contains('LEGENDARY')) return PRRarity.legendary;
-  if (classification.contains('ELITE') || classification.contains('STRONG PR 💪'))
-    return PRRarity.elite;
-  if (classification.contains('STRONG'))    return PRRarity.strong;
-  return PRRarity.normal;
-}
 
 Future<void> showPRCelebration(
   BuildContext context, {
@@ -215,10 +198,10 @@ Future<void> showMatchedPR(BuildContext context, String exerciseName) async {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-          Text('Matched your best!', style: GoogleFonts.rajdhani(
+          Text('Matched your best.', style: GoogleFonts.rajdhani(
               color: AppColors.gold, fontSize: 15,
               fontWeight: FontWeight.w800)),
-          Text('Keep pushing for a new PR 🔥',
+          Text('A new record is within reach.',
               style: GoogleFonts.inter(
                   color: AppColors.textSecondary, fontSize: 11)),
         ])),
@@ -261,8 +244,8 @@ class _CPainter extends CustomPainter {
           for (int i = 0; i < 5; i++) {
             final a1 = (i * 4 * pi / 5) - pi / 2;
             final a2 = a1 + 2 * pi / 5;
-            if (i == 0) path.moveTo(pt.size*.5*cos(a1), pt.size*.5*sin(a1));
-            else path.lineTo(pt.size*.5*cos(a1), pt.size*.5*sin(a1));
+            if (i == 0) { path.moveTo(pt.size*.5*cos(a1), pt.size*.5*sin(a1)); }
+            else { path.lineTo(pt.size*.5*cos(a1), pt.size*.5*sin(a1)); }
             path.lineTo(pt.size*.22*cos(a2), pt.size*.22*sin(a2));
           }
           path.close();
@@ -358,8 +341,6 @@ class _ShakeState extends State<_Shake>
   late AnimationController _c;
   @override void initState() {
     super.initState();
-    final intensity = widget.rarity == PRRarity.legendary ? 10.0
-        : widget.rarity == PRRarity.elite ? 7.0 : 4.0;
     _c = AnimationController(vsync: this,
         duration: const Duration(milliseconds: 600));
     Future.delayed(const Duration(milliseconds: 150),
@@ -503,41 +484,9 @@ class _PRScreenState extends State<_PRScreen>
   }
 
 
-  // ══════════════════════════════════════════════
-  // FIX 1: calculateScore + isPR (volume-based)
-  // ══════════════════════════════════════════════
-  static double calculateScore(double weight, int reps) {
-    // Fix 9: safety — prevent negative or zero
-    final w = weight.clamp(0.0, 999.0);
-    final r = reps.clamp(0, 999);
-    return w * r;
-  }
-
-  static bool isVolumePR({
-    required double newWeight, required int newReps,
-    required double oldWeight, required int oldReps,
-  }) {
-    // Fix 9: safety
-    if (newWeight < 0 || newReps <= 0) return false;
-    if (oldWeight == 0 && oldReps == 0) return true; // first ever
-    return calculateScore(newWeight, newReps) >
-           calculateScore(oldWeight, oldReps);
-  }
-
   // Fix 2: calculateIncrease
   static double calculateIncrease(double newWeight, double oldWeight) =>
       newWeight - oldWeight;
-
-  // Fix 2+3: Round to gym-standard weights (2.5kg increments)
-  static double _roundToGymWeight(double value) {
-    return (value / 2.5).round() * 2.5;
-  }
-
-  // Fix 3: getNextTarget — 5% increase, rounded to gym plates
-  static double getNextTarget(double currentWeight) {
-    if (currentWeight <= 0) return 20.0;
-    return _roundToGymWeight(currentWeight * 1.05);
-  }
 
   // Unified: uses calculateWorkoutFeedback — same logic as workout screen
   static String _nextTargetStr(
@@ -582,20 +531,6 @@ class _PRScreenState extends State<_PRScreen>
     return 'Started: ${first.toStringAsFixed(0)}kg → Now: ${current.toStringAsFixed(0)}kg 🚀';
   }
 
-  // Compute improvement % for nextTarget logic
-  double _computeImprovePct() {
-    if (widget.improvePct > 0) return widget.improvePct;
-    if (widget.prevWeight > 0 && widget.weight > widget.prevWeight) {
-      return ((widget.weight - widget.prevWeight) / widget.prevWeight * 100)
-          .clamp(0.0, 999.0);
-    }
-    if (widget.prevReps > 0 && widget.reps > widget.prevReps) {
-      return ((widget.reps - widget.prevReps) / widget.prevReps * 100)
-          .clamp(0.0, 999.0);
-    }
-    return 0.0;
-  }
-
   // Format exercise name: "ez_bar_curl" → "Ez Bar Curl"
   static String _formatName(String raw) {
     if (raw.isEmpty) return 'Exercise';
@@ -618,34 +553,32 @@ class _PRScreenState extends State<_PRScreen>
   String _coachMsg() {
     final pct      = widget.improvePct;
     final increase = calculateIncrease(widget.weight, widget.prevWeight);
-    final fullName = _formatName(widget.exerciseName);
-    final name     = fullName.split(' ').last;
 
     // Fix 9: safety check
     if (widget.weight < 0 || widget.reps <= 0) {
-      return 'Keep pushing. Every rep counts 💪';
+      return 'Logged. Keep building.';
     }
 
     // First ever
     if (widget.prevWeight == 0 && widget.prevReps == 0) {
-      return 'First milestone unlocked 💪\nLet\'s build something strong.';
+      return 'First lift on record.\nEverything builds from here.';
     }
 
     // Fix 4: buildSmartMessage logic — exact spec
     String msg;
     if (pct >= 30) {
-      msg = '🚀 Massive jump! ${pct.toStringAsFixed(0)}% improvement.';
+      msg = 'A big jump. Well earned.';
     } else if (widget.reps >= 12) {
-      msg = '🔥 Endurance improving. Control looks solid.';
+      msg = 'Endurance is improving.';
     } else if (increase >= 10) {
-      msg = '💪 Big strength gain. You\'re leveling up fast.';
+      msg = 'Real strength gain.';
     } else {
-      msg = '📈 Small progress, big future gains.';
+      msg = 'Small step forward. They add up.';
     }
 
     // Fix 8: Combo PR — append
     if (widget.sessionPRCount >= 2) {
-      msg += '\n🔥 COMBO ×${widget.sessionPRCount}';
+      msg += '\n${widget.sessionPRCount} records this session.';
     }
 
     return msg;
@@ -843,7 +776,7 @@ class _PRScreenState extends State<_PRScreen>
                                 color: AppColors.bgElevated,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text('Previous Best: ${_prevValue}',
+                              child: Text('Previous Best: $_prevValue',
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
                                   style: GoogleFonts.inter(
@@ -857,10 +790,10 @@ class _PRScreenState extends State<_PRScreen>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
-                                color: AppColors.green.withValues(alpha: 0.12),
+                                color: AppColors.gold.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                    color: AppColors.green.withValues(
+                                    color: AppColors.gold.withValues(
                                         alpha: 0.3)),
                               ),
                               child: Text(
@@ -871,7 +804,7 @@ class _PRScreenState extends State<_PRScreen>
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
                                 style: GoogleFonts.inter(
-                                    color: AppColors.green, fontSize: 12,
+                                    color: AppColors.gold, fontSize: 12,
                                     fontWeight: FontWeight.w800)),
                             ),
                           ),
@@ -909,7 +842,7 @@ class _PRScreenState extends State<_PRScreen>
                       const SizedBox(height: 12),
 
                       // ── XP EXPLOSION ──────────────────
-                      _XPExplode(xp: widget.xpEarned, color: AppColors.purple),
+                      _XPExplode(xp: widget.xpEarned, color: AppColors.textSecondary),
 
                       const SizedBox(height: 12),
 
@@ -930,8 +863,7 @@ class _PRScreenState extends State<_PRScreen>
                             decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: AppGradients.gold),
-                            child: const Center(child: Text('🤖',
-                                style: TextStyle(fontSize: 15))),
+                            child: const Center(child: Icon(Icons.psychology_rounded, color: Colors.black, size: 16)),
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(child: Column(
@@ -1012,22 +944,58 @@ class _PRScreenState extends State<_PRScreen>
                 ),
                 const SizedBox(height: AppSpacing.sm),
 
-                // Share button
-                ElevatedButton.icon(
-                  onPressed: _sharePR,
-                  icon: const Icon(Icons.share_rounded, size: 18),
-                  label: Text('Share Achievement',
-                      style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w800, fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                // Certificate + Share buttons
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      HapticFeedback.mediumImpact();
+                      showPRCertificate(
+                        context,
+                        exerciseName: widget.exerciseName,
+                        weight:       widget.weight,
+                        reps:         widget.reps,
+                        unit:         widget.unit,
+                        prevWeight:   widget.prevWeight,
+                        prevReps:     widget.prevReps,
+                        firstWeight:  widget.firstWeight,
+                        improvePct:   widget.improvePct,
+                      );
+                    },
+                    icon: const Icon(Icons.workspace_premium_rounded,
+                        size: 18),
+                    label: Text('Certificate',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w800, fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          AppColors.gold.withValues(alpha: 0.16),
+                      foregroundColor: AppColors.gold,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                              color:
+                                  AppColors.gold.withValues(alpha: 0.35))),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: _sharePR,
+                    icon: const Icon(Icons.share_rounded, size: 18),
+                    label: Text('Share',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w800, fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.1),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ]),
                 const SizedBox(height: AppSpacing.xs),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),

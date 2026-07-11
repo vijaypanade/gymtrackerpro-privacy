@@ -23,10 +23,13 @@ import '../widgets/home/home_overlay_widgets.dart';
 import '../widgets/home/ai_recovery_scan_card.dart';
 import '../widgets/home/athlete_brain_card.dart';
 import '../widgets/home/coach_card.dart';
-import '../widgets/home/weekly_review_card.dart';
+import '../widgets/home/daily_protein_card.dart';
+import '../screens/weekly_story_screen.dart';
 
 import 'ai_chat_screen.dart';
 import 'main_shell.dart';
+import '../services/workout_session_service.dart';
+import '../utils/launch_beacon.dart';
 
 // ════════════════════════════════════════════════
 // PREMIUM ADAPTIVE SCALE
@@ -111,54 +114,91 @@ class _FullDashboard extends StatelessWidget {
         const _HomeAppBar(),
         const SliverToBoxAdapter(child: _ComebackCeremonyGate()),
 
-        // ── 1. RECOVERY INTELLIGENCE — hero surface ───────────────────
+        // ── 1. COACH — message + today's plan + CTA ──────────────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, rs(context, 8), pad, 0),
-            child: const FadeSlide(delay: 0, child: _RecoveryIntelligenceCard()),
+            padding: EdgeInsets.fromLTRB(pad, rs(context, 6), pad, 0),
+            child: const FadeSlide(delay: 0, child: CoachCard()),
           ),
         ),
 
-        // ── 2. AI VERDICT — bridge: analytics → coaching ──────────────
+        // ── 2. RECOVERY INTELLIGENCE ──────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, rs(context, 16), pad, 0),
-            child: const FadeSlide(delay: 40, child: _AIVerdictCard()),
+            padding: EdgeInsets.fromLTRB(pad, rs(context, 6), pad, 0),
+            child: const FadeSlide(delay: 60, child: _RecoveryIntelligenceCard()),
           ),
         ),
 
-        // ── 3. ATHLETE BRAIN — intelligence mission card ──────────────
-        const SliverToBoxAdapter(
-          child: FadeSlide(delay: 60, child: AthleteBrainCard()),
-        ),
-
-        // ── 4. COACH CARD — deterministic coaching ────────────────────
-        const SliverToBoxAdapter(
-          child: FadeSlide(delay: 80, child: CoachCard()),
-        ),
-
-        // ── 5. TODAY'S WORKOUT ────────────────────────────────────────
+        // ── 2b. DAILY PROTEIN — protein-first nutrition ──────────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, rs(context, 16), pad, 0),
-            child: const FadeSlide(delay: 100, child: _TrainingDecisionCard()),
+            padding: EdgeInsets.fromLTRB(pad, rs(context, 6), pad, 0),
+            child: const FadeSlide(delay: 80, child: DailyProteinCard()),
           ),
         ),
 
-        // ── 6. WEEKLY REVIEW — intelligence card ─────────────────────
-        const SliverToBoxAdapter(
-          child: FadeSlide(delay: 120, child: WeeklyReviewCard()),
-        ),
-
-        // ── 7. WEEKLY PROGRESS STRIP ──────────────────────────────────
+        // ── 3. WEEKLY PROGRESS STRIP ─────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, rs(context, 8), pad, 0),
-            child: const FadeSlide(delay: 140, child: _WeeklyProgressStrip()),
+            padding: EdgeInsets.fromLTRB(pad, rs(context, 6), pad, 0),
+            child: const FadeSlide(delay: 100, child: _WeeklyProgressStrip()),
           ),
         ),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 20)),
+        // ── 3b. WEEKLY STORY CTA — subtle, earned reward ────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(pad, 0, pad, 0),
+            child: const _WeeklyStoryCTA(),
+          ),
+        ),
+
+        // ── 4. ATHLETE BRAIN — shown only after 5 workouts ───────────
+        SliverToBoxAdapter(
+          child: Selector<AppProvider, int>(
+            selector: (_, ap) => ap.totalWorkouts,
+            builder: (ctx, totalWorkouts, __) => Padding(
+              padding: EdgeInsets.fromLTRB(pad, rs(ctx, 6), pad, 0),
+              child: FadeSlide(
+                delay: 100,
+                child: totalWorkouts >= 5
+                    ? const AthleteBrainCard()
+                    : _AthleteBrainLocked(totalWorkouts: totalWorkouts),
+              ),
+            ),
+          ),
+        ),
+
+        // ── 5. TODAY'S PLAN — day 1 only (disappears after first workout) ─
+        SliverToBoxAdapter(
+          child: Selector<AppProvider,
+              ({int totalWorkouts, String title, int exCount, int setCount})>(
+            selector: (_, ap) {
+              final today = ap.todayPlan;
+              return (
+                totalWorkouts: ap.totalWorkouts,
+                title:    today.title,
+                exCount:  today.exercises.length,
+                setCount: today.exercises.fold(0, (s, e) => s + e.sets.length),
+              );
+            },
+            builder: (ctx, d, __) {
+              if (d.totalWorkouts > 0) return const SizedBox.shrink();
+              if (d.exCount == 0)      return const SizedBox.shrink();
+              return Padding(
+                padding: EdgeInsets.fromLTRB(pad, rs(ctx, 6), pad, 0),
+                child: FadeSlide(delay: 120, child: _TodayPlanCard(
+                  title:    d.title,
+                  exCount:  d.exCount,
+                  setCount: d.setCount,
+                )),
+              );
+            },
+          ),
+        ),
+
+        const SliverToBoxAdapter(child: SizedBox(height: 12)),
       ],
     );
   }
@@ -212,26 +252,59 @@ class _HomeAppBar extends StatelessWidget {
 class _HomeAppBarTitle extends StatelessWidget {
   const _HomeAppBarTitle();
 
-  static String _greeting() {
+  static String _contextLine({
+    required bool isCompleted,
+    required bool isRestDay,
+    required String planTitle,
+    required int totalWorkouts,
+  }) {
     final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    if (h < 21) return 'Good evening';
-    return 'Good night';
+    final timeSlot = h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night';
+
+    if (totalWorkouts == 0) {
+      return h < 12 ? 'Ready to start?' : 'First workout awaits';
+    }
+    if (isRestDay) {
+      return 'Rest $timeSlot — body is recovering';
+    }
+    if (isCompleted) {
+      final plan = planTitle.isNotEmpty ? planTitle : 'Workout';
+      return 'Rest $timeSlot — $plan done';
+    }
+    // Pending workout
+    return h < 12 ? 'Morning — time to train' :
+           h < 17 ? 'Afternoon session ready' :
+           h < 21 ? 'Evening grind' : 'Late session — let\'s go';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Selector<AppProvider, String>(
-      selector: (_, ap) => ap.profile.name,
-      builder: (_, name, __) {
-        final first = name.isEmpty ? null : name.split(' ').first;
+    return Selector<AppProvider,
+        ({String name, bool isCompleted, bool isRestDay, String planTitle, int totalWorkouts})>(
+      selector: (_, ap) {
+        final plan = ap.todayPlan;
+        return (
+          name:          ap.profile.name,
+          isCompleted:   plan.isCompleted,
+          isRestDay:     plan.isRestDay,
+          planTitle:     plan.title,
+          totalWorkouts: ap.totalWorkouts,
+        );
+      },
+      builder: (_, d, __) {
+        final first = d.name.isEmpty ? null : d.name.split(' ').first;
+        final line  = _contextLine(
+          isCompleted:   d.isCompleted,
+          isRestDay:     d.isRestDay,
+          planTitle:     d.planTitle,
+          totalWorkouts: d.totalWorkouts,
+        );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _greeting(),
+              line,
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 11,
@@ -594,13 +667,14 @@ class _RecoveryIntelligenceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Selector<AppProvider,
         ({int overall, List<MuscleRecovery> muscles, double readiness,
-          double sleepHours, int todaySteps})>(
+          double sleepHours, int todaySteps, int totalWorkouts})>(
       selector: (_, ap) => (
-        overall:    ap.getOverallRecovery(),
-        muscles:    ap.muscleRecoveryList,
-        readiness:  ap.weeklyReadinessScore,
-        sleepHours: ap.coachSleepHours,
-        todaySteps: ap.healthTodaySteps,
+        overall:       ap.getOverallRecovery(),
+        muscles:       ap.muscleRecoveryList,
+        readiness:     ap.weeklyReadinessScore,
+        sleepHours:    ap.coachSleepHours,
+        todaySteps:    ap.healthTodaySteps,
+        totalWorkouts: ap.totalWorkouts,
       ),
       builder: (ctx, d, __) {
         if (d.muscles.isEmpty) return const _OnboardingRecoveryCard();
@@ -612,13 +686,13 @@ class _RecoveryIntelligenceCard extends StatelessWidget {
         final allBalanced = weakest.recoveryScore >= 90;
         final trendDelta = ((d.readiness * 100 - d.overall) * 0.14).round().clamp(-12, 12);
 
-        final recoveryColor = d.overall >= 80
-            ? AppColors.green
+        final recoveryColor = d.overall >= 70
+            ? AppColors.gold
             : d.overall >= 50
                 ? AppColors.orange
                 : AppColors.red;
 
-        final statusLabel = d.overall >= 80
+        final statusLabel = d.overall >= 70
             ? 'Ready'
             : d.overall >= 50
                 ? 'Adapting'
@@ -630,7 +704,7 @@ class _RecoveryIntelligenceCard extends StatelessWidget {
                 ? 'Declining'
                 : 'Stable';
         final trendColor = trendDelta > 2
-            ? AppColors.green
+            ? AppColors.gold
             : trendDelta < -2
                 ? AppColors.red
                 : AppColors.orange;
@@ -639,29 +713,32 @@ class _RecoveryIntelligenceCard extends StatelessWidget {
           onTap: () { HapticFeedback.lightImpact(); _openScan(ctx); },
           behavior: HitTestBehavior.opaque,
           child: Container(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: const Color(0xFF0F0F0F),
               borderRadius: BorderRadius.circular(AppRadii.xl),
+              border: Border.all(color: const Color(0xFF242424), width: 0.5),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                 // ── Ring (left) · Status info (right) ────────────────
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // Recovery ring — atmospheric glow + dominant number
                     Container(
-                      width: 92,
-                      height: 92,
+                      width: 76,
+                      height: 76,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: recoveryColor.withValues(alpha: 0.22),
-                            blurRadius: 32,
-                            spreadRadius: 2,
+                            color: recoveryColor.withValues(alpha: 0.13),
+                            blurRadius: 18,
+                            spreadRadius: 0,
                           ),
                         ],
                       ),
@@ -671,42 +748,44 @@ class _RecoveryIntelligenceCard extends StatelessWidget {
                           ringColor: recoveryColor,
                         ),
                         child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                '${d.overall}',
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  color: AppColors.textPrimary,
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.0,
-                                  shadows: [
-                                    Shadow(
-                                      color: recoveryColor.withValues(alpha: 0.35),
-                                      blurRadius: 12,
-                                    ),
-                                  ],
+                          child: Transform.translate(
+                            offset: const Offset(0, 3),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${d.overall}',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    color: AppColors.textPrimary,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.0,
+                                    shadows: [
+                                      Shadow(
+                                        color: recoveryColor.withValues(alpha: 0.35),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                '%',
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  color: AppColors.textMuted.withValues(alpha: 0.60),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w400,
+                                Text(
+                                  '%',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    color: AppColors.textMuted.withValues(alpha: 0.55),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.0,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     // Status info
                     Expanded(
                       child: Column(
@@ -734,94 +813,107 @@ class _RecoveryIntelligenceCard extends StatelessWidget {
                               ),
                             ),
                           ]),
-                          const SizedBox(height: 7),
+                          const SizedBox(height: 4),
                           // Primary status — hero headline of the card
                           Text(
                             allBalanced
                                 ? 'All muscles ready'
-                                : '${_abbr(weakest.muscle)} · ${weakest.recoveryScore >= 70 ? "Recovering" : "Needs rest"}',
-                            style: TextStyle(
+                                : strongest.recoveryScore >= 80
+                                    ? '${_abbr(strongest.muscle)} ready to train'
+                                    : 'Recovery in progress',
+                            style: const TextStyle(
                               fontFamily: 'Inter',
-                              color: allBalanced
-                                  ? AppColors.green
-                                  : weakest.recoveryScore < 50
-                                      ? AppColors.red
-                                      : weakest.recoveryScore < 70
-                                          ? AppColors.orange
-                                          : AppColors.textSecondary,
-                              fontSize: 17,
+                              color: AppColors.textPrimary,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
                               letterSpacing: -0.2,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          // Trend + prime muscle — consistent treatment
-                          Row(children: [
-                            Icon(
-                              trendDelta > 2
-                                  ? Icons.trending_up_rounded
-                                  : trendDelta < -2
-                                      ? Icons.trending_down_rounded
-                                      : Icons.trending_flat_rounded,
-                              size: 13,
-                              color: trendColor.withValues(alpha: 0.75),
-                            ),
-                            const SizedBox(width: 4),
+                          // Weakest muscle secondary hint — neutral tone
+                          if (!allBalanced) ...[
+                            const SizedBox(height: 1),
                             Text(
-                              trendLabel,
+                              '${_abbr(weakest.muscle)} needs ~${((100 - weakest.recoveryScore) * 0.48).round()}h rest',
                               style: TextStyle(
                                 fontFamily: 'Inter',
+                                color: AppColors.textMuted.withValues(alpha: 0.65),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          // Trend + prime — only shown after 3+ workouts of data.
+                          // Before that, these metrics are derived from too few
+                          // samples to be reliable and would mislead the user.
+                          if (d.totalWorkouts >= 3)
+                            Row(children: [
+                              Icon(
+                                trendDelta > 2
+                                    ? Icons.trending_up_rounded
+                                    : trendDelta < -2
+                                        ? Icons.trending_down_rounded
+                                        : Icons.trending_flat_rounded,
+                                size: 13,
                                 color: trendColor.withValues(alpha: 0.75),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
                               ),
-                            ),
-                            const Spacer(),
-                            Container(
-                              width: 4,
-                              height: 4,
-                              margin: const EdgeInsets.only(right: 5),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: (strongest.recoveryScore >= 80
-                                        ? AppColors.green
-                                        : AppColors.goldAmber)
-                                    .withValues(alpha: 0.55),
+                              const SizedBox(width: 4),
+                              Text(
+                                trendLabel,
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  color: trendColor.withValues(alpha: 0.75),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
+                              const Spacer(),
+                              Container(
+                                width: 4,
+                                height: 4,
+                                margin: const EdgeInsets.only(right: 5),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: (strongest.recoveryScore >= 80
+                                          ? AppColors.gold
+                                          : AppColors.goldAmber)
+                                      .withValues(alpha: 0.55),
+                                ),
+                              ),
+                              Text(
+                                '${_abbr(strongest.muscle)} primed',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  color: (strongest.recoveryScore >= 80
+                                          ? AppColors.gold
+                                          : AppColors.goldAmber)
+                                      .withValues(alpha: 0.72),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ])
+                          else
                             Text(
-                              '${_abbr(strongest.muscle)} primed',
+                              '${d.totalWorkouts < 3 ? 3 - d.totalWorkouts : 0} session${(3 - d.totalWorkouts) == 1 ? '' : 's'} until recovery trends',
                               style: TextStyle(
                                 fontFamily: 'Inter',
-                                color: (strongest.recoveryScore >= 80
-                                        ? AppColors.green
-                                        : AppColors.goldAmber)
-                                    .withValues(alpha: 0.72),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
+                                color: AppColors.textMuted.withValues(alpha: 0.40),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w400,
                               ),
                             ),
-                          ]),
                         ],
                       ),
                     ),
                   ],
                 ),
-                // ── Muscle bars: only when muscles differ ─────────────
-                if (!allBalanced) ...[
-                  const SizedBox(height: 9),
-                  Container(height: 0.5, color: AppColors.borderSoft),
-                  const SizedBox(height: 8),
-                  ...sorted.take(3).map(
-                    (m) => _RecoveryMuscleBar(
-                        label: _abbr(m.muscle), score: m.recoveryScore),
-                  ),
-                ],
+                // Muscle bars removed from home — detail available in scan modal (tap card)
                 // ── Health Connect signals ────────────────────────────
                 if (d.sleepHours > 0 || d.todaySteps > 0) ...[
-                  const SizedBox(height: 9),
+                  const SizedBox(height: 6),
                   Container(height: 0.5, color: AppColors.borderSoft),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       if (d.sleepHours > 0) ...[
@@ -869,7 +961,8 @@ class _RecoveryIntelligenceCard extends StatelessWidget {
                   ),
                 ],
               ],
-            ),
+                  ),
+                ),
           ),
         );
       },
@@ -899,10 +992,10 @@ class _RecoveryIntelligenceCard extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       useSafeArea: true,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.92,
+      builder: (sheetCtx) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
         maxChildSize: 0.95,
-        minChildSize: 0.60,
+        minChildSize: 0.50,
         expand: false,
         builder: (_, ctrl) => Container(
           decoration: const BoxDecoration(
@@ -911,15 +1004,39 @@ class _RecoveryIntelligenceCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.borderMedium,
-                  borderRadius: BorderRadius.circular(AppRadii.pill),
+              // Handle + close row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    Center(
+                      child: Container(
+                        width: 44, height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.borderMedium,
+                          borderRadius: BorderRadius.circular(AppRadii.pill),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(sheetCtx),
+                      child: Container(
+                        width: 32, height: 32,
+                        decoration: BoxDecoration(
+                          color: AppColors.bgElevated,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.borderMedium, width: 0.5),
+                        ),
+                        child: const Icon(Icons.close_rounded,
+                            color: AppColors.textMuted, size: 16),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 8),
               Expanded(
                 child: SingleChildScrollView(
                   controller: ctrl,
@@ -944,29 +1061,30 @@ class _OnboardingRecoveryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F0F0F),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.gold.withValues(alpha: 0.07),
+            AppColors.bgCard,
+          ],
+        ),
         borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.18), width: 0.8),
       ),
       child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: AppColors.green.withValues(alpha: 0.08),
+              gradient: AppGradients.gold,
               shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.green.withValues(alpha: 0.20),
-                width: 2,
-              ),
             ),
             alignment: Alignment.center,
-            child: const Text(
-              '\u{1F4AA}',
-              style: TextStyle(fontSize: 22),
-            ),
+            child: const Icon(Icons.monitor_heart_rounded, color: Colors.black, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -974,16 +1092,18 @@ class _OnboardingRecoveryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Recovery Tracking',
+                  'RECOVERY',
                   style: AppTextStyles.label.copyWith(
-                    color: AppColors.textSecondary,
+                    color: AppColors.gold,
+                    letterSpacing: 1.2,
+                    fontSize: 10,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
-                  'Log your first workout to unlock muscle recovery analysis.',
+                  'Log your first session to unlock recovery tracking.',
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textMuted,
+                    color: AppColors.textSecondary,
                     height: 1.4,
                   ),
                 ),
@@ -1004,242 +1124,75 @@ class _OnboardingAIVerdictCard extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadii.xl),
       child: Material(
-        color: const Color(0xFF111111),
+        color: Colors.transparent,
         child: InkWell(
-          splashColor: Colors.white.withValues(alpha: 0.05),
-          highlightColor: Colors.white.withValues(alpha: 0.03),
+          splashColor: AppColors.gold.withValues(alpha: 0.06),
+          highlightColor: AppColors.gold.withValues(alpha: 0.03),
           onTap: () {
             const seed = 'I am a new LiftOn user ready to start training.';
             Navigator.push(context, slideRoute(const AIChatScreen(seedContext: seed)));
           },
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 11, 18, 11),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.gold.withValues(alpha: 0.09),
+                  AppColors.bgCard,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(AppRadii.xl),
+              border: Border.all(color: AppColors.gold.withValues(alpha: 0.22), width: 0.8),
+            ),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Coach',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        color: AppColors.textMuted.withValues(alpha: 0.38),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 13,
-                      color: AppColors.textMuted.withValues(alpha: 0.30),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 7),
-                const Text(
-                  'Complete your first workout to activate AI coaching.',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    height: 1.4,
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.gold,
+                    shape: BoxShape.circle,
                   ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.psychology_rounded, color: Colors.black, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'COACH',
+                        style: AppTextStyles.label.copyWith(
+                          color: AppColors.gold,
+                          letterSpacing: 1.2,
+                          fontSize: 10,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Your first workout activates personalised coaching.',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: AppColors.gold.withValues(alpha: 0.60),
                 ),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════
-// TODAY'S WORKOUT CARD
-// Workout name + state. Tap → Planner.
-// Clean. No coaching. No repetition.
-// ════════════════════════════════════════════════
-class _TrainingDecisionCard extends StatelessWidget {
-  const _TrainingDecisionCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Selector<AppProvider, ({
-      String trainMuscle,
-      String planTitle,
-      int    exerciseCount,
-      bool   isCompleted,
-      bool   isRestDay,
-      int    recovery,
-      double totalVolume,
-    })>(
-      selector: (_, ap) {
-        final plan = ap.todayPlan;
-        return (
-          trainMuscle:   ap.topMuscleGroup,
-          planTitle:     plan.title,
-          exerciseCount: plan.exercises.length,
-          isCompleted:   plan.isCompleted,
-          isRestDay:     plan.isRestDay,
-          recovery:      ap.getOverallRecovery(),
-          totalVolume:   plan.exercises
-              .expand((e) => e.sets)
-              .where((s) => s.done && s.weight > 0 && s.reps > 0)
-              .fold(0.0, (v, s) => v + s.weight * s.reps),
-        );
-      },
-      builder: (ctx, d, __) {
-        // Determine state label and primary text
-        final String stateLabel;
-        final String primaryText;
-        final Color  primaryColor;
-        const bool   showChevron = true;
-
-        if (d.isCompleted) {
-          stateLabel  = 'Today';
-          primaryText = d.planTitle.isNotEmpty ? d.planTitle : 'Session done';
-          primaryColor = AppColors.textSecondary;
-        } else if (d.isRestDay) {
-          stateLabel  = 'Today';
-          primaryText = 'Rest day';
-          primaryColor = AppColors.textSecondary;
-        } else {
-          stateLabel  = 'Today';
-          primaryText = d.planTitle.isNotEmpty
-              ? d.planTitle
-              : d.trainMuscle.isNotEmpty
-                  ? '${d.trainMuscle[0].toUpperCase()}${d.trainMuscle.substring(1)} Training'
-                  : 'Training Session';
-          primaryColor = AppColors.textPrimary;
-        }
-
-        // Dynamic chevron color — instant readiness signal
-        final chevronColor = d.recovery <= 20
-            ? const Color(0xFFEF5350)          // deep red — heavy fatigue (muted)
-            : d.recovery <= 40
-                ? AppColors.red                // orange-red
-                : d.recovery <= 70
-                    ? AppColors.orange         // orange — recovering
-                    : d.recovery <= 85
-                        ? AppColors.goldAmber  // gold — moderate/ready
-                        : AppColors.green;     // green — fully ready
-
-        return GestureDetector(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            context.findAncestorStateOfType<MainShellState>()?.changeTab(1);
-          },
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
-            decoration: BoxDecoration(
-              color: const Color(0xFF111111),
-              borderRadius: BorderRadius.circular(AppRadii.xl),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── State label ──────────────────────────────
-                      Text(
-                        stateLabel,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          color: AppColors.textMuted.withValues(alpha: 0.45),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      // ── Workout name + volume (if completed) ─────
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              primaryText,
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                color: primaryColor,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: -0.2,
-                                height: 1.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (d.isCompleted && d.totalVolume > 0) ...[
-                            const SizedBox(width: 8),
-                            Text(
-                              () {
-                                final kg = d.totalVolume;
-                                return kg >= 1000
-                                    ? '${(kg / 1000).toStringAsFixed(1)}t'
-                                    : '${kg.toStringAsFixed(0)}kg';
-                              }(),
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                color: AppColors.goldAmber.withValues(alpha: 0.75),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      if (!d.isRestDay && d.exerciseCount > 0 && !d.isCompleted) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '${d.exerciseCount} exercises',
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            color: AppColors.textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                      if (d.isCompleted) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.check_circle_rounded,
-                                size: 11,
-                                color: AppColors.green.withValues(alpha: 0.60)),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Session complete',
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                color: AppColors.green.withValues(alpha: 0.55),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (showChevron)
-                  Icon(Icons.chevron_right_rounded,
-                      size: 18,
-                      color: chevronColor.withValues(alpha: 0.75)),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }
@@ -1483,13 +1436,13 @@ class _AIVerdictCardState extends State<_AIVerdictCard>
             '$nextWorkout is next in the training rotation.';
       }
       return slot.isEven
-          ? 'Recovery is trending up. This week\'s consistency is compounding — keep the pattern.'
-          : 'You\'re building momentum. Each session this week is stacking adaptation.';
+          ? 'Recovery improving. Stay consistent.'
+          : 'Momentum building. Each session counts.';
     }
     if (recovery >= 80) {
       return slot.isEven
           ? 'High readiness. If there\'s a PR to chase, today is the day to go for it.'
-          : 'Body is primed. Optimal window for progressive overload — push the weight today.';
+          : 'Recovered and ready. Add weight today.';
     }
     return slot.isEven
         ? 'Moderate recovery. Prioritise compound lifts — avoid failure and control intensity.'
@@ -1573,7 +1526,7 @@ class _AIVerdictCardState extends State<_AIVerdictCard>
                     Navigator.push(ctx, slideRoute(AIChatScreen(seedContext: seed)));
                   },
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 11, 18, 11),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1709,7 +1662,7 @@ class _RecoveryMuscleBarState extends State<_RecoveryMuscleBar>
   @override
   Widget build(BuildContext context) {
     final color = widget.score > 60
-        ? AppColors.green
+        ? AppColors.gold
         : widget.score > 40
             ? AppColors.goldAmber
             : widget.score > 20
@@ -1717,7 +1670,7 @@ class _RecoveryMuscleBarState extends State<_RecoveryMuscleBar>
                 : AppColors.red;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.only(bottom: 5),
       child: Row(
         children: [
           SizedBox(
@@ -1762,13 +1715,17 @@ class _RecoveryMuscleBarState extends State<_RecoveryMuscleBar>
           ),
           const SizedBox(width: 8),
           SizedBox(
-            width: 28,
+            width: 36,
             child: Text(
-              '${widget.score}%',
+              widget.score >= 80
+                  ? 'Ready'
+                  : widget.score >= 50
+                      ? '~${((100 - widget.score) * 0.48).round()}h'
+                      : 'Resting',
               textAlign: TextAlign.end,
               style: TextStyle(
                 fontFamily: 'Inter',
-                color: AppColors.textMuted.withValues(alpha: 0.65),
+                color: color.withValues(alpha: 0.60),
                 fontSize: 9,
                 fontWeight: FontWeight.w400,
               ),
@@ -1797,6 +1754,14 @@ class _MissionsCardState extends State<_MissionsCard> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureInit());
+  }
+
+  @override
+  void didUpdateWidget(covariant _MissionsCard old) {
+    super.didUpdateWidget(old);
+    if (!_initScheduled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _ensureInit());
+    }
   }
 
   void _ensureInit() {
@@ -1839,9 +1804,6 @@ class _MissionsCardState extends State<_MissionsCard> {
           a.allDone != b.allDone ||
           !identical(a.missions, b.missions),
       builder: (_, data, __) {
-        if (data.total == 0 && !_initScheduled) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _ensureInit());
-        }
         return RepaintBoundary(child: _MissionsBody(data: data));
       },
     );
@@ -1890,14 +1852,14 @@ class _MissionsBody extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadii.card),
         border: Border.all(
           color: data.allDone
-              ? AppColors.green.withValues(alpha: 0.38)
+              ? AppColors.gold.withValues(alpha: 0.38)
               : AppColors.borderSoft,
           width: 1,
         ),
         boxShadow: data.allDone
             ? [
                 BoxShadow(
-                  color: AppColors.green.withValues(alpha: 0.09),
+                  color: AppColors.gold.withValues(alpha: 0.09),
                   blurRadius: 24,
                 ),
               ]
@@ -1910,7 +1872,7 @@ class _MissionsBody extends StatelessWidget {
             children: [
               Icon(
                 data.allDone ? Icons.check_circle_rounded : Icons.track_changes_rounded,
-                color: data.allDone ? AppColors.green : AppColors.gold,
+                color: data.allDone ? AppColors.gold : AppColors.gold,
                 size: 16,
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -2000,7 +1962,7 @@ class _MissionRingCounter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pct = total > 0 ? completed / total : 0.0;
-    final color = allDone ? AppColors.green : AppColors.gold;
+    final color = allDone ? AppColors.gold : AppColors.gold;
     return SizedBox(
       width: 46,
       height: 46,
@@ -2182,17 +2144,17 @@ class _MissionRowContent extends StatelessWidget {
             height: 34,
             decoration: BoxDecoration(
               color: done
-                  ? AppColors.green.withValues(alpha: 0.14)
+                  ? AppColors.gold.withValues(alpha: 0.14)
                   : AppColors.bgCardLight,
               borderRadius: BorderRadius.circular(AppRadii.sm),
               border: Border.all(
-                color: done ? AppColors.green : AppColors.borderSoft,
+                color: done ? AppColors.gold : AppColors.borderSoft,
                 width: 0.8,
               ),
               boxShadow: done
                   ? [
                       BoxShadow(
-                        color: AppColors.green.withValues(alpha: 0.2),
+                        color: AppColors.gold.withValues(alpha: 0.2),
                         blurRadius: 8,
                       ),
                     ]
@@ -2202,7 +2164,7 @@ class _MissionRowContent extends StatelessWidget {
               child: Icon(
                 done ? Icons.check_rounded : Icons.radio_button_unchecked_rounded,
                 size: 15,
-                color: done ? AppColors.green : AppColors.textMuted,
+                color: done ? AppColors.gold : AppColors.textMuted,
               ),
             ),
           ),
@@ -2669,7 +2631,7 @@ class _ComebackCeremonySheet extends StatelessWidget {
                       color: AppColors.gold.withValues(alpha: 0.22),
                       blurRadius: 18, offset: const Offset(0, 4))],
                 ),
-                child: Text("Let's go →",
+                child: Text("Start session →",
                     textAlign: TextAlign.center,
                     style: GoogleFonts.rajdhani(
                         color: Colors.black,
@@ -2685,6 +2647,429 @@ class _ComebackCeremonySheet extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════
+// ATHLETE BRAIN LOCKED PLACEHOLDER
+// ════════════════════════════════════════════════
+class _AthleteBrainLocked extends StatelessWidget {
+  final int totalWorkouts;
+  const _AthleteBrainLocked({required this.totalWorkouts});
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = 5 - totalWorkouts;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F0F0F),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(color: const Color(0xFF242424), width: 0.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.14),
+                  width: 0.8,
+                ),
+              ),
+              child: const Icon(
+                Icons.psychology_outlined,
+                size: 18,
+                color: AppColors.goldSoft,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Athlete Brain',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$remaining session${remaining == 1 ? '' : 's'} until personalized analysis',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: AppColors.textMuted.withValues(alpha: 0.50),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Progress dots
+            Row(
+              children: List.generate(5, (i) => Container(
+                width: 5,
+                height: 5,
+                margin: const EdgeInsets.only(left: 3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i < totalWorkouts
+                      ? AppColors.gold
+                      : AppColors.gold.withValues(alpha: 0.12),
+                ),
+              )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// TODAY'S PLAN CARD — day 1 only
+// ════════════════════════════════════════════════
+class _TodayPlanCard extends StatefulWidget {
+  final String title;
+  final int exCount;
+  final int setCount;
+  const _TodayPlanCard({
+    required this.title,
+    required this.exCount,
+    required this.setCount,
+  });
+  @override
+  State<_TodayPlanCard> createState() => _TodayPlanCardState();
+}
+
+class _TodayPlanCardState extends State<_TodayPlanCard> {
+  bool _pressed   = false;
+  bool _launching = false;
+
+  // Capture context-dependent values before the async gap.
+  Future<void> _launch() async {
+    if (_launching) return;
+    final shell      = context.findAncestorStateOfType<MainShellState>();
+    final todayIndex = context.read<AppProvider>().todayIndex;
+
+    setState(() => _launching = true);
+    HapticFeedback.mediumImpact();
+    WorkoutSessionService.instance.setIntent(todayIndex);
+
+    // Hold the ritual long enough to be felt (scale + gold wash).
+    await Future.delayed(const Duration(milliseconds: 160));
+
+    if (!mounted) return;
+    setState(() => _launching = false);
+    shell?.changeTab(1);
+    // Arm after changeTab so Planner is already transitioning to visible.
+    LaunchBeacon.arm();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _pressed || _launching;
+    return GestureDetector(
+      onTapDown:  (_) => setState(() => _pressed = true),
+      onTapUp:    (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: _launch,
+      // Whole card scales as one object — 0.98 max, 80ms, no overshoot.
+      child: AnimatedScale(
+        scale:    active ? 0.98 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        curve:    Curves.easeOut,
+        child: Stack(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.gold.withValues(alpha: active ? 0.20 : 0.10),
+                    AppColors.bgCard,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(AppRadii.xl),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: active ? 0.55 : 0.25),
+                  width: active ? 1.2 : 0.8,
+                ),
+              ),
+              child: Row(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: AppGradients.gold,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: active
+                          ? [BoxShadow(
+                              color: AppColors.gold.withValues(alpha: 0.35),
+                              blurRadius: 12, spreadRadius: 0)]
+                          : [],
+                    ),
+                    child: const Icon(Icons.fitness_center_rounded,
+                        color: Colors.black, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('TODAY',
+                            style: GoogleFonts.inter(
+                                color: AppColors.gold,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2)),
+                        const SizedBox(height: 3),
+                        Text(widget.title,
+                            style: GoogleFonts.rajdhani(
+                                color: AppColors.textPrimary,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        Text('${widget.exCount} exercises · ${widget.setCount} sets',
+                            style: GoogleFonts.inter(
+                                color: AppColors.textMuted,
+                                fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  // START pill — the visual endpoint of the scan path.
+                  // Whole card is still tappable; pill adds discoverability.
+                  AnimatedOpacity(
+                    opacity:  _pressed ? 0.82 : 1.0,
+                    duration: const Duration(milliseconds: 120),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 13, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: AppGradients.gold,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'START',
+                        style: GoogleFonts.inter(
+                            color:      Colors.black,
+                            fontSize:   11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Gold wash — soft directional fade, never a flash.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity:  _launching ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 120),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.xl),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end:   Alignment.centerRight,
+                          colors: [
+                            AppColors.gold.withValues(alpha: 0.10),
+                            AppColors.gold.withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════
+// WEEKLY STORY CTA — earned weekly reward
+// Visibility: Sat (if workout done) + Sun (always).
+// After viewed: muted confirmation, resets on new week.
+// ════════════════════════════════════════════════
+class _WeeklyStoryCTA extends StatelessWidget {
+  const _WeeklyStoryCTA();
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<AppProvider,
+        ({int weekday, bool todayDone, bool storyViewed, bool hasData, int totalWorkouts})>(
+      selector: (_, ap) => (
+        weekday:      DateTime.now().weekday,
+        todayDone:    ap.todayPlan.isCompleted,
+        storyViewed:  ap.weeklyStoryViewedThisWeek,
+        hasData:      ap.weeklyReview.hasData,
+        totalWorkouts: ap.totalWorkouts,
+      ),
+      builder: (_, d, __) {
+        if (d.totalWorkouts < 1) return const SizedBox.shrink();
+        if (!d.hasData) return const SizedBox.shrink();
+
+        final visible = d.weekday == 7 || (d.weekday == 6 && d.todayDone);
+        if (!visible) return const SizedBox.shrink();
+
+        if (d.storyViewed) return const _StoryViewedLabel();
+        return const _StoryInviteButton();
+      },
+    );
+  }
+}
+
+class _StoryViewedLabel extends StatelessWidget {
+  const _StoryViewedLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: SizedBox(
+        height: 36,
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_rounded,
+                  size: 12,
+                  color: AppColors.textMuted.withValues(alpha: 0.30)),
+              const SizedBox(width: 5),
+              Text(
+                'Weekly Story Viewed',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: AppColors.textMuted.withValues(alpha: 0.30),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StoryInviteButton extends StatefulWidget {
+  const _StoryInviteButton();
+  @override
+  State<_StoryInviteButton> createState() => _StoryInviteButtonState();
+}
+
+class _StoryInviteButtonState extends State<_StoryInviteButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmer;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmer = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _scheduleShimmer();
+  }
+
+  void _scheduleShimmer() {
+    Future.delayed(const Duration(seconds: 9), () {
+      if (!mounted) return;
+      _shimmer.forward(from: 0).then((_) {
+        if (mounted) _scheduleShimmer();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          final ap = context.read<AppProvider>();
+          ap.markWeeklyStoryViewed();
+          openWeeklyStory(context);
+        },
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          height: 40,
+          child: Center(
+            child: AnimatedBuilder(
+              animation: _shimmer,
+              builder: (_, __) {
+                final v = _shimmer.value;
+                final sparkleAlpha = v < 0.5
+                    ? (v * 2.0).clamp(0.0, 1.0)
+                    : ((1.0 - v) * 2.0).clamp(0.0, 1.0);
+
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '✦',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.gold.withValues(
+                          alpha: 0.45 + (sparkleAlpha * 0.40),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      'Your Weekly Story',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        color: AppColors.gold.withValues(alpha: 0.72),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 9,
+                      color: AppColors.gold.withValues(alpha: 0.35),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // WEEKLY PROGRESS STRIP
 // ════════════════════════════════════════════════
 class _WeeklyProgressStrip extends StatelessWidget {
@@ -2727,189 +3112,191 @@ class _WeeklyProgressStrip extends StatelessWidget {
         final todayIdx = now.weekday - 1; // 0 = Monday
 
         final statusText = done == 0
-            ? 'Start the week strong'
+            ? 'Week starts today'
             : done >= planned
-                ? 'Week complete · elite consistency'
-                : '${planned - done} session${planned - done > 1 ? "s" : ""} to go';
+                ? 'Week complete'
+                : done == 1
+                    ? '${planned - done} sessions left'
+                    : done == 2
+                        ? '${planned - done} sessions left'
+                        : '${planned - done} session${planned - done > 1 ? "s" : ""} left';
 
         return Container(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: const Color(0xFF0F0F0F),
             borderRadius: BorderRadius.circular(AppRadii.xl),
+            border: Border.all(color: const Color(0xFF242424), width: 0.5),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header ──────────────────────────────────────────────
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    'This week',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      color: AppColors.textMuted.withValues(alpha: 0.50),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  RichText(
-                    text: TextSpan(children: [
-                      TextSpan(
-                        text: '$done',
-                        style: const TextStyle(
-                          fontFamily: 'Rajdhani',
-                          color: AppColors.gold,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          height: 1.0,
-                        ),
-                      ),
-                      TextSpan(
-                        text: ' of $planned',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          color: AppColors.textMuted.withValues(alpha: 0.50),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ]),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              // ── 7 day segment blocks ─────────────────────────────────
-              Row(
-                children: List.generate(7, (i) {
-                  final isDone  = doneSet.contains(i);
-                  final isToday = i == todayIdx;
-                  final isRest  = restSet.contains(i) && !isDone;
-                  final isPast  = i < todayIdx && !isDone && !isRest;
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // ── 7 day dots ────────────────────────────────────────
+                Expanded(
+                  child: Row(
+                    children: List.generate(7, (i) {
+                      final isDone  = doneSet.contains(i);
+                      final isToday = i == todayIdx;
+                      final isRest  = restSet.contains(i) && !isDone;
+                      final isPast  = i < todayIdx && !isDone && !isRest;
 
-                  final Color bgColor;
-                  final Color labelColor;
-                  final Color dotColor;
-                  final BoxBorder? border;
-                  final String indicator; // dot, dash, or empty
+                      final Color bgColor;
+                      final Color labelColor;
+                      final Color dotColor;
+                      final BoxBorder? border;
+                      final String indicator;
 
-                  if (isDone) {
-                    bgColor   = AppColors.gold.withValues(alpha: 0.15);
-                    labelColor = AppColors.gold;
-                    dotColor  = AppColors.gold;
-                    border    = Border.all(
-                        color: AppColors.gold.withValues(alpha: 0.30), width: 1);
-                    indicator = 'dot';
-                  } else if (isToday && isRest) {
-                    // Today is a rest day
-                    bgColor   = Colors.white.withValues(alpha: 0.04);
-                    labelColor = AppColors.textMuted.withValues(alpha: 0.45);
-                    dotColor  = Colors.transparent;
-                    border    = Border.all(
-                        color: Colors.white.withValues(alpha: 0.10), width: 1);
-                    indicator = 'dash';
-                  } else if (isToday) {
-                    bgColor   = Colors.white.withValues(alpha: 0.06);
-                    labelColor = Colors.white;
-                    dotColor  = Colors.white.withValues(alpha: 0.35);
-                    border    = Border.all(
-                        color: Colors.white.withValues(alpha: 0.22), width: 1);
-                    indicator = 'dot';
-                  } else if (isRest) {
-                    // Planned rest day — intentional, not a miss
-                    bgColor   = Colors.transparent;
-                    labelColor = AppColors.textMuted.withValues(alpha: 0.22);
-                    dotColor  = Colors.transparent;
-                    border    = null;
-                    indicator = 'dash';
-                  } else if (isPast) {
-                    bgColor   = Colors.transparent;
-                    labelColor = AppColors.textMuted.withValues(alpha: 0.16);
-                    dotColor  = Colors.transparent;
-                    border    = null;
-                    indicator = 'none';
-                  } else {
-                    bgColor   = Colors.transparent;
-                    labelColor = AppColors.textMuted.withValues(alpha: 0.28);
-                    dotColor  = Colors.transparent;
-                    border    = null;
-                    indicator = 'none';
-                  }
+                      if (isDone) {
+                        bgColor    = AppColors.gold.withValues(alpha: 0.14);
+                        labelColor = AppColors.gold;
+                        dotColor   = AppColors.gold;
+                        border     = Border.all(
+                            color: AppColors.gold.withValues(alpha: 0.28), width: 0.8);
+                        indicator  = 'dot';
+                      } else if (isToday && isRest) {
+                        bgColor    = Colors.white.withValues(alpha: 0.04);
+                        labelColor = AppColors.textMuted.withValues(alpha: 0.40);
+                        dotColor   = Colors.transparent;
+                        border     = Border.all(
+                            color: Colors.white.withValues(alpha: 0.08), width: 0.8);
+                        indicator  = 'dash';
+                      } else if (isToday) {
+                        bgColor    = Colors.white.withValues(alpha: 0.06);
+                        labelColor = Colors.white;
+                        dotColor   = Colors.white.withValues(alpha: 0.35);
+                        border     = Border.all(
+                            color: Colors.white.withValues(alpha: 0.20), width: 0.8);
+                        indicator  = 'dot';
+                      } else if (isRest) {
+                        bgColor    = Colors.transparent;
+                        labelColor = AppColors.textMuted.withValues(alpha: 0.18);
+                        dotColor   = Colors.transparent;
+                        border     = null;
+                        indicator  = 'dash';
+                      } else if (isPast) {
+                        bgColor    = Colors.transparent;
+                        labelColor = AppColors.textMuted.withValues(alpha: 0.14);
+                        dotColor   = Colors.transparent;
+                        border     = null;
+                        indicator  = 'none';
+                      } else {
+                        bgColor    = Colors.transparent;
+                        labelColor = AppColors.textMuted.withValues(alpha: 0.24);
+                        dotColor   = Colors.transparent;
+                        border     = null;
+                        indicator  = 'none';
+                      }
 
-                  return Expanded(
-                    child: Container(
-                      margin: EdgeInsets.only(right: i < 6 ? 5 : 0),
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      decoration: BoxDecoration(
-                        color: bgColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: border,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _dayLabels[i],
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              color: labelColor,
-                              fontSize: 10,
-                              fontWeight: (isDone || (isToday && !isRest))
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                              letterSpacing: 0.2,
-                            ),
+                      return Expanded(
+                        child: Container(
+                          margin: EdgeInsets.only(right: i < 6 ? 4 : 0),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            borderRadius: BorderRadius.circular(7),
+                            border: border,
                           ),
-                          const SizedBox(height: 5),
-                          if (indicator == 'dot')
-                            Container(
-                              width: 4,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: dotColor,
-                                boxShadow: isDone
-                                    ? [BoxShadow(
-                                        color: AppColors.gold.withValues(alpha: 0.50),
-                                        blurRadius: 4)]
-                                    : null,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _dayLabels[i],
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  color: labelColor,
+                                  fontSize: 10,
+                                  fontWeight: (isDone || (isToday && !isRest))
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                ),
                               ),
-                            )
-                          else if (indicator == 'dash')
-                            Container(
-                              width: 10,
-                              height: 1.5,
-                              decoration: BoxDecoration(
-                                color: AppColors.textMuted.withValues(alpha: 0.20),
-                                borderRadius: BorderRadius.circular(1),
-                              ),
-                            )
-                          else
-                            const SizedBox(height: 4),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 10),
-              // ── Status line ──────────────────────────────────────────
-              Text(
-                statusText,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  color: done >= planned
-                      ? AppColors.green.withValues(alpha: 0.58)
-                      : AppColors.textMuted.withValues(alpha: 0.38),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w400,
+                              const SizedBox(height: 4),
+                              if (indicator == 'dot')
+                                Container(
+                                  width: 3,
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: dotColor,
+                                    boxShadow: isDone
+                                        ? [BoxShadow(
+                                            color: AppColors.gold.withValues(alpha: 0.50),
+                                            blurRadius: 3)]
+                                        : null,
+                                  ),
+                                )
+                              else if (indicator == 'dash')
+                                Container(
+                                  width: 8,
+                                  height: 1,
+                                  color: AppColors.textMuted.withValues(alpha: 0.18),
+                                )
+                              else
+                                const SizedBox(height: 3),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
                 ),
-              ),
-            ],
+
+                // ── Right: count + status ─────────────────────────────
+                const SizedBox(width: 10),
+                Container(
+                  width: 0.5,
+                  height: 36,
+                  color: const Color(0xFF2A2A2A),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RichText(
+                      text: TextSpan(children: [
+                        TextSpan(
+                          text: '$done',
+                          style: const TextStyle(
+                            fontFamily: 'Rajdhani',
+                            color: AppColors.gold,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            height: 1.0,
+                          ),
+                        ),
+                        TextSpan(
+                          text: done < 3
+                              ? (done == 1 ? ' workout' : ' workouts')
+                              : '/$planned',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            color: AppColors.textMuted.withValues(alpha: 0.45),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        color: done >= planned
+                            ? AppColors.gold.withValues(alpha: 0.55)
+                            : AppColors.textMuted.withValues(alpha: 0.35),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      textAlign: TextAlign.end,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },

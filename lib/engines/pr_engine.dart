@@ -1,8 +1,6 @@
 // lib/engines/pr_engine.dart — Production PR Engine v1.0
 // Complete PR system: detection, delta, XP, classification, AI messages,
 // consistency tracking, edge cases, null safety
-import 'dart:math';
-
 // ════════════════════════════════════════════════
 // DATA STRUCTURES
 // ════════════════════════════════════════════════
@@ -93,7 +91,7 @@ class PRResult {
 
   @override
   String toString() =>
-      'PRResult($outcome, ${newWeight}×$newReps, delta=$delta, xp=$xp)';
+      'PRResult($outcome, $newWeight×$newReps, delta=$delta, xp=$xp)';
 }
 
 // ════════════════════════════════════════════════
@@ -107,12 +105,6 @@ class PREngine {
   // ── Per-exercise consistency counter ──────────
   final Map<String, int>        _consistencyCounter = {};
   final Map<String, double>     _consistencyWeight  = {};
-
-  // ── In-memory PR store (supplement to logs) ──
-  final Map<String, ExercisePR> _prStore = {};
-
-  // ── Random for message variety ────────────────
-  final Random _rng = Random();
 
   // ════════════════════════════════════════════
   // CORE: checkPR — main entry point
@@ -133,7 +125,7 @@ class PREngine {
     // ── STEP 1: First ever log ───────────────────
     if (prevBestWeight == 0 && prevBestReps == 0) {
       _updateConsistency(key, currentWeight);
-      final xp = 100;
+      const xp = 100;
       return PRResult(
         outcome:        PROutcome.first,
         newWeight:      currentWeight,
@@ -240,11 +232,15 @@ class PREngine {
 
     // Same weight, more reps
     if ((currentWeight - prevWeight).abs() < 0.01 &&
-        currentReps > prevReps) return PROutcome.repPR;
+        currentReps > prevReps) {
+      return PROutcome.repPR;
+    }
 
     // Exact match
     if ((currentWeight - prevWeight).abs() < 0.01 &&
-        currentReps == prevReps) return PROutcome.match;
+        currentReps == prevReps) {
+      return PROutcome.match;
+    }
 
     // Drop
     return PROutcome.drop;
@@ -433,11 +429,6 @@ class PREngine {
 
   String _dropMessage(String name) =>
     '📈 Recovery matters.\nCome back stronger next session.';
-
-  String _pick(List<String> options) {
-    if (options.isEmpty) return '';
-    return options[_rng.nextInt(options.length)];
-  }
 
   // ════════════════════════════════════════════
   // CONSISTENCY TRACKING
