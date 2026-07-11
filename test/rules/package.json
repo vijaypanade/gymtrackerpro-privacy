@@ -1,0 +1,14 @@
+{
+  "name": "lifton-firestore-rules-tests",
+  "private": true,
+  "description": "RFC-002.3 Firestore Security Rules emulator test suite",
+  "scripts": {
+    "test": "mocha --timeout 20000 --reporter spec rules_2a_test.js rules_2b_test.js",
+    "test:2b": "mocha --timeout 20000 --reporter spec rules_2b_test.js"
+  },
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.12.0",
+    "mocha": "^10.4.0"
+  }
+}

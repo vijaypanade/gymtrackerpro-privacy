@@ -1,0 +1,126 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Validates RFC-002 sync contract fields on CREATE and UPDATE.
+    // Applied exclusively to RFC-002 sync collections (C1 scope boundary).
+    function validSyncWrite() {
+      let d = request.resource.data;
+      return d.schemaVersion is int
+          && d.writerDeviceId is string
+          && d.writerDeviceId.size() > 0
+          && d.updatedAt is timestamp
+          && (!('deletedAt' in d) || d.deletedAt is timestamp);
+    }
+
+    // M1: null-safe schemaVersion non-decreasing check.
+    // .get('schemaVersion', 0) treats pre-RFC documents (which carry no
+    // schemaVersion) as version 0, allowing them to be updated.
+    // Must only be called on UPDATE — resource is null on CREATE.
+    function validSyncUpdate() {
+      return request.resource.data.schemaVersion
+          >= resource.data.get('schemaVersion', 0);
+    }
+
+    // ── users/{uid} ───────────────────────────────────────────────────────
+
+    match /users/{uid} {
+
+      allow read: if isOwner(uid);
+
+      // C2: Sync contract fields waived for profile root (migration window).
+      // TODO(RFC-002.1): Tighten to full base write conditions once
+      //   user_provider.dart migrates to the repository pattern.
+      // m3: deletedAt must not appear on the profile root document.
+      allow create: if isOwner(uid)
+          && !('deletedAt' in request.resource.data);
+      allow update: if isOwner(uid)
+          && !('deletedAt' in request.resource.data);
+      allow delete: if false;
+
+      // ── RFC-002 sync collections (C1) ────────────────────────────────
+
+      match /logs/{logId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid) && validSyncWrite();
+        allow update: if isOwner(uid) && validSyncWrite() && validSyncUpdate();
+        allow delete: if false;
+      }
+
+      match /plans/{planId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid) && validSyncWrite();
+        allow update: if isOwner(uid) && validSyncWrite() && validSyncUpdate();
+        allow delete: if false;
+      }
+
+      match /instances/{instanceId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid) && validSyncWrite();
+        allow update: if isOwner(uid) && validSyncWrite() && validSyncUpdate();
+        allow delete: if false;
+      }
+
+      match /measurements/{measurementId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid) && validSyncWrite();
+        allow update: if isOwner(uid) && validSyncWrite() && validSyncUpdate();
+        allow delete: if false;
+      }
+
+      match /_meta/{metaId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid) && validSyncWrite();
+        allow update: if isOwner(uid) && validSyncWrite() && validSyncUpdate();
+        allow delete: if false;
+      }
+
+      // ── favorites (m4) ───────────────────────────────────────────────
+      // exerciseIds size constraint applied at wildcard level — covers
+      // favorites/list, favorites/current, and any novel document IDs.
+
+      match /favorites/{docId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid)
+            && (!('exerciseIds' in request.resource.data)
+                || request.resource.data.exerciseIds.size() <= 500);
+        allow update: if isOwner(uid)
+            && (!('exerciseIds' in request.resource.data)
+                || request.resource.data.exerciseIds.size() <= 500);
+        allow delete: if false;
+      }
+    }
+
+    // ── Legacy paths — no sync fields required (§2.6) ────────────────────
+
+    match /workout_history/{uid} {
+      allow read:   if isOwner(uid);
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid);
+      allow delete: if false;
+    }
+
+    match /premium_grants/{uid} {
+      allow read:   if isOwner(uid);
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid);
+      allow delete: if false;
+    }
+
+    // ── Server-owned collections — GET own UID only, no client writes (m1) ─
+
+    match /entitlements/{uid} {
+      allow get: if isOwner(uid);
+    }
+
+    match /ai_usage/{uid} {
+      allow get: if isOwner(uid);
+    }
+
+  }
+}
