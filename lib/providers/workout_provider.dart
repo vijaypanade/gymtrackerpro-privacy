@@ -33,6 +33,9 @@ import '../services/ghost_copy_service.dart';
 import '../data/exercise_data.dart';
 import '../services/storage_service.dart';
 import '../utils/id_helper.dart';
+import '../data/sync/outbox_service.dart';
+import '../data/adapters/logs_sync_adapter.dart';
+import '../data/repositories/workout_log_repository.dart';
 import '../services/voice_coach_service.dart';
 import '../services/rest_timer_service.dart';
 import '../services/workout_session_service.dart';
@@ -924,7 +927,13 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     if (wasDone) await _syncLog(dayIndex, exId);
   }
 
-  Future<void> toggleSetDone(int dayIndex, String exId, String setId) async {
+  Future<void> toggleSetDone(
+    int dayIndex,
+    String exId,
+    String setId, {
+    double? effectiveWeight,
+    double? plannedWeight,
+  }) async {
     final isCompletedSession = _isValidDayIndex(dayIndex) && _weekPlan[dayIndex].isCompleted;
 
     // Allow: today's active workout OR editing a completed session (backfill).
@@ -943,7 +952,10 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     s.done = !s.done;
     _notify();
     _debouncedSave();
-    await _syncLog(dayIndex, exId);
+    // Pass execution data only when marking done (wasNotDone), not when undoing.
+    await _syncLog(dayIndex, exId,
+        effectiveWeight: wasNotDone ? effectiveWeight : null,
+        plannedWeight:   wasNotDone ? plannedWeight   : null);
 
     // Completed session edit: recalculate stats silently, no timer/voice/XP.
     if (isCompletedSession) {
@@ -1033,7 +1045,12 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     }
   }
 
-  Future<void> _syncLog(int dayIndex, String exId) async {
+  Future<void> _syncLog(
+    int dayIndex,
+    String exId, {
+    double? effectiveWeight,
+    double? plannedWeight,
+  }) async {
     final ex = _findEx(dayIndex, exId);
     if (ex == null) return;
 
@@ -1060,6 +1077,9 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     // Historical best BEFORE today's entry is added — used for PR detection below
     final prevBestWeight = doneSets.isNotEmpty ? getPR(key, ex.unit) : 0.0;
     final prevBestReps   = doneSets.isNotEmpty ? getPRReps(key) : 0;
+
+    // RFC-002.1: captured outside the if-block for enqueue after the save.
+    WorkoutLog? syncedLog;
 
     if (doneSets.isNotEmpty) {
       ExSet best = doneSets.first;
@@ -1094,14 +1114,21 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
         _lastMuscleTrained[muscleKey] = now;
       }
 
-      _logs.add(WorkoutLog(
-        exercise:    key,
-        date:        now,
-        weight:      best.weight.clamp(0, 500),
-        reps:        best.reps.clamp(0, 999),
-        minutes:     ex.unit == 'min' ? best.weight.toInt() : 0,
-        muscleGroup: muscleKey.isNotEmpty ? muscleKey : null,
-      ));
+      // RFC-006: actualW is what the athlete actually lifted.
+      // effectiveWeight is passed from the done handler when an adaptive session
+      // is active. Falls back to best.weight (planner) for non-adaptive sessions.
+      final actualW = (effectiveWeight ?? best.weight).clamp(0.0, 500.0);
+
+      syncedLog = WorkoutLog(
+        exercise:      key,
+        date:          now,
+        weight:        actualW,
+        reps:          best.reps.clamp(0, 999),
+        minutes:       ex.unit == 'min' ? actualW.toInt() : 0,
+        muscleGroup:   muscleKey.isNotEmpty ? muscleKey : null,
+        plannedWeight: plannedWeight,  // null for non-adaptive sessions
+      );
+      _logs.add(syncedLog);
 
       _logs.sort((a, b) => a.date.compareTo(b.date));
       if (_logs.length > _maxLogs) {
@@ -1110,7 +1137,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
 
       final pr = getPR(key, ex.unit);
       if (pr > 0) {
-        final val = ex.unit == 'reps' ? best.reps.toDouble() : best.weight;
+        final val = ex.unit == 'reps' ? best.reps.toDouble() : actualW;
         final gap = pr - val;
         final gapPct = gap / pr;
         if (gap > 0 && gapPct <= 0.10) {
@@ -1121,18 +1148,19 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       }
 
       // ── PR detection ─────────────────────────────────────────
-      // Compare today's best set against the historical best (captured before this session)
+      // Compare today's best set against the historical best (captured before this session).
+      // Uses actualW (effective weight) so a deload session cannot trigger a false PR.
       final isBodyweight = ex.unit == 'reps';
-      final isWeightPR   = !isBodyweight && best.weight > prevBestWeight && prevBestWeight >= 0;
+      final isWeightPR   = !isBodyweight && actualW > prevBestWeight && prevBestWeight >= 0;
       final isRepsPR     = !isWeightPR &&
-          best.weight == prevBestWeight &&
+          actualW == prevBestWeight &&
           best.reps > prevBestReps &&
           prevBestReps > 0;
       final isBodyweightPR = isBodyweight && best.reps > prevBestReps && prevBestReps > 0;
       if (isWeightPR || isRepsPR || isBodyweightPR) {
         _addRecentPR(PREvent(
           exercise: ex.name,
-          weight:   best.weight,
+          weight:   actualW,
           reps:     best.reps,
           date:     now,
           isRepPR:  isRepsPR || isBodyweightPR,
@@ -1142,6 +1170,13 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
 
     await _saveLogs();
     await _saveLastMuscleTrained();
+    // RFC-002.1: enqueue per-document cloud sync op (dormant: sync_mode=disabled)
+    if (syncedLog != null) {
+      await WorkoutLogRepository.instance.enqueueUpsert(
+        syncedLog,
+        OutboxService.instance.writerDeviceId,
+      );
+    }
     notifyListeners();
   }
 
@@ -1320,20 +1355,26 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
         l.date.year  == date.year &&
         l.date.month == date.month &&
         l.date.day   == date.day);
-    _logs.add(WorkoutLog(
+    final addedLog = WorkoutLog(
       exercise:    key,
       date:        date,
       weight:      weight.clamp(0, 500),
       reps:        reps.clamp(0, 999),
       minutes:     minutes,
       muscleGroup: getMuscleGroup(key),
-    ));
+    );
+    _logs.add(addedLog);
     _logs.sort((a, b) => a.date.compareTo(b.date));
     if (_logs.length > _maxLogs) {
       _logs = _logs.sublist(_logs.length - _maxLogs);
     }
     _notify();
     await _saveLogs();
+    // RFC-002.1: enqueue per-document cloud sync op (dormant: sync_mode=disabled)
+    await WorkoutLogRepository.instance.enqueueUpsert(
+      addedLog,
+      OutboxService.instance.writerDeviceId,
+    );
   }
 
   String? nearMissMessage(String exerciseKey, String unit) =>
@@ -1351,11 +1392,12 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
   SetProgressionHint analyzeProgression(
     PlannedExercise ex, {
     String goal      = 'muscle_gain',
-    String equipment = 'dumbbell',
     String movement  = 'isolation',
+    // Equipment defaults omitted — WeightRounder resolves '' to dumbbell step.
+    // Pass ex.equipment directly; no inline fallback here.
   }) =>
       ProgressionService.analyzeProgression(ex,
-          goal: goal, equipment: equipment, movement: movement);
+          goal: goal, equipment: ex.equipment, movement: movement);
 
   String getTrainerMessage(PlannedExercise ex) =>
       analyzeProgression(ex).message;
@@ -1412,6 +1454,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
         previousBestReps:   allTimeBest?.reps   ?? 0,
         isBodyweight:       ex.bodyweight,
         unit:               ex.unit,
+        equipment:          ex.equipment,
       );
     }
 
@@ -1427,6 +1470,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
         previousBestReps:   allTimeBest.reps,
         isBodyweight:       ex.bodyweight,
         unit:               ex.unit,
+        equipment:          ex.equipment,
       );
     }
 
@@ -1562,6 +1606,10 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
       _saveStreak(),
       _saveHistory(),
     ]);
+
+    // RFC-002.5: push session to cloud after local saves complete.
+    // Non-blocking — completion UI is not gated on cloud latency.
+    _syncHistoryEntryToCloud(_history.first);
 
     _notify();
 
@@ -1783,6 +1831,7 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
             type:       ex['type']      as String? ?? '',
             unit:       isBW ? 'reps' : (ex['unit'] as String? ?? 'kg'),
             bodyweight: isBW,
+            equipment:  equipment,
             sets: List.generate(exSets, (_) => ExSet(
               id:     IdHelper.uuid(),
               reps:   reps,
@@ -2348,7 +2397,12 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     } catch (e, s) {
       debugPrint('❌ _saveLogs ERROR: $e\n$s');
     }
-    _scheduleCloudSync();
+    // RFC-002.1: gate legacy blob sync — run only while new sync is disabled.
+    // When sync_mode advances beyond disabled, the per-document outbox takes
+    // over and this legacy path is permanently retired.
+    if (!OutboxService.instance.syncMode.isActive) {
+      _scheduleCloudSync();
+    }
   }
 
   Timer? _cloudSyncDebounce;
@@ -2378,24 +2432,441 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
     }
   }
 
-  Future<bool> tryRestoreLogsFromCloud() async {
+  // RFC-002.5 §6 — fire-and-forget per-session cloud write.
+  // Called from markDayComplete after local saves complete.
+  // Also used for incremental imports from HealthSyncEngine (1–50 entries).
+  // Firestore SDK offline persistence handles retry on reconnect.
+  // RFC-002.6B: writes externalSource/externalId when non-null so that
+  // reinstall + cloud restore can correctly deduplicate imported workouts.
+  Future<void> _syncHistoryEntryToCloud(HistoryEntry entry) async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) { return false; }
-      final doc = await FirebaseFirestore.instance
-          .collection('workout_history')
+      if (uid == null) return;
+      final data = <String, dynamic>{
+        'id':              entry.id,
+        'date':            entry.date,
+        'workoutName':     entry.workoutName,
+        'durationMinutes': entry.durationMinutes,
+        'totalVolume':     entry.totalVolume,
+        'xpEarned':        entry.xpEarned,
+        'sv':              1,
+      };
+      if (entry.externalSource != null) data['externalSource'] = entry.externalSource;
+      if (entry.externalId     != null) data['externalId']     = entry.externalId;
+      await FirebaseFirestore.instance
+          .collection('users')
           .doc(uid)
-          .get()
-          .timeout(const Duration(seconds: 10));
-      if (!doc.exists) { return false; }
-      final data = doc.data();
-      if (data == null || data['logs'] == null) { return false; }
-      final cloudLogs = (data['logs'] as List)
-          .map((e) => WorkoutLog.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList();
-      if (cloudLogs.isEmpty) { return false; }
-      _logs = cloudLogs;
+          .collection('history_entries')
+          .doc(entry.id)
+          .set(data);
+      debugPrint('☁️ History entry synced: ${entry.id} (${entry.date})');
+    } catch (e) {
+      debugPrint('History entry sync failed: $e');
+      // Firestore SDK queues the write offline — no manual retry needed.
+    }
+  }
+
+  // RFC-002.6B — bulk WriteBatch upload for initial health import (since: epoch).
+  // Uses the same 500-per-batch pattern as backfillHistoryIfNeeded.
+  // Must not be called for incremental sync — use _syncHistoryEntryToCloud there.
+  Future<void> _batchSyncEntriesToCloud(List<HistoryEntry> entries) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null || entries.isEmpty) return;
+      final historyRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('history_entries');
+      const batchSize = 500;
+      for (int i = 0; i < entries.length; i += batchSize) {
+        final end = (i + batchSize < entries.length) ? i + batchSize : entries.length;
+        final chunk = entries.sublist(i, end);
+        final batch = FirebaseFirestore.instance.batch();
+        for (final entry in chunk) {
+          final data = <String, dynamic>{
+            'id':              entry.id,
+            'date':            entry.date,
+            'workoutName':     entry.workoutName,
+            'durationMinutes': entry.durationMinutes,
+            'totalVolume':     entry.totalVolume,
+            'xpEarned':        entry.xpEarned,
+            'sv':              1,
+          };
+          if (entry.externalSource != null) data['externalSource'] = entry.externalSource;
+          if (entry.externalId     != null) data['externalId']     = entry.externalId;
+          batch.set(historyRef.doc(entry.id), data);
+        }
+        await batch.commit();
+      }
+      debugPrint('☁️ Batch synced ${entries.length} imported entries');
+    } catch (e) {
+      debugPrint('_batchSyncEntriesToCloud failed: $e');
+    }
+  }
+
+  // RFC-002.6B — merge imported HistoryEntry records into local history.
+  //
+  // TWO-KEY DEDUP:
+  //   Imported entries (externalSource + externalId non-null):
+  //     reject if (externalSource, externalId) already exists in _history.
+  //   Native entries (externalSource == null):
+  //     reject if id already exists in _history.
+  //
+  // SYNC MODE:
+  //   isInitialImport = true  → WriteBatch (500-entry chunks, first-ever sync)
+  //   isInitialImport = false → per-entry _syncHistoryEntryToCloud (incremental)
+  //
+  // This is the ONLY WorkoutProvider method that HealthSyncEngine calls.
+  // package:health types must never enter this method.
+  Future<void> mergeImportedHistory(
+    List<HistoryEntry> imported, {
+    bool isInitialImport = false,
+  }) async {
+    if (imported.isEmpty) return;
+
+    // Build dedup sets from existing history.
+    final existingIds = _history.map((e) => e.id).toSet();
+    final existingExternalKeys = <String>{};
+    for (final e in _history) {
+      if (e.externalSource != null && e.externalId != null) {
+        existingExternalKeys.add('${e.externalSource}::${e.externalId}');
+      }
+    }
+
+    // Filter to genuinely new entries only.
+    final newEntries = <HistoryEntry>[];
+    for (final entry in imported) {
+      if (entry.externalSource != null && entry.externalId != null) {
+        final key = '${entry.externalSource}::${entry.externalId}';
+        if (!existingExternalKeys.contains(key)) newEntries.add(entry);
+      } else {
+        if (!existingIds.contains(entry.id)) newEntries.add(entry);
+      }
+    }
+
+    if (newEntries.isEmpty) return;
+
+    _history = [..._history, ...newEntries];
+    _history.sort((a, b) => b.date.compareTo(a.date));
+    await _saveHistory();
+
+    // Cloud sync — batch for initial import, per-entry for incremental.
+    if (isInitialImport) {
+      await _batchSyncEntriesToCloud(newEntries);
+    } else {
+      for (final entry in newEntries) {
+        _syncHistoryEntryToCloud(entry).ignore();
+      }
+    }
+
+    notifyListeners();
+    debugPrint('☁️ mergeImportedHistory: +${newEntries.length} entries '
+        '(${isInitialImport ? "batch" : "incremental"}, '
+        'total=${_history.length})');
+  }
+
+  // RFC-002.5 §7 — pull session history from Firestore, merge with local,
+  // then reconcile derived state (streaks, badges).
+  // Called from LoginScreen._signIn() after tryRestoreFromCloud().
+  // Must NOT be called on normal app launch — restore only, not every init.
+  Future<bool> tryRestoreHistoryFromCloud() async {
+    // Re-entrant restore guard: prevents a second concurrent call to
+    // tryRestoreHistoryFromCloud (e.g. double sign-in tap) from running
+    // while the first is in progress. Does NOT guard markDayComplete —
+    // Dart's cooperative concurrency makes the synchronous merge sections
+    // (steps 2–3 below) atomic between await suspension points.
+    if (_isRestoringHistory) return false;
+    _isRestoringHistory = true;
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return false;
+
+      // ── 1. Fetch from Firestore ──────────────────────────────────────
+      List<HistoryEntry> cloudEntries = [];
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('history_entries')
+            .orderBy('date', descending: true)
+            .limit(2000)
+            .get()
+            .timeout(const Duration(seconds: 15));
+
+        for (final doc in snapshot.docs) {
+          try {
+            cloudEntries.add(HistoryEntry.fromJson(
+                Map<String, dynamic>.from(doc.data())));
+          } catch (e) {
+            debugPrint('history_entries: skipping malformed doc ${doc.id}: $e');
+          }
+        }
+      } catch (e) {
+        // Network failure — proceed with empty cloud list.
+        // Local history is preserved; reconciliation runs against local only.
+        debugPrint('history_entries fetch failed (offline?): $e');
+      }
+
+      // ── 2. Merge: union by id, local entries always retained ─────────
+      final localIds = _history.map((e) => e.id).toSet();
+      final newFromCloud = cloudEntries.where((e) => !localIds.contains(e.id)).toList();
+
+      if (newFromCloud.isNotEmpty) {
+        _history = [..._history, ...newFromCloud];
+        // Sort newest-first so _history.first is always the latest session.
+        _history.sort((a, b) => b.date.compareTo(a.date));
+        await _saveHistory();
+        debugPrint('☁️ History restored: +${newFromCloud.length} from cloud, '
+            'total=${_history.length}');
+      } else {
+        debugPrint('☁️ History restore: no new cloud entries '
+            '(local=${_history.length}, cloud=${cloudEntries.length})');
+      }
+
+      // ── 3. Reconcile derived state from merged history ────────────────
+      await _reconcileStateFromHistory();
+
+      notifyListeners();
+      return true;
+    } finally {
+      _isRestoringHistory = false;
+    }
+  }
+
+  // Re-entrant guard for tryRestoreHistoryFromCloud. Set true on entry,
+  // cleared in finally. Does not interact with markDayComplete.
+  bool _isRestoringHistory = false;
+
+  // RFC-002.5 §7 — recompute derived streak state from the merged history.
+  // Called ONLY from tryRestoreHistoryFromCloud(). Must not be called on
+  // normal app launch — it is a restore-time repair, not a startup routine.
+  //
+  // Does NOT restore XP — XP is owned by GamificationProvider.
+  // Caller is responsible for invoking GamificationProvider.recoverXPIfNeeded
+  // after this method returns (Option B provider boundary).
+  Future<void> _reconcileStateFromHistory() async {
+    if (_history.isEmpty) return;
+
+    // Count only native LiftOn sessions — Apple Watch imports (externalSource
+    // != null) feed recovery/health metrics but must not inflate the session
+    // counter, identity stage, AI maturity gates, or timeline milestones.
+    final nativeHistory = _history
+        .where((e) => e.externalSource == null)
+        .toList(); // preserves newest-first order
+    final nativeCount = nativeHistory.length;
+
+    // ── totalWorkouts ────────────────────────────────────────────────────
+    // Only update if native history has more sessions than the current counter.
+    // A higher local counter means offline completions exist that are not yet
+    // in the cloud window — those are real sessions and must not be erased.
+    // Invariant I-05: never decrease totalWorkouts below native history evidence.
+    if (nativeCount <= _streak.totalWorkouts) {
+      debugPrint('🔧 reconcileHistory: counter=${_streak.totalWorkouts} '
+          '>= native=$nativeCount '
+          '(total incl. Watch=${_history.length}), skipping update');
+      return;
+    }
+
+    _streak.totalWorkouts = nativeCount;
+
+    // ── Training dates set (for streak computation) ──────────────────────
+    // Native-only: Apple Watch walks/runs/yoga must not count as gym training
+    // days for streak purposes in a strength tracker.
+    final trainingDates = nativeHistory.map((e) => e.date).toSet();
+
+    // ── longestStreak ────────────────────────────────────────────────────
+    // Blocker 1 fix: never decrease. Use max(existing, computed).
+    final computedLongest = _computeLongestStreak(trainingDates);
+    if (computedLongest > _streak.longestStreak) {
+      _streak.longestStreak = computedLongest;
+    }
+
+    // ── lastWorkoutDate ──────────────────────────────────────────────────
+    // Use the most recent native LiftOn session, not the most recent Apple
+    // Watch entry, so currentStreak is not kept alive by passive Watch activity.
+    if (nativeHistory.isNotEmpty) {
+      _streak.lastWorkoutDate = nativeHistory.first.date;
+    }
+
+    // ── currentStreak ────────────────────────────────────────────────────
+    // NOT set here. checkStreakHealth() computes it from lastWorkoutDate vs
+    // today, and runs on AppProvider.init(). Setting it here from historical
+    // dates would ignore the time gap since reinstall.
+
+    // ── earnedBadges ─────────────────────────────────────────────────────
+    final rederived = BadgeSystem.checkNewBadges(_streak, []);
+    _streak.earnedBadges = rederived.map((b) => b.id).toList();
+
+    await _saveStreak();
+    debugPrint('🔧 reconcileHistory: totalWorkouts=$nativeCount (native), '
+        'appleWatch=${_history.length - nativeCount}, '
+        'longestStreak=${_streak.longestStreak}, '
+        'lastWorkout=${_streak.lastWorkoutDate}, '
+        'badges=${_streak.earnedBadges.length}');
+  }
+
+  // RFC-002.5 §7 — compute longest consecutive-day streak from a set of
+  // "YYYY-MM-DD" training date strings.
+  static int _computeLongestStreak(Set<String> trainingDates) {
+    if (trainingDates.isEmpty) return 0;
+    final sorted = trainingDates
+        .map(DateTime.parse)
+        .toList()
+      ..sort();
+
+    int longest = 1;
+    int run = 1;
+    for (int i = 1; i < sorted.length; i++) {
+      final diff = sorted[i].difference(sorted[i - 1]).inDays;
+      if (diff == 1) {
+        run++;
+        if (run > longest) longest = run;
+      } else if (diff > 1) {
+        run = 1;
+      }
+      // diff == 0: two completions same calendar day — count the day once.
+    }
+    return longest;
+  }
+
+  // RFC-002.5 §9 — one-time backfill of all local HistoryEntry records to cloud.
+  // Called from AppProvider.init() on every authenticated launch; returns
+  // immediately once the migration flag is written (idempotent).
+  Future<void> backfillHistoryIfNeeded() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      if (_history.isEmpty) return;
+
+      final prefs = await StorageService.instance.prefs();
+      final migrationVersion =
+          prefs.getInt(StorageKeys.historySyncMigrationVersion) ?? 0;
+      if (migrationVersion >= 1) return;
+
+      final attempts = prefs.getInt(StorageKeys.historySyncAttempts) ?? 0;
+      if (attempts >= 5) {
+        debugPrint('⚠️ backfillHistoryIfNeeded: max attempts ($attempts/5) reached, giving up');
+        return;
+      }
+
+      final historyRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('history_entries');
+
+      // Firestore WriteBatch is capped at 500 operations.
+      const batchSize = 500;
+      for (int i = 0; i < _history.length; i += batchSize) {
+        final end = (i + batchSize < _history.length) ? i + batchSize : _history.length;
+        final chunk = _history.sublist(i, end);
+        final batch = FirebaseFirestore.instance.batch();
+        for (final entry in chunk) {
+          batch.set(historyRef.doc(entry.id), {
+            'id':              entry.id,
+            'date':            entry.date,
+            'workoutName':     entry.workoutName,
+            'durationMinutes': entry.durationMinutes,
+            'totalVolume':     entry.totalVolume,
+            'xpEarned':        entry.xpEarned,
+            'sv':              1,
+          });
+        }
+        await batch.commit();
+      }
+
+      await prefs.setInt(StorageKeys.historySyncMigrationVersion, 1);
+      await prefs.setInt(StorageKeys.historySyncAttempts, 0);
+      debugPrint('☁️ backfillHistoryIfNeeded: ${_history.length} entries uploaded');
+    } catch (e) {
+      try {
+        final prefs = await StorageService.instance.prefs();
+        final attempts = prefs.getInt(StorageKeys.historySyncAttempts) ?? 0;
+        await prefs.setInt(StorageKeys.historySyncAttempts, attempts + 1);
+        debugPrint('⚠️ backfillHistoryIfNeeded failed (attempt ${attempts + 1}/5): $e');
+      } catch (_) {}
+    }
+  }
+
+  // RFC-002.2 — restore workout logs on login.
+  //
+  // Source priority:
+  //   1. users/{uid}/logs  — RFC-002.1 per-document subcollection (primary)
+  //   2. workout_history/{uid} — legacy blob (fallback, migration window)
+  //
+  // Merge strategy: UNION only. Local logs are never overwritten.
+  // Cloud fills gaps; new-path documents deleted via soft-delete (deletedAt)
+  // are excluded by LogsSyncAdapter.fromPayload().
+  Future<bool> tryRestoreLogsFromCloud() async {
+    if (_isRestoringLogs) return false;
+    _isRestoringLogs = true;
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return false;
+
+      // ── 1. New path: users/{uid}/logs ─────────────────────────────────────
+      List<WorkoutLog> cloudLogs = [];
+      bool newPathHasData = false;
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('logs')
+            .orderBy('date', descending: false)
+            .limit(5000)
+            .get()
+            .timeout(const Duration(seconds: 15));
+
+        final adapter = LogsSyncAdapter();
+        for (final doc in snapshot.docs) {
+          final log = adapter.fromPayload(Map<String, dynamic>.from(doc.data()));
+          if (log != null) cloudLogs.add(log);
+        }
+        newPathHasData = cloudLogs.isNotEmpty;
+        debugPrint('☁️ logs restore: ${cloudLogs.length} from users/{uid}/logs');
+      } catch (e) {
+        debugPrint('logs restore (new path) failed: $e');
+      }
+
+      // ── 2. Legacy fallback: workout_history/{uid} blob ────────────────────
+      if (!newPathHasData) {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('workout_history')
+              .doc(uid)
+              .get()
+              .timeout(const Duration(seconds: 10));
+          if (doc.exists) {
+            final data = doc.data();
+            if (data != null && data['logs'] != null) {
+              cloudLogs = (data['logs'] as List)
+                  .map((e) => WorkoutLog.fromJson(
+                      Map<String, dynamic>.from(e as Map)))
+                  .toList();
+              debugPrint(
+                  '☁️ logs restore: ${cloudLogs.length} from legacy blob');
+            }
+          }
+        } catch (e) {
+          debugPrint('logs restore (legacy) failed: $e');
+        }
+      }
+
+      if (cloudLogs.isEmpty) return false;
+
+      // ── 3. Union merge — local always wins for same natural key ───────────
+      final localKeys = _logs.map(_logNaturalKey).toSet();
+      final newFromCloud =
+          cloudLogs.where((l) => !localKeys.contains(_logNaturalKey(l))).toList();
+
+      if (newFromCloud.isEmpty) {
+        debugPrint('☁️ logs restore: no new logs '
+            '(local=${_logs.length}, cloud=${cloudLogs.length})');
+        return false;
+      }
+
+      _logs = [..._logs, ...newFromCloud];
       _logs.sort((a, b) => a.date.compareTo(b.date));
+
       final storage = StorageService.instance;
       final localData = _logs.map((l) => l.toJson()).toList();
       await Future.wait([
@@ -2403,13 +2874,29 @@ debugPrint('⚠️ Hive returned ${plans.length} days — falling through to pre
         storage.setJson(StorageKeys.logs, localData),
       ]);
       notifyListeners();
-      debugPrint('☁️ Restored ${_logs.length} logs from cloud');
+      debugPrint('☁️ logs restore: +${newFromCloud.length} new, '
+          'total=${_logs.length}');
       return true;
     } catch (e) {
-      debugPrint('Cloud log restore failed: $e');
+      debugPrint('tryRestoreLogsFromCloud failed: $e');
       return false;
+    } finally {
+      _isRestoringLogs = false;
     }
   }
+
+  bool _isRestoringLogs = false;
+
+  // Natural key matching LogsSyncAdapter.docIdFor — used to dedup on restore.
+  static String _logNaturalKey(WorkoutLog l) {
+    final date = l.date.toIso8601String().substring(0, 10);
+    return '${l.normalizedExercise}_${date}_${l.weight}_${l.reps}_${l.minutes}';
+  }
+
+  // _reconcileStreakWithRestoredLogs() removed — RFC-002.5.
+  // Replaced by _reconcileStateFromHistory() which derives session count
+  // from HistoryEntry (one-per-session) instead of WorkoutLog
+  // (one-per-exercise-per-day, capped, best-set-only, wrong source).
 
   // ═════════════════════════════════════════════════════════
   // RESET

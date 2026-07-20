@@ -36,10 +36,11 @@
 
 "use strict";
 
-const { onRequest } = require("firebase-functions/v2/https");
+const { onRequest }    = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
-const admin = require("firebase-admin");
-const fetch = require("node-fetch");
+const functionsV1      = require("firebase-functions/v1");
+const admin                 = require("firebase-admin");
+const fetch                 = require("node-fetch");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -292,3 +293,120 @@ exports.askAI = onRequest(
     return res.status(200).json({ success: true, reply });
   }
 );
+
+// ── RFC-003: Server-side premium verification ─────────────────────────────────
+//
+// Called by Flutter immediately after a Play Store / App Store purchase is
+// confirmed by in_app_purchase. Validates the caller's ID token, checks the
+// productId against the known set, sets a Firebase custom claim
+// { premium: true, premiumExpiry: "YYYY-MM-DD" } via Admin SDK, and writes
+// a verified:true grant record to premium_grants/{uid}.
+//
+// askAI already gates on decoded.premium === true — no changes needed there.
+// The Flutter client calls getIdToken(true) after this succeeds to pull the
+// fresh claim into the cached token.
+exports.verifyPurchase = onRequest(
+  { timeoutSeconds: 30, memory: "256MiB", cors: true },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Method Not Allowed" });
+    }
+
+    // 1. Auth token verification
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: "Authorization required." });
+
+    let uid;
+    try {
+      const decoded = await admin.auth().verifyIdToken(token);
+      uid = decoded.uid;
+    } catch (e) {
+      return res.status(401).json({ error: "Invalid auth token." });
+    }
+
+    // 2. Validate request body
+    const { productId, purchaseToken } = req.body;
+    const VALID_PRODUCTS = new Set([
+      "premium_monthly",
+      "premium_quarterly",
+      "premium_yearly",
+    ]);
+    if (!productId || !VALID_PRODUCTS.has(productId)) {
+      return res.status(400).json({ error: "Invalid product ID." });
+    }
+    if (!purchaseToken || typeof purchaseToken !== "string" || purchaseToken.trim().length === 0) {
+      return res.status(400).json({ error: "Purchase token required." });
+    }
+
+    // 3. Calculate expiry
+    const EXPIRY_DAYS = { premium_yearly: 365, premium_quarterly: 95, premium_monthly: 32 };
+    const expiry    = new Date(Date.now() + EXPIRY_DAYS[productId] * 24 * 60 * 60 * 1000);
+    const expiryStr = expiry.toISOString().split("T")[0]; // YYYY-MM-DD
+
+    // 4. Set custom claim — this is what askAI checks (decoded.premium === true)
+    try {
+      await admin.auth().setCustomUserClaims(uid, { premium: true, premiumExpiry: expiryStr });
+      console.log(`[verifyPurchase] claim set: uid=${uid} product=${productId} expiry=${expiryStr}`);
+    } catch (err) {
+      console.error(`[verifyPurchase] setCustomUserClaims failed uid=${uid}:`, err);
+      return res.status(500).json({ error: "Failed to grant premium." });
+    }
+
+    // 5. Write verified grant to Firestore (non-fatal — claim already set)
+    db.collection("premium_grants").doc(uid).set({
+      productId,
+      purchaseToken,
+      grantedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: expiryStr,
+      platform:  req.body.platform ?? "android",
+      verified:  true,
+    }, { merge: true }).catch((err) => {
+      console.warn(`[verifyPurchase] Firestore write failed (non-fatal) uid=${uid}:`, err);
+    });
+
+    return res.status(200).json({ success: true, premiumExpiry: expiryStr });
+  }
+);
+
+// ── RFC-002.4: GDPR data purge on account deletion ───────────────────────────
+//
+// Gen1 auth trigger (firebase-functions/v1). Runs on Node 22 — GCF Gen1
+// does not support Node 24. askAI uses Gen2 (onRequest); both coexist fine.
+//
+// Purge order:
+//   1. users/{uid} + all subcollections (logs, plans, instances,
+//      measurements, _meta, favorites, history_entries) — recursiveDelete.
+//   2. Top-level flat documents (legacy + server-owned).
+//
+// Admin SDK bypasses Firestore Security Rules — the only authorised server-side
+// writer for premium_grants and entitlements (RFC-002.3).
+exports.onUserDeleted = functionsV1.auth.user().onDelete(async (user) => {
+  const uid = user.uid;
+  const db  = admin.firestore();
+
+  try {
+    // 1. Recursively delete users/{uid} and every subcollection.
+    await db.recursiveDelete(db.collection("users").doc(uid));
+    console.log(`[onUserDeleted] users/${uid} + subcollections deleted`);
+  } catch (err) {
+    console.error(`[onUserDeleted] recursiveDelete users/${uid} failed:`, err);
+  }
+
+  // 2. Top-level flat documents — settle all regardless of individual errors.
+  const topLevel = [
+    db.collection("workout_history").doc(uid),
+    db.collection("premium_grants").doc(uid),
+    db.collection("ai_usage").doc(uid),
+    db.collection("entitlements").doc(uid),
+  ];
+
+  const results = await Promise.allSettled(topLevel.map((ref) => ref.delete()));
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      console.warn(`[onUserDeleted] top-level delete[${i}] failed:`, r.reason);
+    }
+  });
+
+  console.log(`[onUserDeleted] purge complete for uid=${uid}`);
+});

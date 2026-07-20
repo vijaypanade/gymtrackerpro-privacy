@@ -126,6 +126,25 @@ class GamificationProvider extends ChangeNotifier {
     }
   }
 
+  // RFC-002.5 §7 Option B — XP recovery after reinstall.
+  // Called from LoginScreen after tryRestoreHistoryFromCloud() returns.
+  // WorkoutProvider has no knowledge of this method (no circular dependency).
+  Future<void> recoverXPIfNeeded(List<HistoryEntry> history) async {
+    if (_xp.totalXP != 0) return; // XP already present — nothing to recover.
+    if (history.isEmpty) return;
+
+    final sumFromHistory = history.fold<int>(0, (s, e) => s + e.xpEarned);
+    final recovered = sumFromHistory > 0
+        ? sumFromHistory
+        : history.length * XPSystem.xpWorkoutComplete; // floor estimate
+
+    _xp.totalXP = recovered;
+    await _saveXP();
+    notifyListeners();
+    debugPrint('🔧 XP recovered: $recovered (${sumFromHistory > 0 ? "exact" : "floor estimate"}, '
+        '${history.length} sessions)');
+  }
+
   // ── Missions
   void completeMission(String id) {
     final idx = _missions.indexWhere((m) => m.id == id);

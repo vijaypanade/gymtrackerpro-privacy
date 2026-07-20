@@ -11,6 +11,7 @@ import '../../models/recovery_state.dart';
 import '../../services/training_adjustment_service.dart';
 import '../../providers/analytics_provider.dart';
 import '../../memory/snapshots/athlete_memory_snapshot.dart';
+import 'biometric_context.dart';
 import 'environment_context.dart';
 import 'workout_context.dart';
 
@@ -26,6 +27,9 @@ class DecisionContext {
   /// Long-term EMA memory snapshot. Advisory only — does not alter
   /// AdaptiveProgrammingService outputs in this commit.
   final AthleteMemorySnapshot? athleteMemorySnapshot;
+  /// Raw biometric readings for post-compute coaching message attribution.
+  /// Null when HealthKit / Health Connect is not connected or has no data.
+  final BiometricContext? biometricContext;
 
   const DecisionContext({
     required this.recoveryState,
@@ -37,5 +41,6 @@ class DecisionContext {
     required this.workoutContext,
     required this.environmentContext,
     this.athleteMemorySnapshot,
+    this.biometricContext,
   });
 }

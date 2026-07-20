@@ -14,6 +14,8 @@ import 'package:provider/provider.dart';
 import '../services/storage_service.dart';
 import '../services/training_intent_parser.dart';
 
+import '../ai/models/chat_prompt_input.dart';
+import '../ai/services/chat_prompt_builder.dart';
 import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../services/monetization_service.dart';
@@ -173,310 +175,40 @@ class _AIChatScreenState extends State<AIChatScreen>
               })
           .toList();
 
-      // Build a context-rich prompt for the secure backend.
-      // ApiService.askAI now takes a single String prompt — we fold all
-      // the user/profile/history context into it here.
-
       final lowerText = text.toLowerCase();
 
-      final wantsWorkoutPlan =
-          lowerText.contains('workout') ||
-          lowerText.contains('plan') ||
-          lowerText.contains('back') ||
-          lowerText.contains('chest') ||
-          lowerText.contains('bicep') ||
-          lowerText.contains('tricep') ||
-          lowerText.contains('legs') ||
-          lowerText.contains('shoulder') ||
-          lowerText.contains('push') ||
-          lowerText.contains('pull');
-
-      final buf = StringBuffer();
-
-      final pf = p.profile;
-
-      // ═══════════════════════════════════════════════
-      // LAYER 1: IDENTITY — Indian Elite Trainer
-      // ═══════════════════════════════════════════════
-      buf.writeln('You are LiftOn Coach — a calm, experienced Indian strength coach.');
-      buf.writeln('Personality: quiet confidence, like a coach who has trained hundreds. NO fluff, NO lecture, NO report tone.');
-      buf.writeln();
-      buf.writeln('COMMUNICATION STYLE:');
-      buf.writeln('- Sound like a calm, premium Indian fitness coach.');
-      buf.writeln('- Be concise, confident, and practical.');
-      buf.writeln('- Avoid excessive slang, hype, or motivational clichés.');
-      buf.writeln('- Use short, scan-friendly responses.');
-      buf.writeln('- Never sound childish, aggressive, or overly emotional.');
-      buf.writeln('- Prioritize clarity and coaching quality over personality.');
-      buf.writeln();
-
-      // ═══════════════════════════════════════════════
-      // LAYER 2: KNOWLEDGE & EXPERTISE
-      // ═══════════════════════════════════════════════
-      if (wantsWorkoutPlan) {
-        buf.writeln('EXPERTISE MODE: Workout Planning (COACH VOICE — strict format)');
-        buf.writeln('');
-        buf.writeln('OUTPUT FORMAT (follow EXACTLY):');
-        buf.writeln('Line 1: One-line opener with address + readiness comment (max 12 words).');
-        buf.writeln('Line 2: Blank.');
-        buf.writeln('Then EXACTLY this template for each exercise (no deviations):');
-        buf.writeln('1. [EXERCISE_NAME] — [SETS]x[REPS], RIR [N]');
-        buf.writeln('   [SHORT_TIP under 8 words]');
-        buf.writeln('');
-        buf.writeln('CRITICAL: Exercise name is MANDATORY on every line.');
-        buf.writeln('NEVER output just "3x10, RIR 2" without a name.');
-        buf.writeln('Use real exercise names: Bench Press, Squat, Pull-up, Deadlift, etc.');
-        buf.writeln('');
-        buf.writeln('Real example output:');
-        buf.writeln('1. Goblet Squat — 3x12, RIR 2');
-        buf.writeln('   Knees out, chest tall.');
-        buf.writeln('2. Push-up — 3x10, RIR 2');
-        buf.writeln('   Slow down, fast up.');
-        buf.writeln('3. Dumbbell Row — 3x12 each, RIR 2');
-        buf.writeln('   Squeeze the back.');
-        buf.writeln('');
-        buf.writeln('Final line: One-line closer (max 10 words).');
-        buf.writeln('');
-        buf.writeln('FORMAT RULES (hard limits):');
-        buf.writeln('- NO long "Why" paragraphs. ONE tip per exercise, ≤8 words.');
-        buf.writeln('- NO warm-up/cool-down sections unless explicitly asked.');
-        buf.writeln('- NO "Recovery Note" / "Sleep advice" unless explicitly asked.');
-        buf.writeln('- NO food advice in workout plans.');
-        // Allow more words when user asks for multiple exercises
-        final exCount = RegExp(r'\b(\d+)\s+exercise').firstMatch(text.toLowerCase());
-        final nEx = exCount != null ? int.tryParse(exCount.group(1) ?? '0') ?? 0 : 0;
-        final wordLimit = nEx >= 5 ? 300 : (nEx >= 3 ? 220 : 150);
-        buf.writeln('- Total reply MUST fit in $wordLimit words.');
-        buf.writeln('- Match user level — never overload beginners.');
-        buf.writeln('- Progress weights gradually using the recovery data below.');
-      } else {
-        buf.writeln('EXPERTISE MODE: Conversational Coaching');
-        buf.writeln('- Length: simple questions under 40 words; normal replies '
-            '40-90 words; complex topics max 150 words. Never walls of text.');
-        buf.writeln('- Coach voice: short, direct, action-first. Natural paragraph breaks.');
-        buf.writeln('- CLARIFY BEFORE ASSUMING: if the user sends only 1-2 words '
-            '("bench", "protein", "legs"), do NOT prescribe — ask one short '
-            'clarifying question first ("Planning to train bench today?").');
-        buf.writeln('- FOLLOW-UP VARIETY: end MOST replies (~70%) with one short '
-            'question. Sometimes (~20%) close with a quiet line instead '
-            '("See how that feels.", "I\'d start there."). Occasionally (~10%) '
-            'no follow-up at all. Never ask two questions in one reply.');
-        buf.writeln('- Use bullets only if listing 3+ items.');
-        buf.writeln('- If you don\'t know, say so — never invent science.');
-        buf.writeln('- BANNED WORDS (never use): optimal, hypertrophy, progressive '
-            'overload, adaptation, muscle synthesis, active recovery, '
-            '"fatigue detected", readiness, "recovery score".');
-        buf.writeln('- NEVER quote scores, percentages or numbers from the data '
-            'below unless the user explicitly asks for numbers.');
-        buf.writeln('- Speak conclusions, not metrics: say "your body needs a '
-            'lighter day", never "readiness is 46/100".');
-      }
-      buf.writeln();
-
-      // ═══════════════════════════════════════════════
-      // EQUIPMENT CONSTRAINT (if user asks for bodyweight)
-      // ═══════════════════════════════════════════════
-      final wantsBW = text.toLowerCase().contains('bodyweight') ||
-          text.toLowerCase().contains('body weight') ||
-          text.toLowerCase().contains('no equipment') ||
-          text.toLowerCase().contains('home workout') ||
-          text.toLowerCase().contains('without gym');
-      if (wantsBW) {
-        buf.writeln('EQUIPMENT CONSTRAINT: BODYWEIGHT ONLY');
-        buf.writeln('- User wants NO EQUIPMENT workout (home/bodyweight).');
-        buf.writeln('- USE ONLY: Push-ups, Pull-ups, Chin-ups, Dips, Squats,');
-        buf.writeln('  Lunges, Planks, Crunches, Burpees, Mountain Climbers,');
-        buf.writeln('  Pike Push-ups, Diamond Push-ups, Jumping Jacks,');
-        buf.writeln('  Glute Bridges, Supermans, Leg Raises, Wall Sit.');
-        buf.writeln('- DO NOT include ANY barbell/dumbbell/machine exercises.');
-        buf.writeln('- Always use proper exercise names (e.g. "Push-up", "Plank").');
-        buf.writeln();
-      }
-
-      // ═══════════════════════════════════════════════════════════════
-      // TRAINING INTENT — HARD CONSTRAINTS
-      // ═══════════════════════════════════════════════════════════════
-      final constraintBlock = TrainingIntentParser.buildConstraintBlock(intent);
-      if (constraintBlock.isNotEmpty) {
-        buf.writeln(constraintBlock);
-      }
-
-      // ═══════════════════════════════════════════════
-      // LAYER 3: CONSISTENCY PSYCHOLOGY
-      // ═══════════════════════════════════════════════
-      buf.writeln('PSYCHOLOGY RULES (very important):');
-      buf.writeln('- Celebrate small wins (streak milestones, PRs, comeback days).');
-      buf.writeln('- After missed days: NO guilt-tripping. Frame it as "comeback energy".');
-      buf.writeln('- Build identity, not just habits: "You ARE someone who trains hard."');
-      buf.writeln('- Use streak data to fuel momentum talk when streak ≥ 3 days.');
-      buf.writeln('- If user sounds demotivated: acknowledge feelings first, then redirect to one small action.');
-      buf.writeln('- Never shame body type, weight, or starting point.');
-      buf.writeln();
-
-      buf.writeln();
-
-      // Detect profile completeness
-      final hasName = pf.name.isNotEmpty && pf.name != 'Champion';
-      final hasAge = pf.age > 0 && pf.age != 25;
-      final hasWeight = pf.weightKg > 0 && pf.weightKg != 70.0;
-      final hasHeight = pf.heightCm > 0 && pf.heightCm != 170.0;
-      final profileComplete = hasName && hasAge && hasWeight && hasHeight;
-
-      buf.writeln('USER PROFILE (use this to personalize ALL advice):');
-      buf.writeln('- Name: ${pf.name}');
-      buf.writeln('- Age: ${pf.age}, Gender: ${pf.gender}');
-      buf.writeln('- Weight: ${pf.weightKg}kg, Height: ${pf.heightCm}cm');
-      buf.writeln('- BMI: ${pf.bmi.toStringAsFixed(1)} (${pf.bmiCategory})');
-      buf.writeln('- BMR: ${pf.bmr.toStringAsFixed(0)} kcal/day');
-      buf.writeln('- Activity Level: ${pf.activityLevel}');
-      buf.writeln('- Goal: ${pf.goal}');
-      buf.writeln('- Level: ${pf.level}');
-      buf.writeln('- Diet Preference: ${pf.dietPreference} (veg/nonveg/eggetarian)');
-      buf.writeln('- Location: ${pf.state}');
-      debugPrint('SENDING LOCATION TO AI: ${pf.state}');
-      buf.writeln('- Trainer style: ${pf.trainerType}');
-      buf.writeln('- Streak: ${p.streak.currentStreak} days');
-      buf.writeln('- Total workouts: ${p.streak.totalWorkouts}');
-      buf.writeln();
-
-      if (!profileComplete) {
-        buf.writeln('⚠️ IMPORTANT: User profile is INCOMPLETE.');
-        buf.writeln('If user asks for personalized advice — DO NOT guess. Instead politely ask them '
-            'to update their Profile tab with: age, weight, height, and goal. Keep it friendly, 2 sentences max.');
-        buf.writeln();
-      }
-
-      buf.writeln('IMPORTANT PRODUCT RULE:');
-      buf.writeln('- DO NOT generate full diet plans inside chat.');
-      buf.writeln('- DO NOT generate full workout plans inside chat.');
-      buf.writeln('- If user asks for diet plan, meal plan, calorie plan, bulking diet, or fat loss diet:');
-      buf.writeln('  Give general guidance (macros, food types, timing). Do NOT reference any in-app diet tool.');
-      buf.writeln('  LiftOn does not have a diet planner feature.');
-
-      buf.writeln('- If user asks for workout plan, split, PPL routine, bro split, weekly schedule, or training program:');
-      buf.writeln('  redirect them to Planner or Tools.');
-      buf.writeln('  Tell them the Planner creates more structured and personalized plans than chat.');
-      buf.writeln('  Mention split-based generation like Push Pull Legs, Upper Lower, Bro Split, etc.');
-      buf.writeln('- Keep the reply short, premium, and confident.');
-      buf.writeln('- You MAY still answer general nutrition questions.');
-      buf.writeln();
-      buf.writeln('- User is from India. Suggest Indian foods only.');
-      buf.writeln('- Respect dietPreference: if "veg" → NEVER suggest meat/fish/egg.');
-      buf.writeln('- If "eggetarian" → eggs OK but no meat/fish.');
-      buf.writeln('- If "nonveg" → all foods OK.');
-      buf.writeln('- Use household items: dal, roti, rice, paneer, dahi, sabzi, '
-          'poha, upma, idli, dosa, chicken curry, eggs, etc.');
-      buf.writeln('- AVOID: avocado, salmon, quinoa, expensive western foods.');
-      if (p.lastWorkoutNames.isNotEmpty) {
-        buf.writeln('- Last workout: ${p.lastWorkoutNames.first}');
-      }
-      if (p.weakMuscle.isNotEmpty) {
-        buf.writeln('- Weakest muscle: ${p.weakMuscle}');
-      }
-
-      buf.writeln('- Current fatigue: ${p.isFatigued ? "High" : "Normal"}');
-      buf.writeln('- Needs deload: ${p.needsDeloadByVolume}');
-      buf.writeln('- Recent workouts: ${p.lastWorkoutNames.take(5).join(", ")}');
-      buf.writeln();
-
-      // ═══════════════════════════════════════════════
-      // SPORTS SCIENCE DATA (use to personalize advice)
-      // ═══════════════════════════════════════════════
-      final totalSessions = p.streak.totalWorkouts;
-      final isNewUser = totalSessions < 3;
-
-      if (isNewUser) {
-        buf.writeln('USER STATUS: NEW USER (only \$totalSessions workouts logged).');
-        buf.writeln('CRITICAL: Recovery/readiness scores are NOT reliable yet.');
-        buf.writeln('- DO NOT mention any recovery percentage or readiness score.');
-        buf.writeln('- DO NOT pretend to know fatigue or volume trend.');
-        buf.writeln('- Treat as fresh start: suggest beginner-friendly form-first workout.');
-        buf.writeln('- Encourage them to log workouts so AI learns their body.');
-      } else {
-        buf.writeln('RECOVERY DATA (INTERNAL ONLY — inform your advice, '
-            'NEVER quote these numbers or terms to the user):');
-        buf.writeln('- Recovery Score: ${p.recoveryScore.toStringAsFixed(0)}/100');
-        buf.writeln('- Training Readiness: ${p.readinessScore.toStringAsFixed(0)}/100');
-        buf.writeln('  → 85+ = good day to push hard');
-        buf.writeln('  → 60-84 = normal training');
-        buf.writeln('  → 30-59 = keep it light, focus on form');
-        buf.writeln('  → <30 = suggest rest');
-        buf.writeln('- Volume Trend: ${p.needsDeloadByVolume ? "DROPPING — recommend deload" : "Stable/growing"}');
-
-        // ── Fix 1: Per-muscle recovery ──────────────────
-        final muscleRecoveries = p.muscleRecoveryList;
-        if (muscleRecoveries.isNotEmpty) {
-          buf.writeln('');
-          buf.writeln('MUSCLE-BY-MUSCLE RECOVERY (critical — use for muscle-specific advice):');
-          for (final mr in muscleRecoveries) {
-            buf.writeln('- ${mr.muscle}: ${mr.recoveryScore}% ${mr.emoji} ${mr.status}'
-                ' (last trained ${mr.lastTrainedDate})');
-          }
-          buf.writeln('→ NEVER suggest training a muscle below 40% recovery.');
-          buf.writeln('→ If user asks what to train today → pick highest % muscles.');
-        }
-      }
-
-      // ── Fix 2: Exercise weight history ───────────────
-      final exHistory = p.workout.buildExerciseHistory();
-      if (exHistory.isNotEmpty) {
-        buf.writeln('');
-        buf.writeln('EXERCISE HISTORY — last 21 days (use for weight recommendations):');
-        for (final ex in exHistory) {
-          if (ex.unit == 'kg' && ex.bestWeight > 0) {
-            buf.writeln('- ${ex.name}: best ${ex.bestWeight}kg × ${ex.bestReps} reps');
-          } else if (ex.bestReps > 0) {
-            buf.writeln('- ${ex.name}: best ${ex.bestReps} reps (bodyweight)');
-          }
-        }
-        buf.writeln('→ When user asks weight for a listed exercise → suggest best + 2.5kg if recovery ≥ 60%.');
-        buf.writeln('→ If same weight 3+ sessions → tell them they are stagnant, suggest increase or technique change.');
-      }
-      buf.writeln();
-
-      buf.writeln('TRAINER DECISION RULES (apply to all workout advice):');
-      buf.writeln('- If readiness < 30 → STRONGLY suggest rest/walk/mobility only.');
-      buf.writeln('- If readiness 30-59 → suggest 60% intensity, technique focus, RIR 3-4.');
-      buf.writeln('- If readiness 60-84 → normal session, RIR 1-2 on top sets.');
-      buf.writeln('- If readiness 85+ → green light for PR attempt or heavy day.');
-      buf.writeln('- If needsDeload = true → MANDATORY mention deload this week.');
-      buf.writeln('- If weakMuscle is set → prioritize it 2x/week, mention by name.');
-      buf.writeln('- Let the data shape your advice silently — the user should '
-          'feel understood, not measured.');
-      buf.writeln();
-
-      final contextBlock = _compressedConversationContext(history, p, text);
-      if (contextBlock.isNotEmpty) buf.writeln(contextBlock);
-
-      // Continuity — this is one ongoing conversation, not a fresh session.
-      if (history.isNotEmpty) {
-        buf.writeln('ONGOING CONVERSATION RULES:');
-        buf.writeln('- Do NOT greet again. Answer directly.');
-        buf.writeln('- Carry earlier context forward: if the user mentioned pain, '
-            'an injury, a constraint or a goal above, factor it into this '
-            'answer and reference it briefly when relevant '
-            '("Yesterday you mentioned your shoulder...").');
-        buf.writeln('- Never contradict advice you gave earlier in this conversation.');
-        buf.writeln();
-      }
-
-      // One remembered habit — engine-gated (high confidence + 7-day cooldown
-      // shared with every other surface). Absent = stay silent, never invent.
+      // Pre-fetch verified memory observation (async) before building the prompt.
+      // ObservationEngine.pick() is async; the builder receives the text synchronously.
       final memoryObs = await ObservationEngine.pick(p.observationCandidates());
-      if (memoryObs != null) {
-        buf.writeln('COACH MEMORY (real, verified): "${memoryObs.text}"');
-        buf.writeln('- You MAY weave this in naturally, at most once, and only '
-            'if it fits the user\'s message. Otherwise ignore it silently.');
-        buf.writeln('- Never present it as analysis ("according to data...") — '
-            'just say it like a coach who remembers.');
-        buf.writeln();
+      // Mark seen only if the maturity gate will actually include it in the prompt.
+      if (memoryObs != null &&
+          p.aiMaturity.allowedClaims.content.canMakeObservation) {
         ObservationEngine.markSeen(memoryObs);
       }
 
-      buf.writeln('User just asked: "$text"');
+      // Delegate prompt construction to ChatPromptBuilder.
+      // Prompt Builder owns all trust decisions — widget only passes raw data.
+      final prompt = const ChatPromptBuilder().build(ChatPromptInput(
+        aiMaturity:          p.aiMaturity,
+        profile:             p.profile,
+        streak:              p.streak,
+        recoveryScore:       p.recoveryScore.round(),
+        readinessScore:      p.readinessScore,
+        isFatigued:          p.isFatigued,
+        needsDeloadByVolume: p.needsDeloadByVolume,
+        muscleRecoveryList:  p.muscleRecoveryList,
+        exerciseHistory:     p.workout.buildExerciseHistory(),
+        lastWorkoutNames:    p.lastWorkoutNames,
+        weakMuscle:          p.weakMuscle,
+        isTravelMode:        p.settings.travelMode,
+        conversationHistory: history,
+        userMessage:         text,
+        intent:              intent,
+        memoryObservation:   memoryObs?.text,
+      ));
 
       final reply = await ApiService.askAI(
-        buf.toString(),
+        prompt,
         timeout:   const Duration(seconds: 60),
         isPremium: p.isPremium,
       );
@@ -527,11 +259,17 @@ class _AIChatScreenState extends State<AIChatScreen>
       }
     } catch (e) {
       if (!mounted) return;
+      final isNetwork = e.toString().contains('SocketException') ||
+          e.toString().contains('TimeoutException') ||
+          e.toString().contains('HandshakeException') ||
+          e.toString().contains('Connection refused');
       setState(() {
         _isTyping = false;
         _messages.add({
           'role': 'ai',
-          'text': "⚠️ Something went wrong. Try again 💪",
+          'text': isNetwork
+              ? "⚠️ No internet connection. Check your network and try again."
+              : "⚠️ Something went wrong. Try again 💪",
         });
       });
       _saveHistory();
@@ -541,94 +279,14 @@ class _AIChatScreenState extends State<AIChatScreen>
     _scrollToBottom();
   }
 
-  String _compressedConversationContext(
-    List<Map<String, String>> history,
-    AppProvider p,
-    String currentText,
-  ) {
-    if (history.isEmpty) return '';
-    final recent = history.length > 6
-        ? history.sublist(history.length - 6)
-        : history;
-    final older = history.length > 6
-        ? history.sublist(0, history.length - 6)
-        : const <Map<String, String>>[];
-
-    final buf = StringBuffer();
-    if (older.isNotEmpty) {
-      buf.writeln('CONVERSATION SUMMARY:');
-      buf.writeln('- User goal: ${p.profile.goal}; level: ${p.profile.level}; diet: ${p.profile.dietPreference}.');
-      buf.writeln('- Current topic: ${_topicFor(currentText, older)}.');
-      final constraints = _constraintsFromHistory(older);
-      if (constraints.isNotEmpty) {
-        buf.writeln('- Important constraints: $constraints.');
-      }
-    }
-
-    buf.writeln('RECENT CONVERSATION:');
-    for (final m in recent) {
-      final role = m['role'] == 'user' ? 'User' : 'Coach';
-      buf.writeln('$role: ${_clip(m['text'] ?? '', 220)}');
-    }
-    buf.writeln();
-    return buf.toString();
-  }
-
-  String _topicFor(String currentText, List<Map<String, String>> older) {
-    final combined = '$currentText ${older.map((m) => m['text'] ?? '').join(' ')}'
-        .toLowerCase();
-    if (combined.contains('diet') || combined.contains('protein') ||
-        combined.contains('calorie') || combined.contains('meal')) {
-      return 'nutrition';
-    }
-    if (combined.contains('recovery') || combined.contains('sleep') ||
-        combined.contains('sore') || combined.contains('fatigue')) {
-      return 'recovery';
-    }
-    if (combined.contains('plan') || combined.contains('workout') ||
-        combined.contains('split')) {
-      return 'workout planning';
-    }
-    if (combined.contains('motivation') || combined.contains('consistency') ||
-        combined.contains('streak')) {
-      return 'consistency';
-    }
-    return 'general coaching';
-  }
-
-  String _constraintsFromHistory(List<Map<String, String>> older) {
-    final text = older.map((m) => m['text'] ?? '').join(' ').toLowerCase();
-    final constraints = <String>[];
-    if (text.contains('bodyweight') || text.contains('no equipment') ||
-        text.contains('home workout')) {
-      constraints.add('bodyweight/no equipment');
-    }
-    if (text.contains('vegetarian') || text.contains(' veg ')) {
-      constraints.add('vegetarian');
-    }
-    if (text.contains('eggetarian')) constraints.add('eggetarian');
-    if (text.contains('injury') || text.contains('pain')) {
-      constraints.add('avoid aggravating pain/injury');
-    }
-    return constraints.take(4).join(', ');
-  }
-
-  String _clip(String value, int maxChars) {
-    final clean = value.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (clean.length <= maxChars) return clean;
-    return '${clean.substring(0, maxChars - 3)}...';
-  }
-
   // ── PLAN REQUEST HANDLER ──────────────────────────────────────────────────
   Future<void> _handlePlanRequest(AppProvider p, String text) async {
-    // ✅ Check daily AI limit — offer rewarded ad if limit hit
     if (!p.canUseAI() && !p.isPremium) {
       setState(() {
         _isTyping = false;
         _messages.add({
           'role': 'ai',
-          'text': 'You\'ve used your free AI plan for today.\n\nWatch an ad for 1 more, or upgrade to Premium for unlimited coaching — no daily caps, ever.',
-          'showRewardedAd': true,
+          'text': 'You\'ve used your 3 free AI plans for today. Upgrade to Premium for unlimited coaching — no daily caps, ever.',
         });
       });
       _saveHistory();
@@ -715,13 +373,7 @@ class _AIChatScreenState extends State<AIChatScreen>
                 text:           msg['text'] as String? ?? '',
                 isUser:         msg['role'] == 'user',
                 planData:       msg['planData'] as Map<String, dynamic>?,
-                showRewardedAd: msg['showRewardedAd'] as bool? ?? false,
-                onApplyPlan:    (plan) => _openPlanPreview(plan),
-                onAdComplete: () {
-                  // Ad watched → retry plan generation
-                  final p = context.read<AppProvider>();
-                  _handlePlanRequest(p, 'generate plan');
-                },
+                onApplyPlan: (plan) => _openPlanPreview(plan),
               );
             },
           ),
@@ -753,9 +405,8 @@ class _AIChatScreenState extends State<AIChatScreen>
     final ap = context.read<AppProvider>();
     PaywallSheet.show(
       context,
-      trigger: PaywallTrigger.aiLimitHit,
-      onUpgrade:    () => ap.refreshMonetization(),
-      onAdComplete: () => ap.refreshMonetization(),
+      trigger:   PaywallTrigger.aiLimitHit,
+      onUpgrade: () => ap.refreshMonetization(),
     );
   }
 }
@@ -797,11 +448,11 @@ class _AppBar extends StatelessWidget {
           children: [
             Text('Coach', style: GoogleFonts.rajdhani(
                 color: AppColors.textPrimary,
-                fontSize: 17, fontWeight: FontWeight.w900,
+                fontSize: 20, fontWeight: FontWeight.w900,
                 letterSpacing: 0.4)),
             Text('Adaptive fitness intelligence', style: GoogleFonts.inter(
                 color: AppColors.textMuted.withValues(alpha: 0.72),
-                fontSize: 10.5,
+                fontSize: 12,
                 fontWeight: FontWeight.w500)),
           ],
         )),
@@ -816,16 +467,11 @@ class _MessageBubble extends StatelessWidget {
   final bool isUser;
   final Map<String, dynamic>? planData;
   final void Function(Map<String, dynamic>)? onApplyPlan;
-  final bool showRewardedAd;
-  final VoidCallback? onAdComplete;
-
   const _MessageBubble({
     required this.text,
     required this.isUser,
     this.planData,
     this.onApplyPlan,
-    this.showRewardedAd = false,
-    this.onAdComplete,
   });
 
   @override
@@ -887,35 +533,13 @@ class _MessageBubble extends StatelessWidget {
                       .replaceAll('3.', '\n3.'),
                   style: GoogleFonts.inter(
                     color: isUser ? Colors.black : AppColors.textPrimary,
-                    fontSize: 13.8,
+                    fontSize: 16,
                     fontWeight: FontWeight.w500,
                     height: 1.62,
                     letterSpacing: 0.1,
                   ),
                 ),
               ),
-              // ✅ Watch Ad button — shown when daily limit hit
-              if (showRewardedAd && onAdComplete != null) ...[
-                const SizedBox(height: 8),
-                // WatchAdForAIButton — enable after flutter pub get
-                GestureDetector(
-                  onTap: onAdComplete,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
-                    ),
-                    child: Text('Watch an ad for 1 extra plan',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                            color: AppColors.gold, fontSize: 13,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                ),
-              ],
             ],
           )),
 
@@ -1037,7 +661,7 @@ class _QuickChips extends StatelessWidget {
               ),
               child: Text(q, style: GoogleFonts.inter(
                   color: AppColors.textSecondary,
-                  fontSize: 12, fontWeight: FontWeight.w600)),
+                  fontSize: 14, fontWeight: FontWeight.w600)),
             ),
           );
         }).toList(),
@@ -1075,11 +699,11 @@ class _InputBar extends StatelessWidget {
             focusNode:  focus,
             textInputAction: TextInputAction.send,
             style: GoogleFonts.inter(
-                color: AppColors.textPrimary, fontSize: 14),
+                color: AppColors.textPrimary, fontSize: 16),
             decoration: InputDecoration(
               hintText: 'Ask about training, recovery, or nutrition…',
               hintStyle: GoogleFonts.inter(
-                  color: AppColors.textMuted, fontSize: 14),
+                  color: AppColors.textMuted, fontSize: 16),
               filled: true,
               fillColor: AppColors.bgCard,
               contentPadding: const EdgeInsets.symmetric(

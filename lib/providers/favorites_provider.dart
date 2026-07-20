@@ -17,18 +17,26 @@ class FavoritesProvider extends ChangeNotifier {
 
   /// Load favorites from Firestore on app start
   Future<void> loadFavorites() async {
-    final user = FirebaseAuth.instance.currentUser;
+    User? user;
+    try {
+      user = FirebaseAuth.instance.currentUser;
+    } catch (_) {
+      return; // Firebase not initialized yet
+    }
     if (user == null) return;
 
     _loading = true;
 
     try {
+      // Timeout guards splash navigation — this get() is awaited in the boot
+      // Future.wait, so an unbounded server wait would hold the logo screen.
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('favorites')
           .doc('list')
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 5));
 
       if (doc.exists && doc.data() != null) {
         final ids = List<String>.from(doc.data()!['exerciseIds'] ?? []);
@@ -80,7 +88,12 @@ class FavoritesProvider extends ChangeNotifier {
 
   /// Save to Firestore
   Future<void> _syncToFirestore() async {
-    final user = FirebaseAuth.instance.currentUser;
+    User? user;
+    try {
+      user = FirebaseAuth.instance.currentUser;
+    } catch (_) {
+      return;
+    }
     if (user == null) return;
 
     try {

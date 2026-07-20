@@ -177,7 +177,7 @@ class _RestDayCard extends StatelessWidget {
   static const _overlineStyle = TextStyle(
     fontFamily: 'Inter',
     color: AppColors.textMuted,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: FontWeight.w800,
     letterSpacing: 2.2,
   );
@@ -193,7 +193,7 @@ class _RestDayCard extends StatelessWidget {
   static const _subStyle = TextStyle(
     fontFamily: 'Inter',
     color: AppColors.textMuted,
-    fontSize: 12,
+    fontSize: 14,
     height: 1.45,
   );
 
@@ -270,7 +270,7 @@ class _EmptyWorkoutCard extends StatelessWidget {
   static const _subStyle = TextStyle(
     fontFamily: 'Inter',
     color: AppColors.textMuted,
-    fontSize: 12,
+    fontSize: 14,
     height: 1.4,
   );
 
@@ -367,7 +367,7 @@ class _ActiveWorkoutCard extends StatelessWidget {
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       color: Color(0xFF9E9E9E),
-                      fontSize: 11,
+                      fontSize: 13,
                     ),
                   ),
                 ),
@@ -429,7 +429,7 @@ class _CompletedSummaryCard extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: 'Inter',
                   color: AppColors.textMuted,
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.3,
                 ),
@@ -439,7 +439,7 @@ class _CompletedSummaryCard extends StatelessWidget {
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     color: AppColors.textPrimary,
-                    fontSize: 17,
+                    fontSize: 18,
                     fontWeight: FontWeight.w500,
                   ),
                   overflow: TextOverflow.ellipsis, maxLines: 1),
@@ -451,7 +451,7 @@ class _CompletedSummaryCard extends StatelessWidget {
                   const SizedBox(width: 3),
                   Text(_fmtVol(data.totalVolume),
                       style: const TextStyle(fontFamily: 'Inter',
-                          color: AppColors.textSecondary, fontSize: 11,
+                          color: AppColors.textSecondary, fontSize: 13,
                           fontWeight: FontWeight.w500)),
                   const SizedBox(width: 12),
                 ],
@@ -460,7 +460,7 @@ class _CompletedSummaryCard extends StatelessWidget {
                 const SizedBox(width: 3),
                 Text('${data.total} exercises',
                     style: const TextStyle(fontFamily: 'Inter',
-                        color: AppColors.textMuted, fontSize: 11)),
+                        color: AppColors.textMuted, fontSize: 13)),
               ]),
             ],
           )),
@@ -469,7 +469,7 @@ class _CompletedSummaryCard extends StatelessWidget {
             Icon(Icons.edit_rounded, color: AppColors.textMuted, size: 14),
             SizedBox(height: 2),
             Text('Edit', style: TextStyle(fontFamily: 'Inter',
-                color: AppColors.textMuted, fontSize: 8.5,
+                color: AppColors.textMuted, fontSize: 10,
                 fontWeight: FontWeight.w500)),
           ]),
         ]),
@@ -550,7 +550,7 @@ class _WorkoutHeader extends StatelessWidget {
                 Text(dayLabel,
                     style: GoogleFonts.rajdhani(
                       color: AppColors.gold,
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 2.5,
                     )),
@@ -670,7 +670,7 @@ class _WorkoutHeader extends StatelessWidget {
               Text('Total volume: ${_formatVolume(data.totalVolume)}',
                   style: GoogleFonts.inter(
                     color: AppColors.textSecondary,
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   )),
             ]),
@@ -710,7 +710,7 @@ class _WorkoutHeader extends StatelessWidget {
             Text(label,
                 style: GoogleFonts.inter(
                   color: AppColors.textMuted,
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                 )),
           ],
@@ -783,7 +783,7 @@ class _ExerciseRow extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'Inter',
                 color: done ? AppColors.textMuted : AppColors.textPrimary,
-                fontSize: 13,
+                fontSize: 15,
                 fontWeight: FontWeight.w500,
                 decoration: done ? TextDecoration.lineThrough : null,
                 decorationColor: AppColors.textMuted,
@@ -796,7 +796,7 @@ class _ExerciseRow extends StatelessWidget {
             style: const TextStyle(
               fontFamily: 'Inter',
               color: AppColors.textMuted,
-              fontSize: 11,
+              fontSize: 13,
             ),
           ),
           const SizedBox(width: AppSpacing.sm),

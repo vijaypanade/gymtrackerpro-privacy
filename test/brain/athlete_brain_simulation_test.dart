@@ -24,6 +24,7 @@
 // that violates invariants. No production code is modified.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gymtrackerpromaster/ai/maturity/allowed_claims.dart';
 import 'package:gymtrackerpromaster/brain/models/decision_context.dart';
 import 'package:gymtrackerpromaster/brain/models/environment_context.dart';
 import 'package:gymtrackerpromaster/brain/models/workout_context.dart';
@@ -41,6 +42,64 @@ import 'package:gymtrackerpromaster/services/training_adjustment_service.dart';
 // ── Test-wide singleton ───────────────────────────────────────────────────────
 
 const _brain = AthleteBrainService();
+
+// ── Test AllowedClaims fixtures ───────────────────────────────────────────────
+
+// Full maturity — used by all tests except new-athlete maturity gating.
+const _kPermissiveClaims = AllowedClaims(
+  ui: AllowedClaimsUi(
+    canShowTrendArrow:       true,
+    canShowWhyToggle:        true,
+    canShowWeeklyStory:      true,
+    canShowDominantSignals:  true,
+    canShowSessionProphecy:  true,
+    canShowAdaptiveIncrease: true,
+    canShowConfidenceArc:    false,
+  ),
+  content: AllowedClaimsContent(
+    canMakeObservation:        true,
+    canMakePatternClaim:       true,
+    canMakePrediction:         true,
+    canMakePrescription:       true,
+    canReferenceHistory:       true,
+    canAddressAthleteDirectly: true,
+    canCompareSessions:        true,
+    canUseTrendLanguage:       true,
+    canInjectPersonalContext:  true,
+  ),
+);
+
+// Increase-restricted — simulates new-athlete maturity (canShowAdaptiveIncrease=false).
+const _kRestrictedClaims = AllowedClaims(
+  ui: AllowedClaimsUi(
+    canShowTrendArrow:       false,
+    canShowWhyToggle:        false,
+    canShowWeeklyStory:      false,
+    canShowDominantSignals:  false,
+    canShowSessionProphecy:  false,
+    canShowAdaptiveIncrease: false,
+    canShowConfidenceArc:    false,
+  ),
+  content: AllowedClaimsContent(
+    canMakeObservation:        false,
+    canMakePatternClaim:       false,
+    canMakePrediction:         false,
+    canMakePrescription:       false,
+    canReferenceHistory:       false,
+    canAddressAthleteDirectly: false,
+    canCompareSessions:        false,
+    canUseTrendLanguage:       false,
+    canInjectPersonalContext:  false,
+  ),
+);
+
+// Thin wrapper: defaults to full maturity. Pass claims: _kRestrictedClaims for
+// new-athlete / maturity-gating scenarios.
+AdaptiveWorkoutDecision _decide(
+  DecisionContext ctx, {
+  AllowedClaims claims = _kPermissiveClaims,
+}) =>
+    _brain.computeDecision(ctx, claims);
 
 // ── Anchored timestamp — every scenario uses the same instant ─────────────────
 
@@ -229,43 +288,62 @@ AthleteMemorySnapshot _mem({
 // ═════════════════════════════════════════════════════════════════════════════
 
 void main() {
-  // ── § 1  Baseline / new athlete ───────────────────────────────────────────
+  // ── § 1  New athlete — maturity-gated increase, safety always on ─────────
+  // With AIMaturity Phase 1 (_kRestrictedClaims), canShowAdaptiveIncrease=false.
+  // Increase focus modes (overload / strengthPush / hypertrophyPush) are blocked.
+  // Safety decisions (deload / recovery) are ALWAYS available regardless of maturity.
 
-  group('§1 Baseline — new athlete (totalWorkouts < 3)', () {
-    test('1.1 zero workouts always returns baseline', () {
-      final d = _brain.computeDecision(_ctx(totalWorkouts: 0));
+  group('§1 New athlete — increase blocked, safety always on', () {
+    test('1.1 no safety signals + restricted claims → maintain', () {
+      final d = _decide(_ctx(totalWorkouts: 0), claims: _kRestrictedClaims);
       _checkInvariants('1.1', d);
-      expect(d.focus, AdaptiveTrainingFocus.maintain, reason: 'baseline focus');
+      expect(d.focus, AdaptiveTrainingFocus.maintain, reason: 'no signals, no increase permission');
       expect(d.intensityMultiplier, 1.0);
       expect(d.volumeMultiplier, 1.0);
       expect(d.shouldModifyWorkout, isFalse);
     });
 
-    test('1.2 one workout — baseline regardless of recovery score', () {
-      final d = _brain.computeDecision(_ctx(totalWorkouts: 1, recoveryScore: 30));
+    test('1.2 recoveryScore=30 + restricted claims → recovery (safety always fires)', () {
+      final d = _decide(_ctx(totalWorkouts: 1, recoveryScore: 30), claims: _kRestrictedClaims);
       _checkInvariants('1.2', d);
-      expect(d.intensityMultiplier, 1.0);
-      expect(d.volumeMultiplier, 1.0);
+      expect(d.focus, AdaptiveTrainingFocus.recovery,
+          reason: 'recovery is a safety decision — always permitted');
+      expect(d.intensityMultiplier, 0.80, reason: 'score<50 → 0.80 intensity');
+      expect(d.volumeMultiplier, 0.65, reason: 'score<50 → 0.65 volume');
     });
 
-    test('1.3 two workouts — baseline even with needsDeload flag', () {
-      final d = _brain.computeDecision(_ctx(totalWorkouts: 2, needsDeload: true));
+    test('1.3 needsDeload + restricted claims → deload (safety always fires)', () {
+      final d = _decide(_ctx(totalWorkouts: 2, needsDeload: true), claims: _kRestrictedClaims);
       _checkInvariants('1.3', d);
-      expect(d.shouldInsertDeload, isFalse, reason: 'APS ignores flags before 3 workouts');
+      expect(d.focus, AdaptiveTrainingFocus.deload,
+          reason: 'deload is a safety decision — always permitted');
+      expect(d.shouldInsertDeload, isTrue);
     });
 
-    test('1.4 two workouts — baseline with high overreachingRisk', () {
-      final d = _brain.computeDecision(
+    test('1.4 overreachingRisk=high + restricted claims → deload (safety first)', () {
+      final d = _decide(
         _ctx(totalWorkouts: 2, overreaching: OverreachingRisk.high),
+        claims: _kRestrictedClaims,
       );
       _checkInvariants('1.4', d);
-      expect(d.focus, AdaptiveTrainingFocus.maintain);
+      expect(d.focus, AdaptiveTrainingFocus.deload,
+          reason: 'high overreaching triggers deload regardless of maturity');
     });
 
-    test('1.5 exactly 3 workouts — APS is active', () {
-      final d = _brain.computeDecision(_ctx(totalWorkouts: 3, needsDeload: true));
+    test('1.5 prime conditions + restricted claims → increase blocked, no overload', () {
+      final d = _decide(
+        _ctx(
+          recoveryScore:     90,
+          momentum:          MomentumLevel.peaking,
+          overloadReadiness: OverloadReadiness.prime,
+          highFatigue:       false,
+          overreaching:      OverreachingRisk.none,
+        ),
+        claims: _kRestrictedClaims,
+      );
       _checkInvariants('1.5', d);
-      expect(d.shouldInsertDeload, isTrue, reason: 'APS active at totalWorkouts == 3');
+      expect(d.focus, isNot(AdaptiveTrainingFocus.overload),
+          reason: 'canShowAdaptiveIncrease=false blocks increase even under prime conditions');
     });
   });
 
@@ -273,7 +351,7 @@ void main() {
 
   group('§2 Deload focus', () {
     test('2.1 needsDeload flag → deload', () {
-      final d = _brain.computeDecision(_ctx(needsDeload: true));
+      final d = _decide(_ctx(needsDeload: true));
       _checkInvariants('2.1', d);
       expect(d.focus, AdaptiveTrainingFocus.deload);
       expect(d.intensityMultiplier, 0.75);
@@ -282,34 +360,34 @@ void main() {
     });
 
     test('2.2 overreachingRisk=high → deload (safety first)', () {
-      final d = _brain.computeDecision(_ctx(overreaching: OverreachingRisk.high));
+      final d = _decide(_ctx(overreaching: OverreachingRisk.high));
       _checkInvariants('2.2', d);
       expect(d.focus, AdaptiveTrainingFocus.deload);
     });
 
     test('2.3 collapseRisk=high → deload', () {
-      final d = _brain.computeDecision(_ctx(collapseRisk: RecoveryCollapseRisk.high));
+      final d = _decide(_ctx(collapseRisk: RecoveryCollapseRisk.high));
       _checkInvariants('2.3', d);
       expect(d.focus, AdaptiveTrainingFocus.deload);
     });
 
     test('2.4 deload message is non-empty', () {
-      final d = _brain.computeDecision(_ctx(needsDeload: true));
+      final d = _decide(_ctx(needsDeload: true));
       expect(d.athleteFacingMessage, isNotEmpty);
     });
 
     test('2.5 deload: failure training is reduced', () {
-      final d = _brain.computeDecision(_ctx(needsDeload: true));
+      final d = _decide(_ctx(needsDeload: true));
       expect(d.shouldReduceFailureTraining, isTrue);
     });
 
     test('2.6 deload: shouldModifyWorkout is true', () {
-      final d = _brain.computeDecision(_ctx(needsDeload: true));
+      final d = _decide(_ctx(needsDeload: true));
       expect(d.shouldModifyWorkout, isTrue);
     });
 
     test('2.7 overreachingRisk=high + needsDeload → deload (combinedSignal)', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(overreaching: OverreachingRisk.high, needsDeload: true),
       );
       _checkInvariants('2.7', d);
@@ -317,7 +395,7 @@ void main() {
     });
 
     test('2.8 deload wins over comeback (safety priority)', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(needsDeload: true, daysSinceLast: 7, comebackProb: 0.9),
       );
       _checkInvariants('2.8', d);
@@ -330,7 +408,7 @@ void main() {
 
   group('§3 Comeback session', () {
     test('3.1 daysSince=4 + comeback≥0.5 → comebackSession', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(daysSinceLast: 4, comebackProb: 0.6),
       );
       _checkInvariants('3.1', d);
@@ -338,7 +416,7 @@ void main() {
     });
 
     test('3.2 daysSince=7 + comeback≥0.5 → comebackSession', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(daysSinceLast: 7, comebackProb: 0.5),
       );
       _checkInvariants('3.2', d);
@@ -346,21 +424,21 @@ void main() {
     });
 
     test('3.3 daysSince=4 + comeback=0.4 → NOT comebackSession', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(daysSinceLast: 4, comebackProb: 0.4),
       );
       expect(d.focus, isNot(AdaptiveTrainingFocus.comebackSession));
     });
 
     test('3.4 daysSince=3 + comeback=0.9 → NOT comebackSession (below 4-day threshold)', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(daysSinceLast: 3, comebackProb: 0.9),
       );
       expect(d.focus, isNot(AdaptiveTrainingFocus.comebackSession));
     });
 
     test('3.5 intimidationRisk=high + daysSince=2 → comebackSession', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(intimidation: IntimidationRisk.high, daysSinceLast: 2),
       );
       _checkInvariants('3.5', d);
@@ -368,7 +446,7 @@ void main() {
     });
 
     test('3.6 intimidationRisk=moderate + daysSince=2 → comebackSession', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(intimidation: IntimidationRisk.moderate, daysSinceLast: 2),
       );
       _checkInvariants('3.6', d);
@@ -376,14 +454,14 @@ void main() {
     });
 
     test('3.7 comebackSession: intensity is 0.85', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(daysSinceLast: 5, comebackProb: 0.8),
       );
       expect(d.intensityMultiplier, 0.85);
     });
 
     test('3.8 comebackSession: volume is 0.75', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(daysSinceLast: 5, comebackProb: 0.8),
       );
       expect(d.volumeMultiplier, 0.75);
@@ -394,26 +472,26 @@ void main() {
 
   group('§4 Recovery focus', () {
     test('4.1 recoveryScore=50 → recovery focus', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 50));
+      final d = _decide(_ctx(recoveryScore: 50));
       _checkInvariants('4.1', d);
       expect(d.focus, AdaptiveTrainingFocus.recovery);
     });
 
     test('4.2 recoveryScore=59 → recovery focus (boundary)', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 59));
+      final d = _decide(_ctx(recoveryScore: 59));
       _checkInvariants('4.2', d);
       expect(d.focus, AdaptiveTrainingFocus.recovery);
     });
 
     test('4.3 recoveryScore=60 → NOT recovery focus (boundary)', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(recoveryScore: 60, fatigue: FatigueTrend.improving),
       );
       expect(d.focus, isNot(AdaptiveTrainingFocus.recovery));
     });
 
     test('4.4 fatigue=accumulating + score=70 → recovery', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(recoveryScore: 70, fatigue: FatigueTrend.accumulating),
       );
       _checkInvariants('4.4', d);
@@ -421,7 +499,7 @@ void main() {
     });
 
     test('4.5 fatigue=suppressed + score=65 → recovery', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(recoveryScore: 65, fatigue: FatigueTrend.suppressed),
       );
       _checkInvariants('4.5', d);
@@ -429,7 +507,7 @@ void main() {
     });
 
     test('4.6 collapseRisk=moderate + score=68 → recovery', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(recoveryScore: 68, collapseRisk: RecoveryCollapseRisk.moderate),
       );
       _checkInvariants('4.6', d);
@@ -437,32 +515,32 @@ void main() {
     });
 
     test('4.7 recovery: intensity<1.0', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 45));
+      final d = _decide(_ctx(recoveryScore: 45));
       expect(d.intensityMultiplier, lessThan(1.0));
     });
 
     test('4.8 recovery: intensityMult=0.80 when score<50', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 40));
+      final d = _decide(_ctx(recoveryScore: 40));
       expect(d.intensityMultiplier, 0.80);
     });
 
     test('4.9 recovery: intensityMult=0.92 when 50≤score<60', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 55));
+      final d = _decide(_ctx(recoveryScore: 55));
       expect(d.intensityMultiplier, 0.92);
     });
 
     test('4.10 recovery: volumeMult=0.65 when score<50', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 40));
+      final d = _decide(_ctx(recoveryScore: 40));
       expect(d.volumeMultiplier, 0.65);
     });
 
     test('4.11 recovery: volumeMult=0.80 when 50≤score<60', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 55));
+      final d = _decide(_ctx(recoveryScore: 55));
       expect(d.volumeMultiplier, 0.80);
     });
 
     test('4.12 recovery: failure training is reduced', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 50));
+      final d = _decide(_ctx(recoveryScore: 50));
       expect(d.shouldReduceFailureTraining, isTrue);
     });
   });
@@ -471,7 +549,7 @@ void main() {
 
   group('§5 Overload focus', () {
     test('5.1 prime conditions → overload', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overreaching:      OverreachingRisk.none,
@@ -483,7 +561,7 @@ void main() {
     });
 
     test('5.2 overload: intensity=1.10 when discipline≥70', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -493,7 +571,7 @@ void main() {
     });
 
     test('5.3 overload: intensity=1.05 when discipline<70', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -503,7 +581,7 @@ void main() {
     });
 
     test('5.4 overload: volumeMult=1.05', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -512,7 +590,7 @@ void main() {
     });
 
     test('5.5 overload not triggered when recoveryScore=84 (below 85 threshold)', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     84,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -524,7 +602,7 @@ void main() {
     });
 
     test('5.6 overload not triggered when highFatigue=true', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -534,7 +612,7 @@ void main() {
     });
 
     test('5.7 overload not triggered when overreachingRisk=moderate', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -544,7 +622,7 @@ void main() {
     });
 
     test('5.8 overload: facing message is non-empty', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -557,7 +635,7 @@ void main() {
 
   group('§6 Strength / hypertrophy / technical focus', () {
     test('6.1 strength push: momentum=peaking + goal=strength + score≥72', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 80,
         momentum:      MomentumLevel.peaking,
         goal:          'strength',
@@ -567,7 +645,7 @@ void main() {
     });
 
     test('6.2 strength push: intensity=1.05', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 80,
         momentum:      MomentumLevel.peaking,
         goal:          'strength',
@@ -576,7 +654,7 @@ void main() {
     });
 
     test('6.3 strength push: volume=1.0', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 80,
         momentum:      MomentumLevel.peaking,
         goal:          'strength',
@@ -585,7 +663,7 @@ void main() {
     });
 
     test('6.4 strength not triggered when recoveryScore=71', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 71,
         momentum:      MomentumLevel.peaking,
         goal:          'strength',
@@ -598,7 +676,7 @@ void main() {
     });
 
     test('6.5 hypertrophy push: plateau≥2 + goal=muscle_gain + score≥65', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 70,
         plateau:       PlateauRisk.high,
         goal:          'muscle_gain',
@@ -609,7 +687,7 @@ void main() {
     });
 
     test('6.6 hypertrophy: intensity=0.95', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 70,
         plateau:       PlateauRisk.high,
         goal:          'muscle_gain',
@@ -619,7 +697,7 @@ void main() {
     });
 
     test('6.7 hypertrophy: volumeMult=1.05', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 70,
         plateau:       PlateauRisk.high,
         goal:          'muscle_gain',
@@ -629,7 +707,7 @@ void main() {
     });
 
     test('6.8 hypertrophy not triggered when score=64', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 64,
         plateau:       PlateauRisk.high,
         goal:          'muscle_gain',
@@ -639,7 +717,7 @@ void main() {
     });
 
     test('6.9 technical session: 62≤score<78 + overreaching≤none', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 70,
         overreaching:  OverreachingRisk.none,
         fatigue:       FatigueTrend.improving,
@@ -649,17 +727,17 @@ void main() {
     });
 
     test('6.10 technical: intensity=0.95', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 70));
+      final d = _decide(_ctx(recoveryScore: 70));
       expect(d.intensityMultiplier, 0.95);
     });
 
     test('6.11 technical: volumeMult=0.90', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 70));
+      final d = _decide(_ctx(recoveryScore: 70));
       expect(d.volumeMultiplier, 0.90);
     });
 
     test('6.12 technical not triggered when overreachingRisk=moderate', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 70,
         overreaching:  OverreachingRisk.moderate,
       ));
@@ -671,7 +749,7 @@ void main() {
 
   group('§7 Maintain focus', () {
     test('7.1 stable conditions → maintain', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 78,
         momentum:      MomentumLevel.building,
         fatigue:       FatigueTrend.stable,
@@ -682,17 +760,17 @@ void main() {
     });
 
     test('7.2 maintain: intensityMult=1.0', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 78, fatigue: FatigueTrend.stable));
+      final d = _decide(_ctx(recoveryScore: 78, fatigue: FatigueTrend.stable));
       expect(d.intensityMultiplier, 1.0);
     });
 
     test('7.3 maintain: volumeMult=1.0 (no modifiers)', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 78));
+      final d = _decide(_ctx(recoveryScore: 78));
       expect(d.volumeMultiplier, 1.0);
     });
 
     test('7.4 maintain: athleteFacingMessage is empty when no swap/axial', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 78,
         fatigue:       FatigueTrend.stable,
         overreaching:  OverreachingRisk.none,
@@ -701,14 +779,14 @@ void main() {
     });
 
     test('7.5 maintain: shouldModifyWorkout is false when nothing triggers', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 78));
+      final d = _decide(_ctx(recoveryScore: 78));
       // Only false when focus=maintain AND no swaps/axial/failure flags
       // failure training is reduced when score<70 — score=78 avoids it
       expect(d.shouldReduceFailureTraining, isFalse);
     });
 
     test('7.6 recover-aligned message when suppressed muscles don\'t conflict', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:       78,
         suppressedMuscles:   ['legs'],
         exerciseCategories:  ['Chest', 'Shoulders'],
@@ -718,12 +796,12 @@ void main() {
     });
 
     test('7.7 no recover-aligned message when no suppressed muscles', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 78));
+      final d = _decide(_ctx(recoveryScore: 78));
       expect(d.recoveryAlignedMessage, isEmpty);
     });
 
     test('7.8 maintain with plateau=high: reasoning contains rotate rep ranges', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 78,
         plateau:       PlateauRisk.high,
         isOnPlateau:   true,
@@ -740,14 +818,14 @@ void main() {
   group('§8 Memory advisory signal effects', () {
     // Rule 1: consistencyScore < 0.30 → disciplineScore -5
     test('8.1 rule1: low consistency reduces discipline signal by 5', () {
-      final withMem = _brain.computeDecision(_ctx(
+      final withMem = _decide(_ctx(
         recoveryScore: 90,
         momentum:      MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
         discipline:    72,
         memory:        _mem(consistency: 0.20),  // rule 1 fires: -5 → effective 67
       ));
-      final noMem = _brain.computeDecision(_ctx(
+      final noMem = _decide(_ctx(
         recoveryScore: 90,
         momentum:      MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -759,7 +837,7 @@ void main() {
     });
 
     test('8.2 rule1: low consistency does NOT change focus', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 80,
         memory:        _mem(consistency: 0.10),
       ));
@@ -771,7 +849,7 @@ void main() {
 
     test('8.3 rule1: very low consistency + borderline discipline may shift overload intensity', () {
       // discipline=71 + consistency<0.30 → effective=66 (<70) → intensity 1.05 not 1.10
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -784,14 +862,14 @@ void main() {
 
     // Rule 2: progressionVelocity > 0.75 → +3 discipline, +0.03 comeback
     test('8.4 rule2: high progression lifts discipline by 3', () {
-      final withMem = _brain.computeDecision(_ctx(
+      final withMem = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
         discipline:        68,
         memory:            _mem(progressionV: 0.80),  // +3 → effective 71 ≥ 70
       ));
-      final noMem = _brain.computeDecision(_ctx(
+      final noMem = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -802,11 +880,11 @@ void main() {
     });
 
     test('8.5 rule2: below 0.75 threshold — no progression boost', () {
-      final d1 = _brain.computeDecision(_ctx(
+      final d1 = _decide(_ctx(
         recoveryScore: 80, discipline: 65,
         memory: _mem(progressionV: 0.75),  // exactly at threshold — rule requires >0.75
       ));
-      final d2 = _brain.computeDecision(_ctx(
+      final d2 = _decide(_ctx(
         recoveryScore: 80, discipline: 65,
       ));
       expect(d1.intensityMultiplier, d2.intensityMultiplier,
@@ -816,7 +894,7 @@ void main() {
     // Rule 3: recoveryVelocity < 0.35 → -0.04 comeback
     test('8.6 rule3: slow recovery velocity reduces comeback probability', () {
       // comebackProb=0.50 - 0.04 = 0.46 < 0.50 → comebackSession not triggered
-      final withMem = _brain.computeDecision(_ctx(
+      final withMem = _decide(_ctx(
         daysSinceLast: 4,
         comebackProb:  0.50,
         memory:        _mem(recoveryV: 0.30),  // rule3: -0.04 → effective 0.46
@@ -826,7 +904,7 @@ void main() {
     });
 
     test('8.7 rule3: above 0.35 threshold — no recovery penalty', () {
-      final d1 = _brain.computeDecision(_ctx(
+      final d1 = _decide(_ctx(
         daysSinceLast: 4,
         comebackProb:  0.50,
         memory:        _mem(recoveryV: 0.35),  // exactly at threshold — rule requires <0.35
@@ -837,7 +915,7 @@ void main() {
 
     // Rule 4: reliabilityScore < 0.40 → -3 discipline
     test('8.8 rule4: low reliability reduces discipline by 3', () {
-      final withMem = _brain.computeDecision(_ctx(
+      final withMem = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -849,7 +927,7 @@ void main() {
     });
 
     test('8.9 rule4: at 0.40 threshold — no penalty (rule requires <0.40)', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -863,7 +941,7 @@ void main() {
     // Rule 5: volumeTolerance > 0.75 → +0.05 comeback
     test('8.10 rule5: high volume tolerance increases comeback probability', () {
       // comebackProb=0.46 + 0.05 = 0.51 → comebackSession triggered
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         daysSinceLast: 4,
         comebackProb:  0.46,
         memory:        _mem(volumeTol: 0.80),  // +0.05 → effective 0.51
@@ -873,7 +951,7 @@ void main() {
     });
 
     test('8.11 rule5: at 0.75 threshold — no boost (rule requires >0.75)', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         daysSinceLast: 4,
         comebackProb:  0.46,
         memory:        _mem(volumeTol: 0.75),
@@ -886,7 +964,7 @@ void main() {
     test('8.12 combined rules 1+4 clamped to -5 max reduction', () {
       // rules 1 (-5) + 4 (-3) = -8, clamped to -5
       // discipline=65 - 5 = 60 (not 57)
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -899,7 +977,7 @@ void main() {
 
     test('8.13 combined rules 2+5 clamped to +0.05 max comeback boost', () {
       // rules 2 (+0.03) + 5 (+0.05) = +0.08, clamped to +0.05
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         daysSinceLast: 4,
         comebackProb:  0.46,
         memory:        _mem(progressionV: 0.80, volumeTol: 0.80),
@@ -910,17 +988,17 @@ void main() {
 
     // Rule 6: identityStage / experienceLevel — advisory only
     test('8.14 rule6: beginner identity does not change focus', () {
-      final d1 = _brain.computeDecision(_ctx(
+      final d1 = _decide(_ctx(
         recoveryScore: 80,
         memory:        _mem(identity: 'beginner', experience: 'novice'),
       ));
-      final d2 = _brain.computeDecision(_ctx(recoveryScore: 80));
+      final d2 = _decide(_ctx(recoveryScore: 80));
       expect(d1.focus, d2.focus, reason: 'identity/experience are advisory only');
     });
 
     test('8.15 no memory snapshot → same as zero advisory', () {
-      final withNull  = _brain.computeDecision(_ctx(recoveryScore: 80));
-      final withZero  = _brain.computeDecision(_ctx(
+      final withNull  = _decide(_ctx(recoveryScore: 80));
+      final withZero  = _decide(_ctx(
         recoveryScore: 80,
         memory:        _mem(
           consistency: 0.5, adherence: 0.5, reliability: 0.5,
@@ -938,7 +1016,7 @@ void main() {
   group('§9 Behavioral modifiers', () {
     test('9.1 burnoutRisk=high + volumeMult>1.02 → capped to 1.0', () {
       // Overload focus normally gives 1.05 — burnout caps it
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -950,7 +1028,7 @@ void main() {
     });
 
     test('9.2 burnoutRisk=moderate + volumeMult>1.02 → capped to 1.0', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -960,7 +1038,7 @@ void main() {
     });
 
     test('9.3 burnoutRisk=low — no volume cap', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -971,7 +1049,7 @@ void main() {
     });
 
     test('9.4 intimidationRisk=high + volumeMult≥1.0 → 0.85', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -985,7 +1063,7 @@ void main() {
     });
 
     test('9.5 intimidationRisk=moderate — same softening', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     80,
         fatigue:           FatigueTrend.improving,
         overreaching:      OverreachingRisk.none,
@@ -997,7 +1075,7 @@ void main() {
     });
 
     test('9.6 burnout reasoning: add recovery day when burnout≥2', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 78,
         burnout:       BurnoutRisk.high,
       ));
@@ -1005,7 +1083,7 @@ void main() {
     });
 
     test('9.7 overreachingRisk=high reasoning: reduce weekly volume', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 78,
         overreaching:  OverreachingRisk.high,
         needsDeload:   true,
@@ -1014,7 +1092,7 @@ void main() {
     });
 
     test('9.8 back suppression reasoning: shift pull day', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     78,
         suppressedMuscles: ['back'],
       ));
@@ -1026,7 +1104,7 @@ void main() {
 
   group('§10 Exercise swaps', () {
     test('10.1 deadlift + shouldReduceAxialLoad → swap to Chest Supported Row', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:       70,
         shouldReduceAxialLoad: true,
         exerciseNames:       ['Barbell Deadlift'],
@@ -1037,7 +1115,7 @@ void main() {
     });
 
     test('10.2 squat + back suppressed → swap to Leg Press', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:      55,
         suppressedMuscles:  ['back'],
         exerciseNames:      ['Back Squat'],
@@ -1047,7 +1125,7 @@ void main() {
     });
 
     test('10.3 romanian deadlift + highFatigue → swap to Leg Curl', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:      55,
         highFatigue:        true,
         exerciseNames:      ['Romanian Deadlift'],
@@ -1057,7 +1135,7 @@ void main() {
     });
 
     test('10.4 no swap when recovery is strong and no flags', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:      90,
         momentum:           MomentumLevel.peaking,
         overloadReadiness:  OverloadReadiness.prime,
@@ -1070,7 +1148,7 @@ void main() {
     test('10.5 bent-over row (hyphenated) + recoveryScore<60 → swap to Seated Cable Row', () {
       // The swap rule for 'bent-over row' (hyphenated) triggers on recoveryScore<60.
       // The rule for 'bent over row' (no hyphen) triggers only on back suppression.
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:      55,
         exerciseNames:      ['Bent-Over Row'],
         exerciseCategories: ['Back'],
@@ -1080,7 +1158,7 @@ void main() {
     });
 
     test('10.6 each exercise gets at most one swap', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:       50,
         shouldReduceAxialLoad: true,
         exerciseNames:       ['Barbell Deadlift'],
@@ -1091,7 +1169,7 @@ void main() {
     });
 
     test('10.7 conflict detected when suppressed muscle matches session category', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:      55,
         suppressedMuscles:  ['legs'],
         exerciseCategories: ['Legs'],
@@ -1102,7 +1180,7 @@ void main() {
     });
 
     test('10.8 no conflict when session avoids suppressed muscle', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:      80,
         suppressedMuscles:  ['legs'],
         exerciseCategories: ['Chest', 'Arms'],
@@ -1250,7 +1328,7 @@ void main() {
         _ctx(needsDeload: true, overreaching: OverreachingRisk.high),
       ];
       for (final (i, ctx) in triggers.indexed) {
-        final d = _brain.computeDecision(ctx);
+        final d = _decide(ctx);
         expect(d.intensityMultiplier, 0.75,
             reason: 'deload trigger $i: intensity must be 0.75');
         expect(d.volumeMultiplier, 0.65,
@@ -1267,7 +1345,7 @@ void main() {
         _ctx(recoveryScore: 65, fatigue: FatigueTrend.suppressed),
       ];
       for (final (i, ctx) in scenarios.indexed) {
-        final d = _brain.computeDecision(ctx);
+        final d = _decide(ctx);
         if (d.focus == AdaptiveTrainingFocus.recovery) {
           expect(d.intensityMultiplier, lessThan(1.0),
               reason: 'recovery scenario $i must have intensity < 1.0');
@@ -1276,7 +1354,7 @@ void main() {
     });
 
     test('12.3 overload focus always produces intensity ≥ 1.05', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -1300,7 +1378,7 @@ void main() {
         _ctx(recoveryScore: 78, fatigue: FatigueTrend.stable),                    // maintain
       ];
       for (final ctx in contexts) {
-        reached.add(_brain.computeDecision(ctx).focus);
+        reached.add(_decide(ctx).focus);
       }
       expect(reached, contains(AdaptiveTrainingFocus.deload));
       expect(reached, contains(AdaptiveTrainingFocus.recovery));
@@ -1309,7 +1387,7 @@ void main() {
     });
 
     test('12.5 computedAt timestamp is propagated from input', () {
-      final d = _brain.computeDecision(_ctx(recoveryScore: 80));
+      final d = _decide(_ctx(recoveryScore: 80));
       expect(d.computedAt, _now);
     });
 
@@ -1331,7 +1409,7 @@ void main() {
 
   group('§13 Edge cases & boundary conditions', () {
     test('13.1 recoveryScore exactly 85 → overload possible (boundary)', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     85,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -1343,7 +1421,7 @@ void main() {
     });
 
     test('13.2 recoveryScore exactly 60 — NOT recovery (boundary)', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 60,
         fatigue:       FatigueTrend.improving,
         collapseRisk:  RecoveryCollapseRisk.low,
@@ -1353,7 +1431,7 @@ void main() {
     });
 
     test('13.3 discipline exactly 70 → intensityMult=1.10 in overload', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -1364,7 +1442,7 @@ void main() {
     });
 
     test('13.4 discipline exactly 69 → intensityMult=1.05 in overload', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore:     90,
         momentum:          MomentumLevel.peaking,
         overloadReadiness: OverloadReadiness.prime,
@@ -1375,14 +1453,14 @@ void main() {
     });
 
     test('13.5 daysSinceLast exactly 4 + comebackProb=0.50 → comebackSession', () {
-      final d = _brain.computeDecision(
+      final d = _decide(
         _ctx(daysSinceLast: 4, comebackProb: 0.50),
       );
       expect(d.focus, AdaptiveTrainingFocus.comebackSession);
     });
 
     test('13.6 daysSinceLast=3 + intimidation=low → no comeback', () {
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         daysSinceLast: 3,
         intimidation:  IntimidationRisk.low,
         comebackProb:  0.9,
@@ -1392,13 +1470,13 @@ void main() {
 
     test('13.7 suppressedMuscles list is passed through unmodified', () {
       final suppressed = ['back', 'legs'];
-      final d = _brain.computeDecision(_ctx(suppressedMuscles: suppressed));
+      final d = _decide(_ctx(suppressedMuscles: suppressed));
       expect(d.suppressedMuscles, containsAll(suppressed));
     });
 
     test('13.8 prioritizedMuscles list is passed through from focusMuscles', () {
       final focus = ['chest', 'shoulders'];
-      final d = _brain.computeDecision(_ctx(
+      final d = _decide(_ctx(
         recoveryScore: 80,
         focusMuscles:  focus,
       ));

@@ -80,7 +80,6 @@ class MainShellState extends State<MainShell>
         PaywallSheet.show(context,
           trigger:      trigger,
           onUpgrade:    () => ap.refreshMonetization(),
-          onAdComplete: () => ap.refreshMonetization(),
         );
       });
     });
@@ -315,7 +314,7 @@ class _NavTile extends StatelessWidget {
               ),
               child: Icon(
                 item.icon,
-                size: 21,
+                size: 23,
                 color: selected
                     ? AppColors.gold
                     : AppColors.textSecondary.withValues(alpha: 0.82),
@@ -331,7 +330,7 @@ class _NavTile extends StatelessWidget {
                 color: selected
                     ? AppColors.gold
                     : AppColors.textSecondary.withValues(alpha: 0.82),
-                fontSize: 9.5,
+                fontSize: 13,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
               ),
               child: Text(item.label),
@@ -413,12 +412,12 @@ class _OfflineBannerBody extends StatelessWidget {
           Text('No internet connection',
               style: GoogleFonts.inter(
                   color: AppColors.textMuted,
-                  fontSize: 11.5, fontWeight: FontWeight.w500)),
+                  fontSize: 13, fontWeight: FontWeight.w500)),
           const Spacer(),
           Text('Working offline',
               style: GoogleFonts.inter(
                   color: AppColors.textMuted.withValues(alpha: 0.50),
-                  fontSize: 10, fontWeight: FontWeight.w400)),
+                  fontSize: 12, fontWeight: FontWeight.w400)),
         ]),
       ),
     );

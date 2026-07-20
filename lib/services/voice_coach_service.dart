@@ -1,10 +1,10 @@
+import 'dart:io';
+import 'dart:math';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:math';
+import '../utils/locale_helper.dart';
 
-
-/// Premium Voice Coach Service
-/// Provides multi-language TTS coaching during workouts
+/// Premium Voice Coach Service — English, personality-aware, gender-selectable.
 class VoiceCoachService {
   static final VoiceCoachService _instance = VoiceCoachService._();
   factory VoiceCoachService() => _instance;
@@ -13,112 +13,169 @@ class VoiceCoachService {
   final FlutterTts _tts = FlutterTts();
   bool _initialized = false;
 
-  // Settings
-  bool _enabled = true;
-  bool _autoRepCounting = false;
-  String _language = 'en'; // 'en', 'hi', 'mr'
-  double _volume = 1.0;
-  double _speechRate = 0.44;
-  final String _trainerPersonality = 'friendly';
-
+  bool   _enabled           = true;
+  bool   _autoRepCounting   = false;
+  double _volume            = 1.0;
+  double _speechRate        = 0.44;
+  String _trainerPersonality = 'friendly'; // no longer hardcoded — read from prefs
+  String _voiceGender       = 'default';   // 'default' | 'male' | 'female'
 
   final Random _random = Random();
 
-  String _pick(List<String> lines) {
-    return lines[_random.nextInt(lines.length)];
-  }
+  String _pick(List<String> lines) => lines[_random.nextInt(lines.length)];
 
-  // Getters
-  bool get enabled => _enabled;
-  bool get autoRepCounting => _autoRepCounting;
-  String get language => _language;
-  double get volume => _volume;
-  double get speechRate => _speechRate;
+  // ── Getters ────────────────────────────────────────────────────────────────
+  bool   get enabled           => _enabled;
+  bool   get autoRepCounting   => _autoRepCounting;
+  double get volume            => _volume;
+  double get speechRate        => _speechRate;
+  String get trainerPersonality => _trainerPersonality;
+  String get voiceGender       => _voiceGender;
 
-  /// Initialize TTS engine + load saved settings
+  // ── Init ──────────────────────────────────────────────────────────────────
   Future<void> init() async {
     if (_initialized) return;
-
     final prefs = await SharedPreferences.getInstance();
-    _enabled = prefs.getBool('vc_enabled') ?? true;
-    _autoRepCounting = prefs.getBool('vc_auto_reps') ?? false;
-    _language = prefs.getString('vc_language') ?? 'en';
-    _volume = prefs.getDouble('vc_volume') ?? 1.0;
-    _speechRate = prefs.getDouble('vc_speech_rate') ?? 0.55;
-
+    _enabled            = prefs.getBool('vc_enabled')      ?? true;
+    _autoRepCounting    = prefs.getBool('vc_auto_reps')    ?? false;
+    _volume             = prefs.getDouble('vc_volume')     ?? 1.0;
+    _speechRate         = prefs.getDouble('vc_speech_rate') ?? 0.55;
+    _trainerPersonality = prefs.getString('vc_personality') ?? 'friendly';
+    _voiceGender        = prefs.getString('vc_voice_gender') ?? 'default';
     await _applyTtsSettings();
+    await _configureIosAudioSession();
     _initialized = true;
   }
 
-  Future<void> _applyTtsSettings() async {
-    final ttsLang = _toTtsLocale(_language);
+  /// Called when Voice Coach sheet opens — sets personality from user profile
+  /// ONLY if the user has never explicitly chosen one in settings.
+  Future<void> syncWithProfile(String profileTrainerType) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey('vc_personality')) {
+      await setPersonality(profileTrainerType);
+    }
+  }
 
-    // Check if language is available on device
+  // ── iOS audio session configuration ───────────────────────────────────────
+  //
+  // setSharedInstance(true): prevents AVAudioSession.setActive(false) after
+  // each utterance — the session stays alive between cues so the Dart isolate
+  // keeps running when the screen is locked (UIBackgroundModes: audio must
+  // also be declared in Info.plist, which it is).
+  //
+  // IosTextToSpeechAudioCategory.playback + duckOthers:
+  //   • Allows TTS to play while the screen is locked.
+  //   • Ducks music/podcasts while speaking; iOS automatically unduckes them
+  //     (resumes full volume) the moment the utterance ends — the user never
+  //     has to manually restart their music.
+  Future<void> _configureIosAudioSession() async {
+    if (!Platform.isIOS) return;
     try {
-      final isAvailable = await _tts.isLanguageAvailable(ttsLang);
-      if (isAvailable == true || isAvailable == 1) {
-        await _tts.setLanguage(ttsLang);
-      } else {
-        // Fallback to Indian English if Hindi/Marathi not installed
-        await _tts.setLanguage('en-IN');
-      }
+      await _tts.setSharedInstance(true);
+      await _tts.setIosAudioCategory(
+        IosTextToSpeechAudioCategory.playback,
+        [
+          IosTextToSpeechAudioCategoryOptions.duckOthers,
+          IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+          IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+        ],
+        IosTextToSpeechAudioMode.defaultMode,
+      );
+    } catch (_) {}
+  }
+
+  // ── Settings apply ────────────────────────────────────────────────────────
+  Future<void> _applyTtsSettings() async {
+    // Use device-locale English accent (en-US for USA, en-IN for India, etc.)
+    try {
+      await _tts.setLanguage(LocaleHelper.ttsLocale);
     } catch (_) {
-      await _tts.setLanguage('en-IN');
+      try { await _tts.setLanguage('en-US'); } catch (_) {}
     }
 
     await _tts.setVolume(_volume);
 
-    // More natural Indian pacing
-    double rate = _speechRate;
+    double rate  = _speechRate;
     double pitch = 1.0;
-
     switch (_trainerPersonality) {
       case 'strict':
-        rate = (_speechRate - 0.03).clamp(0.35, 1.0);
+        rate  = (_speechRate - 0.03).clamp(0.35, 1.0);
         pitch = 0.92;
-        break;
-
       case 'military':
-        rate = (_speechRate - 0.01).clamp(0.35, 1.0);
+        rate  = (_speechRate - 0.01).clamp(0.35, 1.0);
         pitch = 0.88;
-        break;
-
       case 'motivational':
-        rate = (_speechRate + 0.02).clamp(0.35, 1.0);
+        rate  = (_speechRate + 0.02).clamp(0.35, 1.0);
         pitch = 1.06;
-        break;
-
-      case 'friendly':
       default:
-        rate = _speechRate;
+        rate  = _speechRate;
         pitch = 1.0;
     }
-
     await _tts.setSpeechRate(rate);
     await _tts.setPitch(pitch);
+
+    if (_voiceGender != 'default') {
+      await _pickAndSetVoice();
+    }
   }
 
-  /// Check if a specific language is installed on device
-  Future<bool> isLanguageInstalled(String langCode) async {
+  // ── Voice gender selection ────────────────────────────────────────────────
+
+  // Well-known iOS TTS voice names by gender
+  static const _femaleNames = {
+    'samantha', 'allison', 'ava', 'susan', 'zoe', 'victoria',
+    'karen', 'moira', 'tessa', 'nicky', 'siri',
+  };
+  static const _maleNames = {
+    'alex', 'daniel', 'fred', 'tom', 'gordon', 'arthur',
+    'ryan', 'oliver', 'james', 'lee',
+  };
+
+  bool _isFemaleVoice(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('female')) return true;
+    final first = lower.split(RegExp(r'[-_ ]')).first;
+    return _femaleNames.contains(first);
+  }
+
+  bool _isMaleVoice(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('male') && !lower.contains('female')) return true;
+    final first = lower.split(RegExp(r'[-_ ]')).first;
+    return _maleNames.contains(first);
+  }
+
+  Future<void> _pickAndSetVoice() async {
     try {
-      final ttsLang = _toTtsLocale(langCode);
-      final result = await _tts.isLanguageAvailable(ttsLang);
-      return result == true || result == 1;
-    } catch (_) {
-      return false;
-    }
+      final raw = await _tts.getVoices;
+      if (raw == null) return;
+      final voices = (raw as List).cast<Map>();
+      final locale = LocaleHelper.ttsLocale;
+      final langPrefix = locale.substring(0, 2); // 'en'
+
+      // Filter to English voices only
+      final enVoices = voices
+          .where((v) => (v['locale'] as String? ?? '').startsWith(langPrefix))
+          .toList();
+
+      Map? pick;
+      for (final v in enVoices) {
+        final name = v['name'] as String? ?? '';
+        if (_voiceGender == 'female' && _isFemaleVoice(name)) { pick = v; break; }
+        if (_voiceGender == 'male'   && _isMaleVoice(name))   { pick = v; break; }
+      }
+      pick ??= enVoices.isNotEmpty ? enVoices.first : null;
+
+      if (pick != null) {
+        await _tts.setVoice({
+          'name':   pick['name']   as String,
+          'locale': pick['locale'] as String,
+        });
+      }
+    } catch (_) {}
   }
 
-  String _toTtsLocale(String lang) {
-    switch (lang) {
-      case 'hi': return 'hi-IN';
-      case 'mr': return 'mr-IN';
-      default: return 'en-IN';
-    }
-  }
-
-  // ── SETTINGS UPDATES ──────────────────────
-
+  // ── Setters ───────────────────────────────────────────────────────────────
   Future<void> setEnabled(bool v) async {
     _enabled = v;
     final prefs = await SharedPreferences.getInstance();
@@ -132,13 +189,6 @@ class VoiceCoachService {
     await prefs.setBool('vc_auto_reps', v);
   }
 
-  Future<void> setLanguage(String lang) async {
-    _language = lang;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('vc_language', lang);
-    await _applyTtsSettings();
-  }
-
   Future<void> setVolume(double v) async {
     _volume = v.clamp(0.0, 1.0);
     final prefs = await SharedPreferences.getInstance();
@@ -150,303 +200,256 @@ class VoiceCoachService {
     _speechRate = v.clamp(0.3, 1.0);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('vc_speech_rate', _speechRate);
-    await _tts.setSpeechRate(_speechRate);
+    await _applyTtsSettings();
   }
 
-  // ── CORE SPEAK METHOD ──────────────────────
+  Future<void> setPersonality(String v) async {
+    _trainerPersonality = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('vc_personality', v);
+    await _applyTtsSettings();
+  }
 
+  Future<void> setVoiceGender(String gender) async {
+    _voiceGender = gender;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('vc_voice_gender', gender);
+    await _applyTtsSettings();
+  }
+
+  // ── Internal speak ────────────────────────────────────────────────────────
   Future<void> _speak(String text) async {
     if (!_enabled || !_initialized) return;
-
-    // Tiny natural pause between cues
     await Future.delayed(const Duration(milliseconds: 120));
-
-    // Softer queue behaviour instead of harsh cuts
-    try {
-      await _tts.awaitSpeakCompletion(true);
-    } catch (_) {}
-
+    try { await _tts.awaitSpeakCompletion(true); } catch (_) {}
     await _tts.speak(text);
   }
 
-  Future<void> stop() async {
-    await _tts.stop();
-  }
+  Future<void> stop() async => _tts.stop();
 
-  // ── COACHING CUES (multi-language) ──────────────────────
+  // ── COACHING CUES ─────────────────────────────────────────────────────────
 
-  /// "Set 1 ready" / "सेट 1 तयार" / "सेट 1 तयार"
   Future<void> setStart(int setNum) async {
-    final en = switch (_trainerPersonality) {
+    final cue = switch (_trainerPersonality) {
       'strict' => _pick([
-        'Set $setNum. Focus.',
-        'Set $setNum. No distractions.',
-        'Set $setNum. Move.',
-      ]),
-
+          'Set $setNum. Focus.',
+          'Set $setNum. No distractions.',
+          'Set $setNum. Move.',
+          'Set $setNum. Execute.',
+          'Set $setNum. Lock in now.',
+        ]),
       'military' => _pick([
-        'Set $setNum. Lock in.',
-        'Set $setNum. Execute.',
-        'Set $setNum. Stay tight.',
-      ]),
-
+          'Set $setNum. Lock in.',
+          'Set $setNum. Execute.',
+          'Set $setNum. Stay tight.',
+          'Set $setNum. Move out.',
+          'Set $setNum. On my count — go.',
+        ]),
       'motivational' => _pick([
-        'Set $setNum. Let’s go!',
-        'Set $setNum. Strong reps!',
-        'Set $setNum. Time to work!',
-      ]),
-
+          'Set $setNum. Let\'s go!',
+          'Set $setNum. Strong reps!',
+          'Set $setNum. Time to work!',
+          'Set $setNum. Make it count!',
+          'Set $setNum. You\'ve got this!',
+        ]),
       _ => _pick([
-        'Set $setNum. Ready, go!',
-        'Set $setNum. Nice and controlled.',
-        'Set $setNum. Let’s begin.',
-      ]),
+          'Set $setNum. Ready, go!',
+          'Set $setNum. Nice and controlled.',
+          'Set $setNum. Let\'s begin.',
+          'Set $setNum. Take your time.',
+          'Set $setNum. Smooth reps.',
+        ]),
     };
-
-    final lines = {
-      'en': en,
-      'hi': 'सेट $setNum. तैयार हो जाओ!',
-      'mr': 'सेट $setNum. तयार रहा!',
-    };
-
-    await _speak(lines[_language] ?? lines['en']!);
+    await _speak(cue);
   }
 
-  /// Rep counter — only if auto rep counting enabled
   Future<void> repCount(int rep) async {
     if (!_autoRepCounting) return;
-
-    String en = '$rep';
-
-    // Occasional coaching accents for realism
-    if (rep == 5 || rep == 8 || rep == 10) {
-
-      en = switch (_trainerPersonality) {
-
+    String cue = '$rep';
+    if (rep == 5 || rep == 8 || rep == 10 || rep == 12) {
+      cue = switch (_trainerPersonality) {
         'strict' => _pick([
-          '$rep. Keep moving.',
-          '$rep. Stay tight.',
-          '$rep. Again.',
-        ]),
-
+            '$rep. Keep moving.',
+            '$rep. Stay tight.',
+            '$rep. Again.',
+            '$rep. Don\'t slow down.',
+          ]),
         'military' => _pick([
-          '$rep. Lock in.',
-          '$rep. Drive.',
-          '$rep. Stay focused.',
-        ]),
-
+            '$rep. Lock in.',
+            '$rep. Drive.',
+            '$rep. Stay focused.',
+            '$rep. Push.',
+          ]),
         'motivational' => _pick([
-          '$rep. Let’s go!',
-          '$rep. Strong reps!',
-          '$rep. Come on!',
-        ]),
-
+            '$rep. Let\'s go!',
+            '$rep. Strong reps!',
+            '$rep. Come on!',
+            '$rep. Keep it up!',
+          ]),
         _ => _pick([
-          '$rep. Nice.',
-          '$rep. Good control.',
-          '$rep. Looking strong.',
-        ]),
+            '$rep. Nice.',
+            '$rep. Good control.',
+            '$rep. Looking strong.',
+            '$rep. Keep it clean.',
+          ]),
       };
     }
-
-    final lines = {
-      'en': en,
-      'hi': _hindiNumber(rep),
-      'mr': _marathiNumber(rep),
-    };
-
-    await _speak(lines[_language] ?? lines['en']!);
+    await _speak(cue);
   }
 
-  /// "Halfway! Push!" mid-set motivation
   Future<void> halfway() async {
-
-    final en = switch (_trainerPersonality) {
-
+    final cue = switch (_trainerPersonality) {
       'strict' => _pick([
-        'Keep pushing.',
-        'No slowing down.',
-        'Again.',
-      ]),
-
+          'Keep pushing.',
+          'No slowing down.',
+          'Again.',
+          'Halfway. Finish it.',
+          'Push through.',
+        ]),
       'military' => _pick([
-        'Stay locked.',
-        'Drive through.',
-        'Finish strong.',
-      ]),
-
+          'Stay locked.',
+          'Drive through.',
+          'Finish strong.',
+          'Halfway. Don\'t break.',
+          'Execute.',
+        ]),
       'motivational' => _pick([
-        'Come on! Push!',
-        'That’s strong!',
-        'One more rep!',
-      ]),
-
+          'Come on! Push!',
+          'That\'s strong!',
+          'Halfway! Keep it up!',
+          'You\'re doing great!',
+          'Don\'t stop now!',
+        ]),
       _ => _pick([
-        'Nice control.',
-        'Keep going.',
-        'Looking strong.',
-      ]),
+          'Nice control.',
+          'Keep going.',
+          'Looking strong.',
+          'Halfway there.',
+          'Good rhythm.',
+        ]),
     };
-
-    final lines = {
-      'en': en,
-      'hi': 'आधा हो गया! जोर लगाओ!',
-      'mr': 'अर्धे झाले! जोर लाव!',
-    };
-
-    await _speak(lines[_language] ?? lines['en']!);
+    await _speak(cue);
   }
 
-  /// Set completed → start rest
   Future<void> setComplete(int restSeconds) async {
-
-    final en = switch (_trainerPersonality) {
-
+    final cue = switch (_trainerPersonality) {
       'strict' => _pick([
-        'Good. Rest $restSeconds seconds.',
-        'Recover. $restSeconds seconds.',
-        'Stay focused. Rest $restSeconds.',
-      ]),
-
+          'Good. Rest $restSeconds seconds.',
+          'Recover. $restSeconds seconds.',
+          'Stay focused. Rest $restSeconds.',
+          'Set done. $restSeconds seconds.',
+          'Rest. Back in $restSeconds.',
+        ]),
       'military' => _pick([
-        'Recover fast. $restSeconds seconds.',
-        'Rest $restSeconds. Stay ready.',
-        'Control your breathing. $restSeconds seconds.',
-      ]),
-
+          'Recover fast. $restSeconds seconds.',
+          'Rest $restSeconds. Stay ready.',
+          'Control your breathing. $restSeconds seconds.',
+          'Stand down. $restSeconds seconds.',
+          'Recovery window. $restSeconds seconds.',
+        ]),
       'motivational' => _pick([
-        'Strong set! Rest $restSeconds seconds.',
-        'Nice work! Recover for $restSeconds.',
-        'That was solid. Rest up!',
-      ]),
-
+          'Strong set! Rest $restSeconds seconds.',
+          'Nice work! Recover for $restSeconds.',
+          'That was solid. Rest up!',
+          'Crushed it! $restSeconds seconds rest.',
+          'Great effort! Breathe for $restSeconds.',
+        ]),
       _ => _pick([
-        'Good set. Rest $restSeconds seconds.',
-        'Nice work. Recover for $restSeconds.',
-        'Take a short rest.',
-      ]),
+          'Good set. Rest $restSeconds seconds.',
+          'Nice work. Recover for $restSeconds.',
+          'Take a short rest.',
+          'Well done. $restSeconds seconds.',
+          'Solid set. Rest $restSeconds.',
+        ]),
     };
-
-    final lines = {
-      'en': en,
-      'hi': 'बहुत बढ़िया! $restSeconds सेकंड आराम।',
-      'mr': 'छान काम! $restSeconds सेकंद विश्रांती.',
-    };
-
-    await _speak(lines[_language] ?? lines['en']!);
+    await _speak(cue);
   }
 
-  /// Rest timer countdown alert (10 sec remaining)
-
-  /// Long rest reminder
   Future<void> restTooLong() async {
-
-    final en = switch (_trainerPersonality) {
-
+    final cue = switch (_trainerPersonality) {
       'strict' => _pick([
-        'Back to work.',
-        'Rest is over.',
-        'Move.',
-      ]),
-
+          'Back to work.',
+          'Rest is over.',
+          'Move.',
+          'Time\'s up. Next set.',
+          'No more rest.',
+        ]),
       'military' => _pick([
-        'Stay sharp.',
-        'Get ready.',
-        'Next set incoming.',
-      ]),
-
+          'Stay sharp.',
+          'Get ready.',
+          'Next set incoming.',
+          'Fall in. Move.',
+          'Back on the line.',
+        ]),
       'motivational' => _pick([
-        'Let’s keep going!',
-        'You’re not done yet!',
-        'Time for another set!',
-      ]),
-
+          'Let\'s keep going!',
+          'You\'re not done yet!',
+          'Time for another set!',
+          'Come on, one more!',
+          'Let\'s go, let\'s go!',
+        ]),
       _ => _pick([
-        'Ready for the next set?',
-        'Let’s continue.',
-        'Time to move again.',
-      ]),
+          'Ready for the next set?',
+          'Let\'s continue.',
+          'Time to move again.',
+          'Next set when you\'re ready.',
+          'Take a breath and go.',
+        ]),
     };
-
-    final lines = {
-      'en': en,
-      'hi': 'अगले सेट के लिए तैयार?',
-      'mr': 'पुढच्या सेटसाठी तयार?',
-    };
-
-    await _speak(lines[_language] ?? lines['en']!);
+    await _speak(cue);
   }
 
   Future<void> restCountdown(int secondsLeft) async {
     if (secondsLeft == 10) {
-      final lines = {
-        'en': '10 seconds remaining',
-        'hi': '10 सेकंड बाकी',
-        'mr': '10 सेकंद बाकी',
+      final cue = switch (_trainerPersonality) {
+        'strict'       => '10 seconds. Get ready.',
+        'military'     => '10 seconds. Prepare to execute.',
+        'motivational' => '10 seconds! Get pumped!',
+        _              => '10 seconds remaining.',
       };
-      await _speak(lines[_language] ?? lines['en']!);
+      await _speak(cue);
     } else if (secondsLeft == 3) {
-      final lines = {
-        'en': '3, 2, 1, go!',
-        'hi': '3, 2, 1, चलो!',
-        'mr': '3, 2, 1, चला!',
-      };
-      await _speak(lines[_language] ?? lines['en']!);
+      await _speak('3, 2, 1, go!');
     }
   }
 
-  /// "Last set! Give your best"
   Future<void> lastSet() async {
-    final lines = {
-      'en': 'Last set! Give your best!',
-      'hi': 'आखिरी सेट! पूरी ताकत लगाओ!',
-      'mr': 'शेवटचा सेट! पूर्ण जोर लाव!',
+    final cue = switch (_trainerPersonality) {
+      'strict'       => 'Last set. Leave nothing.',
+      'military'     => 'Final set. Execute perfectly.',
+      'motivational' => 'Last set! Give everything you\'ve got!',
+      _              => 'Last set. Make it your best.',
     };
-    await _speak(lines[_language] ?? lines['en']!);
+    await _speak(cue);
   }
 
-  /// Exercise complete
   Future<void> exerciseComplete(String exerciseName) async {
-    final lines = {
-      'en': '$exerciseName done. Moving on.',
-      'hi': '$exerciseName पूरा। आगे बढ़ो।',
-      'mr': '$exerciseName झाले. पुढे चला.',
+    final cue = switch (_trainerPersonality) {
+      'strict'       => '$exerciseName done.',
+      'military'     => '$exerciseName complete. Move.',
+      'motivational' => '$exerciseName done! Great work!',
+      _              => '$exerciseName done. Moving on.',
     };
-    await _speak(lines[_language] ?? lines['en']!);
+    await _speak(cue);
   }
 
-  /// Workout complete celebration
   Future<void> workoutComplete(int xpEarned) async {
-    final lines = {
-      'en': 'Session complete. $xpEarned XP earned.',
-      'hi': 'सेशन पूरा। $xpEarned XP मिले।',
-      'mr': 'सेशन पूर्ण. $xpEarned XP मिळाले.',
+    final cue = switch (_trainerPersonality) {
+      'strict'       => 'Session complete. $xpEarned XP. Good work.',
+      'military'     => 'Mission complete. $xpEarned XP earned. Dismissed.',
+      'motivational' => 'Workout done! $xpEarned XP! You crushed it!',
+      _              => 'Session complete. $xpEarned XP earned. Well done.',
     };
-    await _speak(lines[_language] ?? lines['en']!);
+    await _speak(cue);
   }
 
-  /// Test voice (used in settings)
   Future<void> testVoice() async {
-    final lines = {
-      'en': 'Voice coach ready. Let\'s crush this workout!',
-      'hi': 'वॉइस कोच तैयार है। चलो वर्कआउट शुरू करें!',
-      'mr': 'व्हॉइस कोच तयार आहे. चला सुरुवात करूया!',
+    final cue = switch (_trainerPersonality) {
+      'strict'       => 'Voice coach active. Stay focused.',
+      'military'     => 'Voice coach online. Ready to execute.',
+      'motivational' => 'Voice coach on! Let\'s crush this workout!',
+      _              => 'Voice coach ready. Let\'s get to work.',
     };
-    await _speak(lines[_language] ?? lines['en']!);
-  }
-
-  // ── Helpers for Hindi/Marathi numbers (1-30 enough for reps) ──
-  String _hindiNumber(int n) {
-    const map = ['', 'एक','दो','तीन','चार','पाँच','छह','सात','आठ','नौ','दस',
-        'ग्यारह','बारह','तेरह','चौदह','पंद्रह','सोलह','सत्रह','अठारह','उन्नीस','बीस',
-        'इक्कीस','बाईस','तेईस','चौबीस','पच्चीस','छब्बीस','सत्ताईस','अट्ठाईस','उनतीस','तीस'];
-    return n >= 1 && n <= 30 ? map[n] : '$n';
-  }
-
-  String _marathiNumber(int n) {
-    const map = ['', 'एक','दोन','तीन','चार','पाच','सहा','सात','आठ','नऊ','दहा',
-        'अकरा','बारा','तेरा','चौदा','पंधरा','सोळा','सतरा','अठरा','एकोणीस','वीस',
-        'एकवीस','बावीस','तेवीस','चोवीस','पंचवीस','सव्वीस','सत्तावीस','अठ्ठावीस','एकोणतीस','तीस'];
-    return n >= 1 && n <= 30 ? map[n] : '$n';
+    await _speak(cue);
   }
 }

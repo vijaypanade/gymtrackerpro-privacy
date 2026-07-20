@@ -39,7 +39,7 @@ class _PremiumScreenState extends State<PremiumScreen>
 
   // ── Feature rows: (emoji, label, free, premium) ──────────
   static const _features = [
-    ('💪', 'Workout Plans',             '2/day',      'Unlimited'),
+    ('💪', 'Workout Plans',             '3/day',      'Unlimited'),
     ('📅', 'Weekly Planner',           '✓',          '✓'),
     ('💪', 'PR Tracking',              '✓',          '✓'),
     ('🔥', 'Streaks & XP',             '✓',          '✓'),
@@ -83,7 +83,7 @@ class _PremiumScreenState extends State<PremiumScreen>
               ),
               const SizedBox(width: 12),
               Text('Go Premium', style: GoogleFonts.rajdhani(
-                  color: AppColors.textPrimary, fontSize: 18,
+                  color: AppColors.textPrimary, fontSize: 20,
                   fontWeight: FontWeight.w900)),
             ]),
           )),
@@ -128,7 +128,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                 'Everything you need to train smarter,\nrecover better, and progress faster.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    color: AppColors.textSecondary, fontSize: 13,
+                    color: AppColors.textSecondary, fontSize: 15,
                     height: 1.5),
               ),
               const SizedBox(height: 28),
@@ -168,14 +168,14 @@ class _PremiumScreenState extends State<PremiumScreen>
               Row(children: [
                 Expanded(child: _PlanTile(
                   price: '₹150', period: '/month',
-                  badge: '3 days free', badgeColor: AppColors.gold,
+                  badge: '14 days free', badgeColor: AppColors.gold,
                   isSelected: _selectedPlan == 'monthly',
                   onTap: () => setState(() => _selectedPlan = 'monthly'),
                 )),
                 const SizedBox(width: 12),
                 Expanded(child: _PlanTile(
-                  price: '₹1000', period: '/year',
-                  badge: 'Save 58%', badgeColor: AppColors.orange,
+                  price: '₹1499', period: '/year',
+                  badge: 'Save 17%', badgeColor: AppColors.orange,
                   isSelected: _selectedPlan == 'yearly',
                   isPopular: true,
                   onTap: () => setState(() => _selectedPlan = 'yearly'),
@@ -205,13 +205,13 @@ class _PremiumScreenState extends State<PremiumScreen>
                       SizedBox(width: 64, child: Text('FREE',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.inter(
-                              color: AppColors.textMuted, fontSize: 10,
+                              color: AppColors.textMuted, fontSize: 12,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1))),
                       SizedBox(width: 72, child: Text('PRO',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.inter(
-                              color: AppColors.gold, fontSize: 10,
+                              color: AppColors.gold, fontSize: 12,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1))),
                     ]),
@@ -232,7 +232,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                           Expanded(child: Text(f.$2,
                               style: GoogleFonts.inter(
                                   color: AppColors.textSecondary,
-                                  fontSize: 12,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w500))),
                           SizedBox(width: 64, child: Text(f.$3,
                               textAlign: TextAlign.center,
@@ -240,7 +240,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                                   color: f.$3 == '—'
                                       ? AppColors.textMuted
                                       : AppColors.textSecondary,
-                                  fontSize: 11,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600))),
                           SizedBox(width: 72, child: Text(f.$4,
                               textAlign: TextAlign.center,
@@ -248,7 +248,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                                   color: f.$4 == '✓' || f.$4 == 'Unlimited'
                                       ? AppColors.gold
                                       : AppColors.textMuted,
-                                  fontSize: 11,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w800))),
                         ]),
                       ),
@@ -280,7 +280,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                         ),
                         child: Text(
                             _selectedPlan == 'yearly'
-                              ? 'Start Free — ₹1000/yr 🚀'
+                              ? 'Start Free — ₹1499/yr 🚀'
                               : 'Start Free — ₹150/mo 🚀',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.rajdhani(
@@ -304,7 +304,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                 'Billed monthly. Cancel anytime in Google Play.',
                 style: GoogleFonts.inter(
                     color: AppColors.textMuted.withValues(alpha: 0.6),
-                    fontSize: 10),
+                    fontSize: 11),
               )),
 
               const SizedBox(height: 10),
@@ -321,7 +321,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                           'Restore Purchase',
                           style: GoogleFonts.inter(
                             color: AppColors.gold,
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             decoration: TextDecoration.underline,
                           ),
@@ -329,7 +329,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                 ),
                 Text('  ·  ',
                     style: GoogleFonts.inter(
-                        color: AppColors.textMuted, fontSize: 12)),
+                        color: AppColors.textMuted, fontSize: 13)),
                 GestureDetector(
                   onTap: () async {
                     final uri = Uri.parse(
@@ -340,7 +340,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                     'Manage Subscription',
                     style: GoogleFonts.inter(
                       color: AppColors.textMuted,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
                       decoration: TextDecoration.underline,
                     ),
@@ -388,18 +388,25 @@ class _PremiumScreenState extends State<PremiumScreen>
       await MonetizationService.instance.upgradeToPremium(plan: _selectedPlan);
       if (!mounted) return;
       context.read<AppProvider>().refreshMonetization();
-      {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Welcome to Premium. All features unlocked.',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-          backgroundColor: AppColors.gold,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-        ));
-      }
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Welcome to Premium. All features unlocked.',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        backgroundColor: AppColors.gold,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg, style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -417,7 +424,7 @@ class _TrustBadge extends StatelessWidget {
       Text(emoji, style: const TextStyle(fontSize: 11)),
       const SizedBox(width: 4),
       Text(label, style: GoogleFonts.inter(
-          color: AppColors.textMuted, fontSize: 10,
+          color: AppColors.textMuted, fontSize: 12,
           fontWeight: FontWeight.w600)),
     ],
   );
@@ -451,7 +458,7 @@ class _AlreadyPremiumScreen extends StatelessWidget {
             Text('All features unlocked. Full coaching and analytics.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    color: AppColors.textSecondary, fontSize: 14,
+                    color: AppColors.textSecondary, fontSize: 15,
                     height: 1.5)),
             const SizedBox(height: 32),
             GestureDetector(
@@ -489,7 +496,7 @@ class _PreviewRow extends StatelessWidget {
       Icon(icon, color: AppColors.gold, size: 14),
       const SizedBox(width: 8),
       Expanded(child: Text(text, style: GoogleFonts.inter(
-          color: AppColors.textSecondary, fontSize: 12,
+          color: AppColors.textSecondary, fontSize: 14,
           fontWeight: FontWeight.w500, height: 1.4))),
       const Icon(Icons.check_circle_rounded,
           color: AppColors.gold, size: 14),
@@ -565,7 +572,7 @@ class _PlanTile extends StatelessWidget {
               color: isSelected ? AppColors.gold : AppColors.textPrimary,
               fontSize: 28, fontWeight: FontWeight.w900, height: 1)),
           Text(period, style: GoogleFonts.inter(
-              color: AppColors.textMuted, fontSize: 11)),
+              color: AppColors.textMuted, fontSize: 13)),
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),

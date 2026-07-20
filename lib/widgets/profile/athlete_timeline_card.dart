@@ -186,7 +186,7 @@ class _StatRow extends StatelessWidget {
           _StatCell(value: '${data.totalWorkouts}',     label: 'Sessions',     delayMs: 0),
           _StatCell(value: '${data.longestStreak}d',   label: 'Peak Streak',  delayMs: 100),
           _StatCell(value: '${data.totalPRs}',         label: 'Lifetime PRs', delayMs: 200),
-          _StatCell(value: '${data.milestones.length}', label: 'Milestones',  delayMs: 300),
+          _StatCell(value: '${data.milestones.length}', label: data.milestones.length == 1 ? 'Milestone' : 'Milestones',  delayMs: 300),
         ],
       ),
     );

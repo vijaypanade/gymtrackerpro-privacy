@@ -1,4 +1,4 @@
-// lib/services/monetization_service.dart — v1.0 COMPLETE MONETIZATION ENGINE
+// lib/services/monetization_service.dart
 // ════════════════════════════════════════════════════════════════════════
 //
 // ARCHITECTURE:
@@ -8,14 +8,10 @@
 //       ↓
 //   UI Screens           ← show paywall via PaywallTrigger enum
 //
-// REVENUE STREAMS:
-//   1. AdMob Banner      — Home screen (free users, always)
-//   2. AdMob Interstitial — After workout complete (max 2/day, free users)
-//   3. AdMob Rewarded    — Unlock extra AI use (watch ad → +1 plan)
-//   4. Subscription      — ₹150/month (no ads + unlimited AI + premium features)
+// REVENUE STREAM: Subscription only — ₹150/month or ₹1499/year
 //
 // PAYWALL TRIGGERS (behavior-based, non-annoying):
-//   - AI limit hit       → "Watch ad OR upgrade"
+//   - AI limit hit       → "Upgrade for unlimited coaching"
 //   - 5th workout done   → "You're consistent! Unlock full coaching"
 //   - PR broken          → "You're progressing! Premium has adaptive plans"
 //   - 7-day streak       → "Streak is building! Protect it with premium"
@@ -25,29 +21,26 @@
 //   - Show VALUE before paywall (let user taste premium features)
 //   - Never interrupt a workout session
 //   - Max 1 paywall prompt per day
-//   - Always offer free path (watch ad) before paid upgrade
 // ════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'ad_service.dart';
 import 'auth_service.dart';
 import 'billing_service.dart';
 import '../utils/app_constants.dart';
 
 // ─────────────────────────────────────────────────────────────
 // PAYWALL TRIGGER ENUM — why the paywall appeared
-// UI uses this to show context-aware messaging
 // ─────────────────────────────────────────────────────────────
 enum PaywallTrigger {
-  aiLimitHit,        // Used the 1 free AI plan today
-  workoutMilestone,  // Completed 5th or 10th workout
-  prBroken,          // Hit a new personal record
-  streakMilestone,   // 7-day streak reached
-  advancedStatsTap,  // Tapped locked analytics feature
-  manual,            // User tapped "Upgrade" themselves
+  aiLimitHit,
+  workoutMilestone,
+  prBroken,
+  streakMilestone,
+  advancedStatsTap,
+  manual,
 }
 
 extension PaywallTriggerX on PaywallTrigger {
@@ -84,11 +77,6 @@ extension PaywallTriggerX on PaywallTrigger {
         return 'Everything you need to train smarter,\nrecover better, and progress faster.';
     }
   }
-
-  bool get showAdOption {
-    // Only show "watch ad" option for AI limit — not for other triggers
-    return this == PaywallTrigger.aiLimitHit;
-  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -100,43 +88,38 @@ class MonetizationService {
 
   static const String _keyPremium         = 'is_premium_v2';
 
-  // UID-scoped key — prevents one account's premium leaking to another on same device
   String get _premiumKey {
     final uid = AuthService.instance.currentUser?.uid;
     return uid != null ? '${_keyPremium}_$uid' : _keyPremium;
   }
+
   static const String _keyAiUsageDate     = 'ai_usage_date_v1';
   static const String _keyAiUsageCount    = 'ai_usage_count_v1';
-  static const String _keyRewardedExtras  = 'rewarded_extras_v1';
   static const String _keyLastPaywallDate = 'last_paywall_date_v1';
   static const String _keyChatUsageDate   = 'chat_usage_date_v1';
   static const String _keyChatUsageCount  = 'chat_usage_count_v1';
 
-  static const int _freeAiLimit   = 1;
+  static const int _freeAiLimit   = 3;
   static const int _freeChatLimit = 5;
 
   bool _isPremium      = false;
   int  _aiUsageToday   = 0;
   int  _chatUsageToday = 0;
-  int  _rewardedExtras = 0;
 
-  // Debug builds: always premium so testers can access all features.
-  // dart.vm.product = false in debug, true in release — zero production impact.
   bool get isPremium    => !const bool.fromEnvironment('dart.vm.product') || _isPremium;
   int  get aiUsageToday => _aiUsageToday;
   int  get freeAiLimit  => _freeAiLimit;
 
   int get aiUsesRemaining {
     if (_isPremium) return 999;
-    return (_freeAiLimit + _rewardedExtras - _aiUsageToday).clamp(0, 99);
+    return (_freeAiLimit - _aiUsageToday).clamp(0, 99);
   }
 
   bool get canUseAI {
     if (_isPremium) return true;
-    return _aiUsageToday < (_freeAiLimit + _rewardedExtras);
+    return _aiUsageToday < _freeAiLimit;
   }
 
-  // ── Chat Message Limits ──
   bool get canUseChat {
     if (_isPremium) return true;
     return _chatUsageToday < _freeChatLimit;
@@ -151,18 +134,15 @@ class MonetizationService {
   int get freeChatLimit  => _freeChatLimit;
 
   // ─────────────────────────────────────────────────────────
-  // INIT — call in AppProvider._init()
+  // INIT
   // ─────────────────────────────────────────────────────────
   Future<void> init() async {
     try {
-      final prefs   = await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
       _isPremium      = prefs.getBool(_premiumKey) ?? false;
       _resetDailyCountsIfNeeded(prefs);
       _aiUsageToday   = prefs.getInt(_keyAiUsageCount)   ?? 0;
-      _rewardedExtras = prefs.getInt(_keyRewardedExtras) ?? 0;
       _chatUsageToday = prefs.getInt(_keyChatUsageCount) ?? 0;
-
-      AdService.instance.init(isPremium: _isPremium);
     } catch (e) {
       debugPrint('MonetizationService.init error: $e');
     }
@@ -172,13 +152,10 @@ class MonetizationService {
     final today    = _todayStr;
     final lastDate = prefs.getString(_keyAiUsageDate) ?? '';
     if (lastDate != today) {
-      prefs.setString(_keyAiUsageDate,   today);
-      prefs.setInt(_keyAiUsageCount,     0);
-      prefs.setInt(_keyRewardedExtras,   0);
-      _aiUsageToday   = 0;
-      _rewardedExtras = 0;
+      prefs.setString(_keyAiUsageDate, today);
+      prefs.setInt(_keyAiUsageCount,   0);
+      _aiUsageToday = 0;
     }
-    // Chat message reset (independent counter)
     final lastChatDate = prefs.getString(_keyChatUsageDate) ?? '';
     if (lastChatDate != today) {
       prefs.setString(_keyChatUsageDate, today);
@@ -198,34 +175,21 @@ class MonetizationService {
     await prefs.setInt(_keyAiUsageCount, _aiUsageToday);
   }
 
-  /// Called after each AI chat message (free tier: 5/day)
   Future<void> recordChatMessageUse() async {
     _chatUsageToday++;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyChatUsageCount, _chatUsageToday);
   }
 
-  /// Called after user watches rewarded ad — grants +1 AI use
-  Future<void> grantRewardedAIUse() async {
-    _rewardedExtras++;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_keyRewardedExtras, _rewardedExtras);
-  }
-
-
   // ─────────────────────────────────────────────────────────
   // PREMIUM UPGRADE
-  // NOTE: Real billing via in_app_purchase → call this after
-  //       purchase verified. For now: direct unlock.
   // ─────────────────────────────────────────────────────────
   Future<void> upgradeToPremium({String plan = 'yearly'}) async {
-    // Try real billing first
     try {
       final productId = plan == 'monthly'
           ? BillingProducts.monthly
           : BillingProducts.yearly;
       await BillingService.instance.purchase(productId);
-      // BillingService will call setPremium via listener
     } catch (e) {
       debugPrint('Billing error: $e');
       rethrow;
@@ -236,15 +200,11 @@ class MonetizationService {
     _isPremium = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_premiumKey, value);
-    AdService.instance.setPremium(value);
     debugPrint('✅ Premium: $value');
   }
 
-  // Called by BillingService after successful purchase or restore
   void markPremiumFromBilling() {
     _isPremium = true;
-    AdService.instance.setPremium(true);
-    // Persist so reinstall restores premium before billing stream fires next time
     SharedPreferences.getInstance().then((prefs) {
       prefs.setBool(_premiumKey, true);
     });
@@ -255,25 +215,18 @@ class MonetizationService {
     _isPremium = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_premiumKey, false);
-    AdService.instance.setPremium(false);
   }
 
   // ─────────────────────────────────────────────────────────
-  // PAYWALL TRIGGER LOGIC
-  // Returns true if paywall should be shown — max 1/day
+  // PAYWALL TRIGGER LOGIC — max 1/day
   // ─────────────────────────────────────────────────────────
-  // NOTE: Interstitial frequency is handled by AdService internally
-  // MonetizationService only handles: isPremium, canUseAI, AI usage count
-
   Future<bool> shouldShowPaywall(PaywallTrigger trigger) async {
     if (_isPremium) return false;
-    // AI limit — always show (user is blocked anyway)
     if (trigger == PaywallTrigger.aiLimitHit) return true;
-    // Other triggers — max 1 per day to avoid annoyance
     try {
       final prefs    = await SharedPreferences.getInstance();
       final lastDate = prefs.getString(_keyLastPaywallDate) ?? '';
-      if (lastDate == _todayStr) return false; // already shown today
+      if (lastDate == _todayStr) return false;
       await prefs.setString(_keyLastPaywallDate, _todayStr);
       return true;
     } catch (_) {
@@ -288,36 +241,32 @@ class MonetizationService {
 }
 
 // ═════════════════════════════════════════════════════════════
-// PAYWALL SHEET — beautiful bottom sheet, behavior-aware
+// PAYWALL SHEET
 // Usage: PaywallSheet.show(context, trigger: PaywallTrigger.prBroken)
 // ═════════════════════════════════════════════════════════════
 class PaywallSheet extends StatefulWidget {
   final PaywallTrigger trigger;
   final VoidCallback?  onUpgrade;
-  final VoidCallback?  onAdComplete; // rewarded ad finished → grant AI use
 
   const PaywallSheet({
     super.key,
     required this.trigger,
     this.onUpgrade,
-    this.onAdComplete,
   });
 
   static Future<void> show(
     BuildContext context, {
     required PaywallTrigger trigger,
     VoidCallback? onUpgrade,
-    VoidCallback? onAdComplete,
   }) async {
     HapticFeedback.mediumImpact();
     await showModalBottomSheet(
-      context:           context,
+      context:            context,
       isScrollControlled: true,
-      backgroundColor:   Colors.transparent,
-      builder:           (_) => PaywallSheet(
-        trigger:      trigger,
-        onUpgrade:    onUpgrade,
-        onAdComplete: onAdComplete,
+      backgroundColor:    Colors.transparent,
+      builder:            (_) => PaywallSheet(
+        trigger:   trigger,
+        onUpgrade: onUpgrade,
       ),
     );
   }
@@ -327,9 +276,8 @@ class PaywallSheet extends StatefulWidget {
 }
 
 class _PaywallSheetState extends State<PaywallSheet> {
-  bool _loadingAd      = false;
   bool _loadingUpgrade = false;
-  String _selectedPlan = 'yearly'; // default to yearly (best value)
+  String _selectedPlan = 'yearly';
 
   @override
   void initState() {
@@ -369,13 +317,12 @@ class _PaywallSheetState extends State<PaywallSheet> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ));
     } else if (b.status == BillingStatus.available) {
-      // Returned to available without premium = user cancelled
       setState(() => _loadingUpgrade = false);
     }
   }
 
   static const _features = [
-    (Icons.auto_awesome_rounded,      'Unlimited AI workout plans',        true),
+    (Icons.auto_awesome_rounded,      'Unlimited AI workout plans',         true),
     (Icons.bar_chart_rounded,         'Advanced analytics & fatigue index', true),
     (Icons.psychology_rounded,        'Smart coaching insights',            true),
     (Icons.track_changes_rounded,     'Plateau detection & deload alerts',  true),
@@ -396,7 +343,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Handle ──────────────────────────────────────
+            // Handle
             Center(child: Container(
               width: 40, height: 4,
               decoration: BoxDecoration(
@@ -405,7 +352,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
             )),
             const SizedBox(height: 20),
 
-            // ── Crown icon ───────────────────────────────────
+            // Crown icon
             Container(
               width: 72, height: 72,
               decoration: const BoxDecoration(
@@ -416,7 +363,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── STEP 1: Dopamine headline ─────────────────────
+            // Headline
             Text(trigger.headline,
                 style: GoogleFonts.rajdhani(
                     color: AppColors.textPrimary, fontSize: 22,
@@ -430,7 +377,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
                 textAlign: TextAlign.center),
             const SizedBox(height: 20),
 
-            // ── STEP 2: Future Preview — make user imagine ────
+            // Future preview
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -461,7 +408,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
             ),
             const SizedBox(height: 20),
 
-            // ── Feature list ─────────────────────────────────
+            // Feature list
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -485,50 +432,35 @@ class _PaywallSheetState extends State<PaywallSheet> {
                             fontWeight: f.$3
                                 ? FontWeight.w600
                                 : FontWeight.w400))),
-                    if (f.$3)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.gold.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4)),
-                        child: Text('PRO',
-                            style: GoogleFonts.inter(
-                                color: AppColors.gold, fontSize: 9,
-                                fontWeight: FontWeight.w800)),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.gold.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(4)),
-                        child: Text('FREE',
-                            style: GoogleFonts.inter(
-                                color: AppColors.gold, fontSize: 9,
-                                fontWeight: FontWeight.w800)),
-                      ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4)),
+                      child: Text('PRO',
+                          style: GoogleFonts.inter(
+                              color: AppColors.gold, fontSize: 9,
+                              fontWeight: FontWeight.w800)),
+                    ),
                   ]),
                 )).toList(),
               ),
             ),
             const SizedBox(height: 24),
 
-            // ── STEP 4: Price — monthly + yearly ─────────────
+            // Price pills — monthly + yearly
             Row(children: [
-              // Monthly
               Expanded(child: _PricePill(
                 price: '₹150', period: '/mo',
-                badge: '3 days free',
+                badge: '14 days free',
                 isSelected: _selectedPlan == 'monthly',
                 onTap: () => setState(() => _selectedPlan = 'monthly'),
               )),
               const SizedBox(width: 10),
-              // Yearly — highlighted as best value
               Expanded(child: _PricePill(
-                price: '₹1000', period: '/yr',
-                badge: 'Save 58%',
+                price: '₹1499', period: '/yr',
+                badge: 'Save 17%',
                 isSelected: _selectedPlan == 'yearly',
                 isHighlighted: true,
                 onTap: () => setState(() => _selectedPlan = 'yearly'),
@@ -536,7 +468,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
             ]),
             const SizedBox(height: 16),
 
-            // ── Social proof ─────────────────────────────────
+            // Social proof
             Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: Row(
@@ -553,7 +485,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
               ),
             ),
 
-            // ── Upgrade CTA ──────────────────────────────────
+            // Upgrade CTA
             _loadingUpgrade
                 ? const CircularProgressIndicator(color: AppColors.gold)
                 : GestureDetector(
@@ -573,7 +505,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
                         children: [
                           Text(
                               _selectedPlan == 'yearly'
-                                  ? 'Start Free Trial — ₹1,000/yr'
+                                  ? 'Start Free Trial — ₹1,499/yr'
                                   : 'Start Free Trial — ₹150/mo',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.rajdhani(
@@ -590,7 +522,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
                   ),
             const SizedBox(height: 10),
 
-            // ── Skip ─────────────────────────────────────────
+            // Skip
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text('Maybe later',
@@ -598,24 +530,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
                       color: AppColors.textMuted, fontSize: 12)),
             ),
 
-            // ── Watch Ad option (below skip — last resort) ───
-            if (trigger.showAdOption) ...[
-              _loadingAd
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 4),
-                      child: CircularProgressIndicator(
-                          color: AppColors.gold, strokeWidth: 2))
-                  : TextButton.icon(
-                      onPressed: _onWatchAdTap,
-                      icon: const Icon(Icons.play_circle_outline_rounded,
-                          color: AppColors.textDisabled, size: 16),
-                      label: Text('Watch an ad for 1 free use',
-                          style: GoogleFonts.inter(
-                              color: AppColors.textDisabled, fontSize: 11)),
-                    ),
-            ],
-
-            // ── Trust signals ────────────────────────────────
+            // Trust signal
             Text('Auto-renews · Cancel before trial ends to avoid charges',
                 style: GoogleFonts.inter(
                     color: AppColors.textMuted.withValues(alpha: 0.5),
@@ -635,8 +550,6 @@ class _PaywallSheetState extends State<PaywallSheet> {
           ? BillingProducts.monthly
           : BillingProducts.yearly;
       await BillingService.instance.purchase(productId);
-      // Native payment dialog is now open.
-      // _onBillingUpdate() will fire when purchase completes, cancels, or errors.
     } catch (e) {
       debugPrint('Upgrade error: $e');
       if (mounted) {
@@ -654,45 +567,10 @@ class _PaywallSheetState extends State<PaywallSheet> {
       }
     }
   }
-
-  Future<void> _onWatchAdTap() async {
-    HapticFeedback.lightImpact();
-    setState(() => _loadingAd = true);
-
-    AdService.instance.showRewarded(
-      onRewarded: () async {
-        await MonetizationService.instance.grantRewardedAIUse();
-        if (!mounted) return;
-        Navigator.pop(context);
-        widget.onAdComplete?.call();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('+1 AI plan unlocked. Go ahead!',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-          backgroundColor: AppColors.gold,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ));
-      },
-      onFailed: () {
-        if (!mounted) return;
-        setState(() => _loadingAd = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Ad not available right now. Try again later.',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-          backgroundColor: AppColors.bgCard,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ));
-      },
-    );
-  }
 }
 
 // ═════════════════════════════════════════════════════════════
-// AI USAGE PILL — shows "2/2 used • Watch ad" inline widget
-// Use anywhere you show the AI button
+// AI USAGE PILL
 // ═════════════════════════════════════════════════════════════
 class AIUsagePill extends StatelessWidget {
   final bool isPremium;
@@ -765,7 +643,7 @@ class AIUsagePill extends StatelessWidget {
 }
 
 // ═════════════════════════════════════════════════════════════
-// FUTURE PREVIEW ROW — Step 2: make user imagine the value
+// FUTURE PREVIEW ROW
 // ═════════════════════════════════════════════════════════════
 class _FuturePreviewRow extends StatelessWidget {
   final IconData icon;
@@ -788,7 +666,7 @@ class _FuturePreviewRow extends StatelessWidget {
 }
 
 // ═════════════════════════════════════════════════════════════
-// PRICE PILL — Step 4: monthly vs yearly toggle
+// PRICE PILL
 // ═════════════════════════════════════════════════════════════
 class _PricePill extends StatelessWidget {
   final String price, period, badge;
@@ -803,10 +681,8 @@ class _PricePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = isSelected
-        ? AppColors.gold
-        : AppColors.borderSoft;
-    final bgColor = isSelected
+    final borderColor = isSelected ? AppColors.gold : AppColors.borderSoft;
+    final bgColor     = isSelected
         ? AppColors.gold.withValues(alpha: 0.10)
         : AppColors.bgSurface;
 
@@ -824,21 +700,17 @@ class _PricePill extends StatelessWidget {
               blurRadius: 10)] : null,
         ),
         child: Column(children: [
-          // Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
-              color: isHighlighted
-                  ? AppColors.gold.withValues(alpha: 0.15)
-                  : AppColors.gold.withValues(alpha: 0.10),
+              color: AppColors.gold.withValues(alpha: isHighlighted ? 0.15 : 0.10),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(badge, style: GoogleFonts.inter(
-                color: isHighlighted ? AppColors.gold : AppColors.gold,
+                color: AppColors.gold,
                 fontSize: 9, fontWeight: FontWeight.w800)),
           ),
           const SizedBox(height: 6),
-          // Price
           Row(mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -851,31 +723,26 @@ class _PricePill extends StatelessWidget {
                   color: AppColors.textMuted, fontSize: 11)),
             ),
           ]),
-          // Per-month breakdown (yearly only)
           if (isHighlighted) ...[
             const SizedBox(height: 2),
-            Text('Just ₹83/month',
+            Text('Just ₹125/month',
                 style: GoogleFonts.inter(
                     color: AppColors.goldSoft,
                     fontSize: 9,
                     fontWeight: FontWeight.w700)),
           ],
-          // Selection indicator
           const SizedBox(height: 4),
           Container(
             width: 18, height: 18,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isSelected
-                  ? AppColors.gold
-                  : Colors.transparent,
+              color: isSelected ? AppColors.gold : Colors.transparent,
               border: Border.all(
                   color: isSelected ? AppColors.gold : AppColors.borderMedium,
                   width: 1.5),
             ),
             child: isSelected
-                ? const Icon(Icons.check_rounded,
-                    color: Colors.black, size: 11)
+                ? const Icon(Icons.check_rounded, color: Colors.black, size: 11)
                 : null,
           ),
         ]),

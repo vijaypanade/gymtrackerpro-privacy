@@ -12,6 +12,10 @@
 // 45 test cases. Pure deterministic — no mocks needed.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gymtrackerpromaster/ai/maturity/ai_maturity_phase.dart';
+import 'package:gymtrackerpromaster/ai/maturity/ai_maturity_state.dart';
+import 'package:gymtrackerpromaster/ai/maturity/allowed_claims.dart';
+import 'package:gymtrackerpromaster/ai/maturity/language_profile.dart';
 import 'package:gymtrackerpromaster/coach/models/coach_context.dart';
 import 'package:gymtrackerpromaster/coach/models/coach_intent.dart';
 import 'package:gymtrackerpromaster/coach/models/coach_mode.dart';
@@ -24,6 +28,88 @@ import 'package:gymtrackerpromaster/services/adaptive_programming_service.dart';
 // ── Singleton ─────────────────────────────────────────────────────────────────
 
 const _coach = CoachBrainService();
+
+// ── Test maturity fixtures ────────────────────────────────────────────────────
+
+// Calibrated — pattern + observation claims enabled.
+// Default fixture for tests that exercise coaching rules gated on pattern claims.
+const _kTestMaturity = AIMaturityState(
+  phase:             AIMaturityPhase.calibrated,
+  progressPct:       1.0,
+  overallConfidence: 0.80,
+  languageProfile: LanguageProfile(
+    requiresHedging:           false,
+    canUsePatternLanguage:     true,
+    canUsePredictionLanguage:  false,
+    canAddressAthleteDirectly: true,
+    phaseLabel:    'Calibrated',
+    openingStyle:  'Based on your training',
+    evidencePrefix: 'Over the past few weeks',
+  ),
+  allowedClaims: AllowedClaims(
+    ui: AllowedClaimsUi(
+      canShowTrendArrow:       true,
+      canShowWhyToggle:        true,
+      canShowWeeklyStory:      true,
+      canShowDominantSignals:  true,
+      canShowSessionProphecy:  false,
+      canShowAdaptiveIncrease: true,
+      canShowConfidenceArc:    false,
+    ),
+    content: AllowedClaimsContent(
+      canMakeObservation:        true,
+      canMakePatternClaim:       true,
+      canMakePrediction:         false,
+      canMakePrescription:       true,
+      canReferenceHistory:       true,
+      canAddressAthleteDirectly: true,
+      canCompareSessions:        true,
+      canUseTrendLanguage:       true,
+      canInjectPersonalContext:  true,
+    ),
+  ),
+);
+
+// Learning phase — observation permitted but pattern claims not yet unlocked.
+// Used for P1 fallback tests: _peakWindow and _highConfidenceOverload are blocked
+// (canMakePatternClaim=false), _lowConfidence is skipped (canMakeObservation=true),
+// so P1 _identityReinforcement is reachable.
+const _kLearningMaturity = AIMaturityState(
+  phase:             AIMaturityPhase.learning,
+  progressPct:       0.50,
+  overallConfidence: 0.40,
+  languageProfile: LanguageProfile(
+    requiresHedging:           true,
+    canUsePatternLanguage:     false,
+    canUsePredictionLanguage:  false,
+    canAddressAthleteDirectly: false,
+    phaseLabel:    'Just Getting Started',
+    openingStyle:  '',
+    evidencePrefix: '',
+  ),
+  allowedClaims: AllowedClaims(
+    ui: AllowedClaimsUi(
+      canShowTrendArrow:       false,
+      canShowWhyToggle:        false,
+      canShowWeeklyStory:      false,
+      canShowDominantSignals:  false,
+      canShowSessionProphecy:  false,
+      canShowAdaptiveIncrease: false,
+      canShowConfidenceArc:    true,
+    ),
+    content: AllowedClaimsContent(
+      canMakeObservation:        true,
+      canMakePatternClaim:       false,
+      canMakePrediction:         false,
+      canMakePrescription:       false,
+      canReferenceHistory:       false,
+      canAddressAthleteDirectly: false,
+      canCompareSessions:        false,
+      canUseTrendLanguage:       false,
+      canInjectPersonalContext:  false,
+    ),
+  ),
+);
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -112,11 +198,13 @@ CoachBrainContext _ctx({
   AdaptiveWorkoutDecision? decision,
   AthleteMemorySnapshot?  memory,
   DecisionConfidence?     confidence,
+  AIMaturityState?        maturity,
 }) => CoachBrainContext(
   recoveryState:         recovery    ?? _recovery(),
   adaptiveDecision:      decision    ?? _decision(),
   athleteMemorySnapshot: memory      ?? _mem(),
   decisionConfidence:    confidence  ?? _confidence(),
+  aiMaturity:            maturity    ?? _kTestMaturity,
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -296,10 +384,10 @@ void main() {
   // ── § 8  P1 — Identity reinforcement ──────────────────────────────────────
 
   group('§8 P1 — Identity reinforcement fallback', () {
-    test('8.1 beginner + overload + mid confidence → P1, identity message', () {
-      // Use identity='beginner' so the P1 beginner branch fires with
-      // intent=reinforceIdentity.  overload focus + confidence in [0.50, 0.72)
-      // skips all P2–P4 rules that would otherwise intercept.
+    test('8.1 beginner + overload focus + learning maturity → P1, identity message', () {
+      // _kLearningMaturity: canMakeObservation=true (skips _lowConfidence P2),
+      // canMakePatternClaim=false (skips _peakWindow P4 and _highConfidenceOverload P3).
+      // focus=overload routes _missionAligned to the default/null case, so P1 fires.
       final msg = _coach.generate(_ctx(
         recovery:   _recovery(score: 75),
         confidence: _confidence(overall: 0.60),
@@ -307,6 +395,7 @@ void main() {
         memory:     _mem(consistency: 0.50, adherence: 0.50,
                          progressionV: 0.50, identity: 'beginner',
                          experience: 'novice'),
+        maturity:   _kLearningMaturity,
       ));
       expect(msg.priority, 1);
       expect(msg.intent, CoachIntent.reinforceIdentity);

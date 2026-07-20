@@ -1,4 +1,6 @@
 // lib/screens/login_screen.dart
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,6 +12,7 @@ import 'onboarding_screen.dart';
 import 'main_shell.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../providers/gamification_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,6 +24,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with TickerProviderStateMixin {
   bool _loading = false;
+  // Which CTA shows the spinner while _loading (both stay disabled).
+  bool _loadingApple = false;
 
   // Entry — plays once on mount
   late final AnimationController _entryCtrl;
@@ -121,16 +126,24 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  Future<void> _signIn() async {
-    setState(() => _loading = true);
+  Future<void> _signIn({bool useApple = false}) async {
+    setState(() {
+      _loading      = true;
+      _loadingApple = useApple;
+    });
     HapticFeedback.mediumImpact();
 
-    final user = await AuthService.instance.signInWithGoogle();
+    final user = useApple
+        ? await AuthService.instance.signInWithApple()
+        : await AuthService.instance.signInWithGoogle();
     if (!mounted) return;
 
     if (user != null) {
       final ap = context.read<AppProvider>();
+      final gp = context.read<GamificationProvider>();
       final restored = await ap.user.tryRestoreFromCloud();
+      await ap.workout.tryRestoreHistoryFromCloud();
+      await gp.recoverXPIfNeeded(ap.workout.history);
       await ap.workout.tryRestoreLogsFromCloud();
 
       final prefs = await SharedPreferences.getInstance();
@@ -211,14 +224,32 @@ class _LoginScreenState extends State<LoginScreen>
 
                   const Spacer(flex: 3),
 
+                  // Apple sign-in CTA — iOS only (App Store guideline 4.8),
+                  // shown first so it is at least as prominent as Google.
+                  if (Platform.isIOS) ...[
+                    FadeTransition(
+                      opacity: _buttonOpacity,
+                      child: SlideTransition(
+                        position: _buttonSlide,
+                        child: _AppleCTA(
+                          loading: _loading && _loadingApple,
+                          onTap: _loading
+                              ? null
+                              : () => _signIn(useApple: true),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   // Google sign-in CTA
                   FadeTransition(
                     opacity: _buttonOpacity,
                     child: SlideTransition(
                       position: _buttonSlide,
                       child: _GoogleCTA(
-                        loading: _loading,
-                        onTap: _loading ? null : _signIn,
+                        loading: _loading && !_loadingApple,
+                        onTap: _loading ? null : () => _signIn(),
                       ),
                     ),
                   ),
@@ -621,6 +652,83 @@ class _Pill extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// Apple CTA — black HIG-style button, mirrors _GoogleCTA feedback
+// (RFC-IOS-APPLE-SIGNIN-001)
+// ════════════════════════════════════════════════════════════
+class _AppleCTA extends StatefulWidget {
+  const _AppleCTA({required this.loading, required this.onTap});
+  final bool loading;
+  final VoidCallback? onTap;
+
+  @override
+  State<_AppleCTA> createState() => _AppleCTAState();
+}
+
+class _AppleCTAState extends State<_AppleCTA> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) {
+        if (widget.onTap != null) setState(() => _pressed = true);
+      },
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 90),
+        curve: Curves.easeOut,
+        child: AnimatedOpacity(
+          opacity: widget.loading ? 0.65 : 1.0,
+          duration: const Duration(milliseconds: 180),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 17),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.22),
+                width: 0.8,
+              ),
+            ),
+            child: widget.loading
+                ? const Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.apple, size: 22, color: Colors.white),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Sign in with Apple',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
       ),
     );
   }

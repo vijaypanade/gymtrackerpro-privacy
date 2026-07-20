@@ -276,6 +276,8 @@ class AppBorders {
 // ══════════════════════════════════════════════
 // TYPOGRAPHY — Rajdhani (headers) + Inter (body)
 // ══════════════════════════════════════════════
+// Scale follows Apple HIG Dynamic Type ramps (body ≥16, secondary ≥14,
+// labels ≥13) so text stays legible on iPhone without layout redesign.
 class AppTextStyles {
   // Display
   static TextStyle get display => const TextStyle(fontFamily: 'Rajdhani',
@@ -286,31 +288,31 @@ class AppTextStyles {
 
   // Headings
   static TextStyle get h1 => const TextStyle(fontFamily: 'Rajdhani',
-    fontSize: 30, fontWeight: FontWeight.w800,
+    fontSize: 32, fontWeight: FontWeight.w800,
     color: AppColors.textPrimary, letterSpacing: 0.5,
   );
   static TextStyle get h2 => const TextStyle(fontFamily: 'Rajdhani',
-    fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
+    fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
   );
   static TextStyle get h3 => const TextStyle(fontFamily: 'Rajdhani',
-    fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
+    fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
   );
   static TextStyle get h4 => const TextStyle(fontFamily: 'Rajdhani',
-    fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
+    fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
   );
 
   // Body
   static TextStyle get body => const TextStyle(fontFamily: 'Inter',
-    fontSize: 14, color: AppColors.textPrimary, height: 1.5,
+    fontSize: 16, color: AppColors.textPrimary, height: 1.5,
   );
   static TextStyle get bodySmall => const TextStyle(fontFamily: 'Inter',
-    fontSize: 12, color: AppColors.textSecondary, height: 1.4,
+    fontSize: 14, color: AppColors.textSecondary, height: 1.45,
   );
   static TextStyle get caption => const TextStyle(fontFamily: 'Inter',
-    fontSize: 10, color: AppColors.textMuted, letterSpacing: 0.4,
+    fontSize: 12, color: AppColors.textMuted, letterSpacing: 0.4, height: 1.35,
   );
   static TextStyle get label => const TextStyle(fontFamily: 'Inter',
-    fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary,
+    fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary,
   );
 
   // Special
@@ -323,23 +325,23 @@ class AppTextStyles {
     color: AppColors.textPrimary, letterSpacing: 1,
   );
   static TextStyle get sectionTitle => const TextStyle(fontFamily: 'Inter',
-    fontSize: 11, fontWeight: FontWeight.w700,
+    fontSize: 12, fontWeight: FontWeight.w700,
     color: AppColors.textMuted, letterSpacing: 1.8,
   );
   static TextStyle get gold => const TextStyle(fontFamily: 'Rajdhani',
-    fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.gold,
+    fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.gold,
   );
   static TextStyle get goldSmall => const TextStyle(fontFamily: 'Inter',
-    fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.gold,
+    fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.gold,
   );
 
   // Button
   static TextStyle get button => const TextStyle(fontFamily: 'Inter',
-    fontSize: 15, fontWeight: FontWeight.w800,
+    fontSize: 16, fontWeight: FontWeight.w800,
     color: Colors.black, letterSpacing: 0.3,
   );
   static TextStyle get buttonSmall => const TextStyle(fontFamily: 'Inter',
-    fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black,
+    fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black,
   );
 }
 
@@ -421,7 +423,7 @@ class AppTheme {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: AppColors.bgElevated,
-      contentTextStyle: const TextStyle(fontFamily: 'Inter',color: AppColors.textPrimary, fontSize: 13),
+      contentTextStyle: const TextStyle(fontFamily: 'Inter',color: AppColors.textPrimary, fontSize: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       behavior: SnackBarBehavior.floating,
     ),
@@ -445,8 +447,8 @@ class AppTheme {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.gold, width: 1),
       ),
-      labelStyle: const TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 13),
-      hintStyle: const TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 13),
+      labelStyle: const TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 14),
+      hintStyle: const TextStyle(fontFamily: 'Inter',color: AppColors.textMuted, fontSize: 14),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     ),
     chipTheme: ChipThemeData(

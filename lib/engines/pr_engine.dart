@@ -1,4 +1,5 @@
 // lib/engines/pr_engine.dart — Production PR Engine v1.0
+import '../services/exercise_intelligence.dart';
 // Complete PR system: detection, delta, XP, classification, AI messages,
 // consistency tracking, edge cases, null safety
 // ════════════════════════════════════════════════
@@ -591,6 +592,10 @@ enum ProgressStatus { first, improved, same, dropped, tooHeavy, tooEasy, perfect
 
 /// SINGLE source of truth for all workout feedback.
 /// Used by workout screen header AND PR celebration screen.
+///
+/// [equipment] is forwarded to WeightRounder so the suggested next weight
+/// lands on a real gym increment. Pass PlannedExercise.equipment directly —
+/// WeightRounder owns the fallback for empty strings (dumbbell step, 2.5 kg).
 WorkoutFeedback calculateWorkoutFeedback({
   required double weight,
   required int reps,
@@ -598,7 +603,14 @@ WorkoutFeedback calculateWorkoutFeedback({
   required int previousBestReps,
   bool isBodyweight = false,
   String unit = 'kg',
+  String equipment = '',
 }) {
+  // Inner helper — rounds a candidate next-weight to the nearest valid gym
+  // increment. Skipped for bodyweight and non-kg units.
+  double snap(double w) {
+    if (isBodyweight || unit != 'kg' || w <= 0) return w;
+    return WeightRounder.round(w, equipment);
+  }
   // ── First time ever — give SCIENTIFIC rep-based feedback ──
   if (previousBestWeight == 0 && previousBestReps == 0) {
     String msg;
@@ -615,19 +627,19 @@ WorkoutFeedback calculateWorkoutFeedback({
       nextR = reps;
     } else if (reps < 6) {
       msg   = '⚠ Too heavy — reduce';
-      nextW = (weight - 2.5).clamp(0, 500);
+      nextW = snap((weight - 2.5).clamp(0, 500));
       nextR = 8;
     } else if (reps > 12) {
       msg   = '💪 Too light — increase';
-      nextW = (weight + 5).clamp(0, 500);
+      nextW = snap((weight + 5).clamp(0, 500));
       nextR = 10;
     } else if (reps >= 8 && reps <= 12) {
       msg   = '🔥 Perfect — push slightly';
-      nextW = (weight + 2.5).clamp(0, 500);
+      nextW = snap((weight + 2.5).clamp(0, 500));
       nextR = reps;
     } else {
       msg   = '👍 Solid — maintain';
-      nextW = (weight + 2.5).clamp(0, 500);
+      nextW = snap((weight + 2.5).clamp(0, 500));
       nextR = reps + 1;
     }
 
@@ -675,7 +687,7 @@ WorkoutFeedback calculateWorkoutFeedback({
   if (reps < 6) {
     return WorkoutFeedback(
       message:    '⚠ Too heavy — reduce',
-      nextWeight: (weight - 2.5).clamp(0, 500),
+      nextWeight: snap((weight - 2.5).clamp(0, 500)),
       nextReps:   8,
       status:     ProgressStatus.tooHeavy,
       xpEarned:   15,
@@ -686,7 +698,7 @@ WorkoutFeedback calculateWorkoutFeedback({
   if (reps > 12) {
     return WorkoutFeedback(
       message:    '💪 Too easy — increase',
-      nextWeight: (weight + 5).clamp(0, 500),
+      nextWeight: snap((weight + 5).clamp(0, 500)),
       nextReps:   10,
       status:     ProgressStatus.tooEasy,
       xpEarned:   40,
@@ -706,7 +718,7 @@ WorkoutFeedback calculateWorkoutFeedback({
 
     return WorkoutFeedback(
       message:    '🔥 NEW PR — +${delta.toStringAsFixed(1)} kg',
-      nextWeight: (weight + 2.5).clamp(0, 500),
+      nextWeight: snap((weight + 2.5).clamp(0, 500)),
       nextReps:   reps,
       status:     ProgressStatus.improved,
       xpEarned:   150,
@@ -717,7 +729,7 @@ WorkoutFeedback calculateWorkoutFeedback({
   if (currVolume > prevVolume * 1.05) {
     return WorkoutFeedback(
       message:    '📈 Progressing well',
-      nextWeight: (weight + 2.5).clamp(0, 500),
+      nextWeight: snap((weight + 2.5).clamp(0, 500)),
       nextReps:   reps,
       status:     ProgressStatus.improved,
       xpEarned:   75,
@@ -728,7 +740,7 @@ WorkoutFeedback calculateWorkoutFeedback({
   if (currVolume < prevVolume * 0.90) {
     return WorkoutFeedback(
       message:    '😐 Slight drop — recover',
-      nextWeight: weight.clamp(0, 500),
+      nextWeight: snap(weight.clamp(0, 500)),
       nextReps:   previousBestReps,
       status:     ProgressStatus.dropped,
       xpEarned:   20,
@@ -739,7 +751,7 @@ WorkoutFeedback calculateWorkoutFeedback({
   if (reps >= 8 && reps <= 12) {
     return WorkoutFeedback(
       message:    '🔥 Perfect — push slightly',
-      nextWeight: (weight + 2.5).clamp(0, 500),
+      nextWeight: snap((weight + 2.5).clamp(0, 500)),
       nextReps:   reps,
       status:     ProgressStatus.perfect,
       xpEarned:   50,
@@ -749,7 +761,7 @@ WorkoutFeedback calculateWorkoutFeedback({
   // 6-8 range
   return WorkoutFeedback(
     message:    '👍 Good — maintain',
-    nextWeight: (weight + 2.5).clamp(0, 500),
+    nextWeight: snap((weight + 2.5).clamp(0, 500)),
     nextReps:   reps + 1,
     status:     ProgressStatus.same,
     xpEarned:   35,

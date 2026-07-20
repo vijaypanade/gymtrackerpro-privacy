@@ -8,17 +8,19 @@
 // 2. Add to AndroidManifest.xml:
 //    <uses-permission android:name="com.android.vending.BILLING"/>
 // 3. Create products in Play Console:
-//    - premium_monthly    ₹149/month  (base plan)
-//    - premium_quarterly  ₹349/3mo    (Save 22%)
-//    - premium_yearly     ₹999/year   (Save 44% — RECOMMENDED)
-//    All three with 14-day free trial introductory pricing.
+//    - premium_monthly    ₹150/month  (base plan)
+//    - premium_yearly     ₹1499/year  (Save 17% — RECOMMENDED)
+//    Both with 14-day free trial introductory pricing.
 // ══════════════════════════════════════════════════════════
 
 import 'dart:async';
+import 'dart:convert';
 import 'monetization_service.dart';
 import 'auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -26,10 +28,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 // PRODUCT IDs — must match Play Console exactly
 // ─────────────────────────────────────────────────────────
 class BillingProducts {
-  static const monthly   = 'premium_monthly';   // ₹149/month
-  static const quarterly = 'premium_quarterly'; // ₹349/3 months
-  static const yearly    = 'premium_yearly';    // ₹999/year
-  static const all       = {monthly, quarterly, yearly};
+  static const monthly = 'premium_monthly'; // ₹150/month
+  static const yearly  = 'premium_yearly';  // ₹1499/year
+  static const all     = {monthly, yearly};
 }
 
 // ─────────────────────────────────────────────────────────
@@ -91,8 +92,8 @@ class BillingService extends ChangeNotifier {
       // Load products
       await _loadProducts();
 
-      // Restore previous purchases
-      await InAppPurchase.instance.restorePurchases();
+      // Restore previous purchases (fire-and-forget — results come via purchaseStream)
+      InAppPurchase.instance.restorePurchases().ignore();
 
       _status = BillingStatus.available;
     } catch (e) {
@@ -109,7 +110,10 @@ class BillingService extends ChangeNotifier {
   Future<void> _loadProducts() async {
     final response = await InAppPurchase.instance.queryProductDetails(
       BillingProducts.all,
-    );
+    ).timeout(const Duration(seconds: 8), onTimeout: () {
+      debugPrint('Product query timed out after 8s');
+      return ProductDetailsResponse(productDetails: [], notFoundIDs: [], error: null);
+    });
 
     if (response.error != null) {
       debugPrint('Product query error: ${response.error}');
@@ -206,24 +210,22 @@ class BillingService extends ChangeNotifier {
   //     Firestore on every cold start.
   //   • The Firestore record is the authoritative source of truth.
   //
-  // Phase 3 upgrade path (when ready):
-  //   Replace _verifyWithServer with a Cloud Function that calls
-  //   the Google Play Developer API with purchase.verificationData
-  //   and writes `verified: true` to the Firestore grant document.
+  // RFC-003: verifyPurchase Cloud Function sets the Firebase custom claim
+  // { premium: true, premiumExpiry } that askAI checks server-side.
   // ─────────────────────────────────────────────────────────
+  static const _verifyPurchaseUrl =
+      'https://us-central1-gymtrackerpro-2cb3a.cloudfunctions.net/verifyPurchase';
+
   Future<void> _handleValidPurchase(PurchaseDetails purchase) async {
     final productId = purchase.productID;
 
-    if (productId != BillingProducts.monthly  &&
-        productId != BillingProducts.quarterly &&
+    if (productId != BillingProducts.monthly &&
         productId != BillingProducts.yearly) { return; }
 
     final now    = DateTime.now();
     final expiry = productId == BillingProducts.yearly
         ? now.add(const Duration(days: 365))
-        : productId == BillingProducts.quarterly
-            ? now.add(const Duration(days: 95))
-            : now.add(const Duration(days: 32));
+        : now.add(const Duration(days: 32));
 
     // 1. Grant locally first so UI responds instantly.
     _isPremium     = true;
@@ -241,6 +243,48 @@ class BillingService extends ChangeNotifier {
       purchaseToken: purchase.verificationData.serverVerificationData,
       expiresAt:     expiry,
     );
+
+    // 3. RFC-003: set Firebase custom claim so askAI recognises premium server-side.
+    // Non-fatal — local grant already active. Claim is refreshed on next getIdToken(true).
+    _callVerifyPurchase(
+      productId:     productId,
+      purchaseToken: purchase.verificationData.serverVerificationData,
+    ).ignore();
+  }
+
+  Future<void> _callVerifyPurchase({
+    required String productId,
+    required String purchaseToken,
+  }) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final idToken = await user.getIdToken();
+      if (idToken == null) return;
+
+      final response = await http.post(
+        Uri.parse(_verifyPurchaseUrl),
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({
+          'productId':     productId,
+          'purchaseToken': purchaseToken,
+          'platform':      defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        // Pull the fresh premium claim into the cached token.
+        await user.getIdToken(true);
+        debugPrint('✅ RFC-003: premium custom claim set');
+      } else {
+        debugPrint('⚠️ verifyPurchase (${response.statusCode}): ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('verifyPurchase error (non-fatal): $e');
+    }
   }
 
   // Writes the purchase grant to Firestore so it can be cross-checked
@@ -261,8 +305,8 @@ class BillingService extends ChangeNotifier {
         'purchaseToken': purchaseToken,
         'grantedAt':     FieldValue.serverTimestamp(),
         'expiresAt':     expiresAt.toIso8601String(),
-        'platform':      'android',
-        'verified':      false, // set to true by server-side verification (Phase 3)
+        'platform':      defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
+        'verified':      false,
       }, SetOptions(merge: true));
       debugPrint('✅ Grant recorded to Firestore');
     } catch (e) {

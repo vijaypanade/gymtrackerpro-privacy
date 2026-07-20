@@ -22,6 +22,9 @@
 // cases — the back-compat getters delegate. Over time, screens should be
 // migrated to read directly from the appropriate sub-provider.
 
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
 import '../services/workout_session_service.dart';
@@ -38,6 +41,7 @@ import '../services/notification_service.dart';
 import '../services/storage_service.dart';
 import '../services/analytics_service.dart';
 import '../engines/pr_engine.dart' as pre;
+import '../services/exercise_intelligence.dart' show WeightRounder;
 import 'ai_provider.dart';
 import 'analytics_provider.dart';
 import 'settings_provider.dart';
@@ -66,6 +70,7 @@ import '../services/exercise_intelligence_service.dart';
 import '../services/athlete_memory_service.dart';
 import '../services/observation_engine.dart';
 import '../brain/services/athlete_brain_service.dart';
+import '../brain/models/biometric_context.dart';
 import '../brain/models/decision_context.dart';
 import '../brain/models/environment_context.dart';
 import '../brain/models/workout_context.dart';
@@ -75,7 +80,8 @@ import '../services/onboarding_intelligence_service.dart';
 import '../services/protein_intelligence_service.dart';
 import '../services/recovery_prediction_service.dart';
 import '../services/behavioral_pattern_service.dart';
-import '../services/health_connect_service.dart';
+import '../services/health_platform_service.dart';
+import '../services/health_sync_engine.dart';
 import '../services/recovery_session_service.dart';
 import '../services/narrative_orchestrator.dart';
 import '../models/weekly_review_data.dart';
@@ -96,6 +102,13 @@ import '../timeline/models/timeline_snapshot.dart';
 import '../timeline/services/athlete_timeline_engine.dart';
 import '../ai/models/ai_coach_context.dart';
 import '../ai/services/gemini_coach_service.dart';
+import '../ai/maturity/ai_maturity_engine.dart';
+import '../ai/maturity/ai_maturity_input.dart';
+import '../ai/maturity/ai_maturity_phase.dart';
+import '../ai/maturity/ai_maturity_state.dart';
+import '../ai/generators/planner_coaching_arbiter.dart';
+import '../models/adaptive_session.dart';
+import '../services/adaptive_session_service.dart';
 
 /// Drives which adaptive surface the planner shows for today's session.
 enum PlannerAdaptiveState {
@@ -180,9 +193,29 @@ class AppProvider extends ChangeNotifier {
   BrainCardData?  _cachedBrainCardData;
   DateTime?       _brainCardComputedAt;
 
+  // ── AIMaturityState cache — 5-minute TTL, same pattern as brainCardData ──
+  AIMaturityState? _cachedAIMaturity;
+  DateTime?        _aiMaturityComputedAt;
+  // Reentrancy guard — aiMaturity → brainCardData → _buildDecisionContext →
+  // trainingAdjustment → aiMaturity is a cycle when all caches are cold
+  // (e.g. right after cloud restore invalidates them with totalWorkouts > 0).
+  bool _aiMaturityComputing = false;
+
+  // ── Planner coaching slot (RFC-PLANNER-UX-001) — 5-minute TTL ─────────────
+  // null is a VALID cached result ("show nothing"), so validity is tracked
+  // by the timestamp, not the value.
+  PlannerCoachingInsight? _cachedCoachingInsight;
+  DateTime?               _coachingInsightComputedAt;
+  // Snoozed insight keys for today — loaded once in init(), persisted on change.
+  final Set<String> _snoozedInsightsToday = {};
+
   // ── BrainCoachMessage cache — same TTL as adaptiveDecision ───────────
   BrainCoachMessage? _cachedCoachMessage;
   DateTime?          _coachMessageComputedAt;
+
+  // ── RFC-006 Adaptive Session state — in-memory, day-scoped ───────────────
+  AdaptiveSession? _adaptiveSession;
+  String?          _adaptiveDeclinedKey; // day key when user chose "Use Original"
 
   // ── AthleteMemory — rebuilt after workout, persisted daily ──
   AthleteMemory? _athleteMemory;
@@ -229,6 +262,7 @@ class AppProvider extends ChangeNotifier {
 
   // ── HealthSnapshot — fetched once on init, refreshed every 30 minutes ───
   HealthSnapshot _latestHealthSnapshot = HealthSnapshot.empty;
+  double? _hrvBaseline; // EMA from SharedPrefs — null until first Apple Watch reading
   DateTime?      _healthSnapshotComputedAt;
 
   // Paywall trigger — set after key events, read by UI
@@ -301,6 +335,12 @@ class AppProvider extends ChangeNotifier {
         travelModeActive: settings.travelMode,
       );
 
+      // RFC-002.5 §9 — one-time backfill of local history to cloud.
+      // Fire-and-forget: Firestore batch.commit() blocks indefinitely on iOS
+      // without offline persistence when the network is slow, which hangs
+      // init() and triggers the watchdog. UI does not depend on this completing.
+      workout.backfillHistoryIfNeeded().ignore();
+
       // Wire WorkoutProvider's external hooks now that AI is loaded.
       workout.wireExternalHooks(
         weightModifier:  () => ai.insight.weightModifier,
@@ -319,6 +359,8 @@ class AppProvider extends ChangeNotifier {
 
       // Load athlete memory (persisted across sessions)
       await loadAthleteMemory();
+      // Planner coaching snoozes (RFC-PLANNER-UX-001) — today's only
+      await _loadInsightSnoozes();
       // Rebuild memory daily — stale if older than 24 hours
       if (_athleteMemory == null ||
           DateTime.now().difference(_athleteMemory!.updatedAt).inHours >= 24) {
@@ -334,8 +376,11 @@ class AppProvider extends ChangeNotifier {
       _scheduleMomentumNotifications();
       // Inactivity alert — schedule notification for 3 days after last workout
       _scheduleInactivityAlertIfNeeded();
-      // Initialize Health Connect silently — non-blocking, never crashes
-      _initHealthConnect().ignore();
+      // Initialize health platform silently — non-blocking, never crashes.
+      // RFC-002.6 sequencing constraint: runs AFTER all awaits above complete,
+      // which guarantees tryRestoreHistoryFromCloud() (called in LoginScreen)
+      // has already populated the local history dedup set before any sync runs.
+      _initHealthPlatform().ignore();
 
       // New week: ghost copy carries last week's plan with progressive weights.
       // Only fall back to smart-plan generation when there's no history to ghost from.
@@ -371,6 +416,7 @@ class AppProvider extends ChangeNotifier {
         daysMissed:       days,
         previousStreak:   workout.streak.currentStreak,
         consistencyScore: athleteMemory.consistencyScore,
+        aiMaturity:       aiMaturity,
         userName:         name,
       ).ignore();
       // Weekly narrative notification (Sunday evening)
@@ -515,8 +561,9 @@ class AppProvider extends ChangeNotifier {
       );
       // Recovery-ready notification — fires next morning when fully recovered
       await NotificationService.instance.scheduleRecoveryReadyNotification(
-        readiness: settings.todayReadiness,
-        userName:  user.name.isEmpty ? 'Champion' : user.name,
+        readiness:  settings.todayReadiness,
+        aiMaturity: aiMaturity,
+        userName:   user.name.isEmpty ? 'Champion' : user.name,
       );
     }
 
@@ -716,6 +763,18 @@ class AppProvider extends ChangeNotifier {
   }
 
   DecisionContext _buildDecisionContext() {
+    final hs = _latestHealthSnapshot;
+    final biometricCtx = hs.isConnected
+        ? BiometricContext(
+            hrv:         hs.hrv,
+            hrvBaseline: _hrvBaseline,
+            rhr:         hs.restingHeartRate,
+            sleepHours:  hs.sleepHours,
+            hasHrv:      hs.hasHrv,
+            hasRhr:      hs.hasRHR,
+            hasSleep:    hs.hasSleepData,
+          )
+        : null;
     return DecisionContext(
       recoveryState:         recoveryState,
       analyticsSnapshot:     analytics.snapshot,
@@ -732,6 +791,7 @@ class AppProvider extends ChangeNotifier {
       ),
       environmentContext:    EnvironmentContext(now: DateTime.now()),
       athleteMemorySnapshot: _evoMemorySnapshot,
+      biometricContext:      biometricCtx,
     );
   }
 
@@ -759,9 +819,12 @@ class AppProvider extends ChangeNotifier {
         previousWeeklyVolume: workout.previousWeeklyVolumeTotalKg,
         readiness:            settings.todayReadiness,
         now:                  now,
-        sleepHours:    hs.hasSleepData ? hs.sleepHours   : null,
-        todayStepCount: hs.hasStepsData ? hs.todaySteps   : null,
-        proteinAdherencePct:  _effectiveProteinAdherence(now),
+        sleepHours:         hs.hasSleepData ? hs.sleepHours        : null,
+        todayStepCount:     hs.hasStepsData ? hs.todaySteps        : null,
+        restingHeartRate:   hs.hasRHR       ? hs.restingHeartRate  : null,
+        hrv:                hs.hasHrv       ? hs.hrv               : null,
+        hrvBaseline:        _hrvBaseline,
+        proteinAdherencePct: _effectiveProteinAdherence(now),
       ),
     );
     _recoveryComputedAt = now;
@@ -920,6 +983,8 @@ class AppProvider extends ChangeNotifier {
   void invalidateRecoveryState() {
     _cachedRecoveryState      = null;
     _invalidateNarrative();
+    _cachedCoachingInsight     = null;
+    _coachingInsightComputedAt = null;
     _recoveryComputedAt       = null;
     _cachedRecoverySuggestion = null;
     _cachedAdjustment         = null;
@@ -934,6 +999,8 @@ class AppProvider extends ChangeNotifier {
     _adaptiveComputedAt          = null;
     _cachedBrainCardData         = null;
     _brainCardComputedAt         = null;
+    _cachedAIMaturity            = null;
+    _aiMaturityComputedAt        = null;
     _cachedCoachMessage          = null;
     _coachMessageComputedAt      = null;
     _cachedMemorySnapshot        = null;
@@ -1002,13 +1069,45 @@ class AppProvider extends ChangeNotifier {
     return snap.sleepHours;
   }
 
-  /// Today's step count from Health Connect.
-  /// Returns 0 when HC is unavailable, not connected, or has no step data.
+  /// Today's step count from Health Connect / HealthKit.
+  /// Returns 0 when unavailable, not connected, or no step data.
   int get healthTodaySteps {
     final snap = _latestHealthSnapshot;
     if (!snap.isConnected || !snap.hasStepsData) return 0;
     return snap.todaySteps;
   }
+
+  /// Yesterday's step count. Already fetched — zero extra HealthKit call.
+  int get healthYesterdaySteps {
+    final snap = _latestHealthSnapshot;
+    if (!snap.isConnected || !snap.hasStepsData) return 0;
+    return snap.yesterdaySteps;
+  }
+
+  /// Most recent resting heart rate in bpm. Null when unavailable.
+  double? get healthRHR {
+    final snap = _latestHealthSnapshot;
+    if (!snap.isConnected || !snap.hasRHR) return null;
+    return snap.restingHeartRate;
+  }
+
+  /// Active energy burned today in kcal. 0 when unavailable.
+  double get healthActiveEnergyKcal {
+    final snap = _latestHealthSnapshot;
+    if (!snap.isConnected || !snap.hasActiveEnergy) return 0.0;
+    return snap.activeEnergyKcal;
+  }
+
+  bool get hasHealthRHR           => _latestHealthSnapshot.hasRHR;
+  bool get hasHealthActiveEnergy  => _latestHealthSnapshot.hasActiveEnergy;
+
+  /// Overnight HRV (SDNN ms) from Apple Watch. Null until first reading available.
+  double? get healthHrv => _latestHealthSnapshot.hasHrv ? _latestHealthSnapshot.hrv : null;
+
+  /// Personal HRV baseline (EMA). Null until established after first reading.
+  double? get healthHrvBaseline => _hrvBaseline;
+
+  bool get hasHealthHrv => _latestHealthSnapshot.hasHrv;
 
   /// Title of the next non-rest training session after today in the week plan.
   /// Returns '' when today is the last training day, the rest of the week is rest days,
@@ -1035,32 +1134,49 @@ class AppProvider extends ChangeNotifier {
     return (muscle: muscle, hours: RecoveryEngine.muscleEtaHours(muscle, score));
   }
 
-  /// Show Health Connect permission dialog; if granted, refresh snapshot.
+  /// Show platform health permission dialog; if granted, refresh snapshot.
+  /// Routes to Health Connect (Android) or HealthKit (iOS) via HealthPlatformService.
   Future<bool> requestHealthPermissions() async {
-    final ok = await HealthConnectService.instance.requestPermissions();
+    final ok = await HealthPlatformService.instance.requestPermissions();
     if (ok) {
       await _refreshHealthSnapshot();
       invalidateRecoveryState();
+      // RFC-002.6B: trigger an incremental sync now that permission is granted.
+      HealthSyncEngine.instance.syncWorkouts(workout).ignore();
     }
     return ok;
   }
 
-  Future<void> _initHealthConnect() async {
+  Future<void> _initHealthPlatform() async {
     try {
-      final svc = HealthConnectService.instance;
+      if (Platform.isIOS) {
+        final prefs = await StorageService.instance.prefs();
+        // Never synced → user never granted access → skip all HealthKit calls.
+        // (HKHealthStore calls SIGKILL when the entitlement is missing from the
+        // signing identity; a fresh install must not touch HealthKit on startup.)
+        if (prefs.getString(StorageKeys.healthLastSyncDate) == null) return;
+        // Previously synced → restore Connected state + incremental workout sync.
+        // hasPermissions() is skipped: iOS never reveals read-authorization status,
+        // and data reads return empty gracefully if access was revoked.
+        await _refreshHealthSnapshot();
+        invalidateRecoveryState();
+        HealthSyncEngine.instance.syncWorkouts(workout).ignore();
+        return;
+      }
+
+      // Android path — unchanged.
+      final svc = HealthPlatformService.instance;
       final ok = await svc.initialize();
       if (!ok) return;
       final available = await svc.isAvailable();
       if (!available) return;
-      // hasPermissions() is unreliable for granted→false (known health pkg bug),
-      // but correctly returns false when never granted. Guard here prevents
-      // Android from logging READ_STEPS/READ_SLEEP missing on first launch.
       final granted = await svc.hasPermissions();
       if (!granted) return;
       await _refreshHealthSnapshot();
       invalidateRecoveryState();
+      HealthSyncEngine.instance.syncWorkouts(workout).ignore();
     } catch (_) {
-      // Health Connect is optional — never block app startup
+      // Health platform is optional — never block app startup.
     }
   }
 
@@ -1069,8 +1185,23 @@ class AppProvider extends ChangeNotifier {
     if (_healthSnapshotComputedAt != null &&
         now.difference(_healthSnapshotComputedAt!).inMinutes < 30) { return; }
     try {
-      _latestHealthSnapshot = await HealthConnectService.instance.fetchSnapshot();
+      _latestHealthSnapshot = await HealthPlatformService.instance.fetchSnapshot();
       _healthSnapshotComputedAt = now;
+
+      // Update personal HRV baseline (EMA: α=0.15 ≈ 6-day half-life).
+      // On first reading, baseline = today's value (modifier → 0, no false alarm).
+      if (_latestHealthSnapshot.hasHrv) {
+        final hrv   = _latestHealthSnapshot.hrv!;
+        final prefs = await StorageService.instance.prefs();
+        final stored = prefs.getDouble(StorageKeys.hrvBaseline);
+        final updated = stored == null ? hrv : stored * 0.85 + hrv * 0.15;
+        await prefs.setDouble(StorageKeys.hrvBaseline, updated);
+        _hrvBaseline = updated;
+      } else if (_hrvBaseline == null) {
+        // First run or no HRV yet — load whatever is already stored.
+        final prefs = await StorageService.instance.prefs();
+        _hrvBaseline = prefs.getDouble(StorageKeys.hrvBaseline);
+      }
     } catch (_) {
       _latestHealthSnapshot = HealthSnapshot.empty;
     }
@@ -1264,7 +1395,7 @@ class AppProvider extends ChangeNotifier {
       return _cachedAdaptive!;
     }
     final context = _buildDecisionContext();
-    _cachedAdaptive = _athleteBrain.computeDecision(context);
+    _cachedAdaptive = _athleteBrain.computeDecision(context, aiMaturity.allowedClaims);
     _adaptiveComputedAt = now;
     return _cachedAdaptive!;
   }
@@ -1334,6 +1465,56 @@ class AppProvider extends ChangeNotifier {
     return _cachedBrainCardData!;
   }
 
+  // ── AIMaturity — 5-minute TTL ─────────────────────────────────────────────
+  //
+  // Shadow-mode in Phase 1: computed and cached but not yet consumed by any
+  // surface. Phase 2 will migrate surfaces one by one to read from here
+  // instead of their own if(totalWorkouts < X) checks.
+  //
+  // Invalidated by invalidateRecoveryState() which already covers every
+  // event that could change the maturity level (workout completion, recovery
+  // state change).
+
+  AIMaturityState get aiMaturity {
+    final now = DateTime.now();
+    if (_cachedAIMaturity   != null &&
+        _aiMaturityComputedAt != null &&
+        now.difference(_aiMaturityComputedAt!).inSeconds < 300) {
+      return _cachedAIMaturity!;
+    }
+
+    // Re-entered while computing (via brainCardData → trainingAdjustment):
+    // return the stale cache if any, else a conservative zero-confidence
+    // evaluation. Never recurse into brainCardData from here.
+    if (_aiMaturityComputing) {
+      return _cachedAIMaturity ??
+          const AIMaturityEngine().evaluate(AIMaturityInput(
+            totalWorkouts:        totalWorkouts,
+            overallConfidence:    0.0,
+            consistencyScore:     athleteMemory.consistencyScore,
+            hrvBaselineAvailable: _hrvBaseline != null,
+            daysSinceLastWorkout: workout.daysSinceLastWorkout,
+          ));
+    }
+
+    _aiMaturityComputing = true;
+    try {
+      final input = AIMaturityInput(
+        totalWorkouts:        totalWorkouts,
+        overallConfidence:    brainCardData.confidencePct / 100.0,
+        consistencyScore:     athleteMemory.consistencyScore,
+        hrvBaselineAvailable: _hrvBaseline != null,
+        daysSinceLastWorkout: workout.daysSinceLastWorkout,
+      );
+
+      _cachedAIMaturity     = const AIMaturityEngine().evaluate(input);
+      _aiMaturityComputedAt = now;
+      return _cachedAIMaturity!;
+    } finally {
+      _aiMaturityComputing = false;
+    }
+  }
+
   // ── CoachBrain — 5-minute TTL ─────────────────────────────────────────────
 
   CoachBrainContext _buildCoachContext() {
@@ -1356,13 +1537,14 @@ class AppProvider extends ChangeNotifier {
       adaptiveDecision:      adaptiveDecision,
       recoveryState:         recoveryState,
       decisionConfidence:    confidence,
+      aiMaturity:            aiMaturity,
     );
   }
 
   /// Deterministic coaching message for today. Cached 5 minutes.
   /// Only CoachBrainService produces this; no other service is involved.
   BrainCoachMessage get coachMessage {
-    if (workout.streak.totalWorkouts == 0) return BrainCoachMessage.onboarding;
+    if (aiMaturity.phase == AIMaturityPhase.baseline) return BrainCoachMessage.onboarding;
 
     final now = DateTime.now();
     if (_cachedCoachMessage  != null &&
@@ -1384,7 +1566,8 @@ class AppProvider extends ChangeNotifier {
     final obs = _dailyObservation;
     if (obs == null ||
         msg.priority > 2 ||
-        DateTime.now().weekday == DateTime.monday) {
+        DateTime.now().weekday == DateTime.monday ||
+        !aiMaturity.allowedClaims.content.canMakeObservation) {
       return msg;
     }
     _dailyObservation = null;
@@ -1507,6 +1690,7 @@ class AppProvider extends ChangeNotifier {
       adaptiveDecision:      adaptiveDecision,
       brainCardData:         brainCardData,
       decisionConfidence:    confidence,
+      aiMaturity:            aiMaturity,
     );
   }
 
@@ -1543,6 +1727,72 @@ class AppProvider extends ChangeNotifier {
 
   String get recoveryAlignedMessage => adaptiveDecision.recoveryAlignedMessage;
   bool   get isComebackSession      => adaptiveDecision.focus == AdaptiveTrainingFocus.comebackSession;
+
+  // ── Planner banner + coaching slot (RFC-PLANNER-UX-001) ───────────────────
+
+  /// Single source of truth for which banner occupies the Planner's top
+  /// contextual slot. Priority order preserved from the original
+  /// _ContextualBannerSlot selector. The coaching arbiter reads this too
+  /// (Amendment 3), so the two slots can never disagree.
+  PlannerBannerType get activePlannerBanner {
+    if (overTrainingRisk > 60)          return PlannerBannerType.overtraining;
+    if (injuryRisks.isNotEmpty)         return PlannerBannerType.injury;
+    if (showComebackBanner)             return PlannerBannerType.comeback;
+    if (trainingAdjustment.isModified)  return PlannerBannerType.recoveryDirective;
+    if (shouldSuggestPlanRefresh)       return PlannerBannerType.adaptive;
+    if (showNewWeekBanner)              return PlannerBannerType.newWeek;
+    return PlannerBannerType.ai;
+  }
+
+  /// The single coaching insight for today's plan, or null → render nothing.
+  /// 5-minute TTL; invalidated by [invalidateRecoveryState] and
+  /// [snoozePlannerInsight].
+  PlannerCoachingInsight? get plannerCoachingInsight {
+    final now = DateTime.now();
+    if (_coachingInsightComputedAt != null &&
+        now.difference(_coachingInsightComputedAt!).inSeconds < 300) {
+      return _cachedCoachingInsight;
+    }
+    _cachedCoachingInsight = const PlannerCoachingArbiter().select(
+      ap:           this,
+      day:          workout.todayPlan,
+      snoozedToday: _snoozedInsightsToday,
+    );
+    _coachingInsightComputedAt = now;
+    return _cachedCoachingInsight;
+  }
+
+  /// Amendment 1 — snooze a coaching insight for the rest of today.
+  Future<void> snoozePlannerInsight(String key) async {
+    _snoozedInsightsToday.add(key);
+    _cachedCoachingInsight     = null;
+    _coachingInsightComputedAt = null;
+    notifyListeners();
+    try {
+      final map = {for (final k in _snoozedInsightsToday) k: _todayKey};
+      await StorageService.instance.setString(
+          StorageKeys.plannerInsightSnooze, jsonEncode(map));
+    } catch (e) {
+      debugPrint('snoozePlannerInsight persist error: $e');
+    }
+  }
+
+  /// Load today's snoozes; entries from previous days are dropped (and the
+  /// pruned map is not rewritten — it self-heals on the next snooze).
+  Future<void> _loadInsightSnoozes() async {
+    try {
+      final raw = await StorageService.instance
+          .getString(StorageKeys.plannerInsightSnooze);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      decoded.forEach((k, v) {
+        if (v == _todayKey) _snoozedInsightsToday.add(k as String);
+      });
+    } catch (e) {
+      debugPrint('loadInsightSnoozes error: $e');
+    }
+  }
 
   // ── AthleteMemorySnapshot — 5-minute TTL ──────────────────────────────
   AthleteMemorySnapshot get athleteMemorySnapshot {
@@ -1743,12 +1993,90 @@ class AppProvider extends ChangeNotifier {
       return _cachedAdjustment!;
     }
     _cachedAdjustment = TrainingAdjustmentService.compute(
-      recovery: recoveryState,
-      context:  coachContext,
-      day:      workout.todayPlan,
+      recovery:                recoveryState,
+      context:                 coachContext,
+      day:                     workout.todayPlan,
+      canShowAdaptiveIncrease: aiMaturity.allowedClaims.ui.canShowAdaptiveIncrease,
     );
     _adjustmentComputedAt = now;
     return _cachedAdjustment!;
+  }
+
+  // ── RFC-006 Adaptive Session public API ────────────────────────────────────
+
+  String get _todayKey {
+    final n = DateTime.now();
+    return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
+  }
+
+  /// The active adaptive session for today; null when not started or declined.
+  AdaptiveSession? get adaptiveSession =>
+      (_adaptiveSession?.dayKey == _todayKey) ? _adaptiveSession : null;
+
+  /// True when the user already chose "Use Original Plan" today.
+  bool get adaptiveDeclinedToday => _adaptiveDeclinedKey == _todayKey;
+
+  /// Build and activate today's adaptive session.
+  void startAdaptiveSession() {
+    final adj  = trainingAdjustment;
+    if (!adj.isModified) return;
+    final card       = brainCardData;
+    final confidence = card.confidencePct / 100.0;
+    final signals    = card.dominantSignals;
+
+    _adaptiveSession     = AdaptiveSessionService.build(
+      day:              workout.todayPlan,
+      adjustment:       adj,
+      confidence:       confidence,
+      dominantSignals:  signals,
+      dayKey:           _todayKey,
+    );
+    _adaptiveDeclinedKey = null;
+    _logAdaptiveEvent(accepted: true,  adj: adj, confidence: confidence, reasons: signals);
+    notifyListeners();
+  }
+
+  /// User chose to stick with the original plan — suppress adaptive UI for today.
+  void declineAdaptiveSession() {
+    final adj  = trainingAdjustment;
+    final card = brainCardData;
+    _adaptiveDeclinedKey = _todayKey;
+    _adaptiveSession     = null;
+    _logAdaptiveEvent(
+      accepted:   false,
+      adj:        adj,
+      confidence: card.confidencePct / 100.0,
+      reasons:    card.dominantSignals,
+    );
+    notifyListeners();
+  }
+
+  /// Clear the adaptive session (called when workout completes or day rolls over).
+  void clearAdaptiveSession() {
+    _adaptiveSession = null;
+    notifyListeners();
+  }
+
+  Future<void> _logAdaptiveEvent({
+    required bool accepted,
+    required TrainingAdjustment adj,
+    required double confidence,
+    required List<String> reasons,
+  }) async {
+    try {
+      final prefs = await StorageService.instance.prefs();
+      final raw   = prefs.getStringList('adaptive_events') ?? [];
+      raw.add(json.encode({
+        'date':          _todayKey,
+        'accepted':      accepted,
+        'intensityMult': adj.intensityMultiplier,
+        'volumeMult':    adj.volumeMultiplier,
+        'confidence':    confidence,
+        'reasons':       reasons,
+      }));
+      if (raw.length > 90) raw.removeRange(0, raw.length - 90);
+      await prefs.setStringList('adaptive_events', raw);
+    } catch (_) {}
   }
 
   // ── Planner narrative — phase-routed through NarrativeOrchestrator ────────
@@ -2213,6 +2541,13 @@ class AppProvider extends ChangeNotifier {
     String fmtGap(double g) =>
         g == g.roundToDouble() ? '${g.round()} kg' : '${g.toStringAsFixed(1)} kg';
 
+    // Returns a PR-proximity phrase that handles gap == 0 gracefully.
+    // gap == 0 → planned weight IS the all-time best → "at your all-time best"
+    // gap  > 0 → "within X kg of your all-time best"
+    String prProximity(String label, double gap) => gap == 0
+        ? '$label is at your all-time best'
+        : '$label is within ${fmtGap(gap)} of your all-time best';
+
     final List<({String label, double gap, bool isStrong})> prOpps = [];
 
     for (final ex in plan.exercises) {
@@ -2243,7 +2578,7 @@ class AppProvider extends ChangeNotifier {
         final exNote = compounds.isNotEmpty
             ? 'Quality sets on ${compounds[0]} — skip max-effort attempts today.'
             : 'Solid working sets — skip max-effort attempts today.';
-        return '$title day. Sleep logged at ${sleepStr}h — '
+        return '$title. Sleep logged at ${sleepStr}h — '
             'recovery supports training, but reduced sleep may limit peak output. $exNote';
       }
 
@@ -2256,17 +2591,17 @@ class AppProvider extends ChangeNotifier {
           if (prOpps.length >= 2) {
             final ex1 = prOpps[0].label;
             final ex2 = prOpps[1].label;
-            return '$title day. Sleep at ${sleepStr}h — '
+            return '$title. Sleep at ${sleepStr}h — '
                 '$ex1 and $ex2 are in PR territory. '
                 'Strong recovery foundation supports max attempts today.';
           }
           final opp = prOpps.first;
           if (opp.isStrong) {
-            return '$title day. Sleep at ${sleepStr}h — '
-                '${opp.label} is within ${fmtGap(opp.gap)} of your all-time best. '
+            return '$title. Sleep at ${sleepStr}h — '
+                '${prProximity(opp.label, opp.gap)}. '
                 'Prime conditions for an attempt today.';
           }
-          return '$title day. Sleep at ${sleepStr}h — '
+          return '$title. Sleep at ${sleepStr}h — '
               '${opp.label} is in PR territory. '
               'Recovery supports progressive loading today.';
         }
@@ -2275,63 +2610,63 @@ class AppProvider extends ChangeNotifier {
           final count = prOpps.length;
           final ex1   = prOpps[0].label;
           final ex2   = prOpps[1].label;
-          return '$title day. $count exercises in PR territory: $ex1 and $ex2. '
+          return '$title. $count exercises in PR territory: $ex1 and $ex2. '
               'Recovery at $recovery% — good conditions for an attempt.';
         }
         final opp = prOpps.first;
         if (opp.isStrong) {
-          return '$title day. ${opp.label} is within ${fmtGap(opp.gap)} of your all-time best — '
+          return '$title. ${prProximity(opp.label, opp.gap)} — '
               'recovery supports an attempt today.';
         }
-        return '$title day. ${opp.label} is in PR territory — '
+        return '$title. ${opp.label} is in PR territory — '
             'focus on progressive loading today.';
       }
 
       if (strongSleep) {
         // Both recovery and sleep optimal — amplify progressive intent.
         if (compounds.length >= 2) {
-          return '$title day. Sleep at ${sleepStr}h — strong recovery foundation. '
+          return '$title. Sleep at ${sleepStr}h — strong recovery foundation. '
               'Target 1–2 PR attempts on ${compounds[0]} and ${compounds[1]}.';
         }
         if (compounds.isNotEmpty) {
-          return '$title day. Sleep at ${sleepStr}h — strong recovery foundation. '
+          return '$title. Sleep at ${sleepStr}h — strong recovery foundation. '
               'Target a PR on ${compounds[0]} today.';
         }
-        return '$title day. Sleep at ${sleepStr}h — strong recovery foundation. '
+        return '$title. Sleep at ${sleepStr}h — strong recovery foundation. '
             'Full training intensity is supported today.';
       }
       // 6–8h sleep or no HC data — standard high-recovery message.
       if (compounds.length >= 2) {
-        return '$title day. Recovery at $recovery% — '
+        return '$title. Recovery at $recovery% — '
             'target 1–2 PR attempts on ${compounds[0]} and ${compounds[1]}.';
       }
       if (compounds.isNotEmpty) {
-        return '$title day. Strong recovery — '
+        return '$title. Strong recovery — '
             'target a PR on ${compounds[0]} today.';
       }
-      return '$title day. Recovery is strong — push intensity across all sets.';
+      return '$title. Recovery is strong — push intensity across all sets.';
     }
 
     // ── Moderate recovery (60–79%) ────────────────────────────────────────────
     if (ctx.overallRecovery >= 60) {
       if (poorSleep) {
-        return '$title day. Sleep logged at ${sleepStr}h — '
+        return '$title. Sleep logged at ${sleepStr}h — '
             'recovery supports productive training. '
             'Maintain current loading and focus on execution quality.';
       }
       if (compounds.isNotEmpty) {
-        return '$title day. Good conditions — '
+        return '$title. Good conditions — '
             'prioritise quality on ${compounds[0]}. Maintain current loading.';
       }
-      return '$title day. Solid session conditions. Focus on execution quality.';
+      return '$title. Solid session conditions. Focus on execution quality.';
     }
 
     // ── Low recovery (< 60%) ─────────────────────────────────────────────────
     if (poorSleep) {
-      return '$title day. Sleep logged at ${sleepStr}h. '
+      return '$title. Sleep logged at ${sleepStr}h. '
           'Keep intensity managed — form over load on all sets today.';
     }
-    return '$title day. Keep intensity managed — '
+    return '$title. Keep intensity managed — '
         'form over load on all sets today.';
   }
 
@@ -2942,7 +3277,7 @@ class AppProvider extends ChangeNotifier {
       workout.appendMissedToToday(missedDayIdx);
   void resetWeek() => workout.resetWeek();
   void toggleRestDay(int i) => workout.toggleRestDay(i);
-  void addExercise(int dayIndex, {
+  Future<void> addExercise(int dayIndex, {
     required String name,
     required String category,
     required String emoji,
@@ -2993,8 +3328,18 @@ class AppProvider extends ChangeNotifier {
       {int? reps, double? weight, int? rir, bool clearRir = false}) =>
       workout.updateSet(dayIndex, exId, setId,
           reps: reps, weight: weight, rir: rir, clearRir: clearRir);
-  void toggleSetDone(int dayIndex, String exId, String setId) =>
-      workout.toggleSetDone(dayIndex, exId, setId);
+  void toggleSetDone(
+    int dayIndex,
+    String exId,
+    String setId, {
+    double? effectiveWeight,
+    double? plannedWeight,
+  }) =>
+      workout.toggleSetDone(
+        dayIndex, exId, setId,
+        effectiveWeight: effectiveWeight,
+        plannedWeight:   plannedWeight,
+      );
   void applyAISuggestion(int dayIndex, List<String> suggestions) =>
       workout.applyAISuggestion(dayIndex, suggestions);
 
@@ -3235,8 +3580,8 @@ class AppProvider extends ChangeNotifier {
           final logs = w.logs.where((l) => l.exercise == ex.baseId).toList();
           final lastWeight = logs.isNotEmpty ? logs.last.weight : 0.0;
           if (lastWeight > 0) {
-            final next = (lastWeight * 1.025).toStringAsFixed(1);
-            return 'Last ${ex.name}: ${lastWeight}kg — try ${next}kg today.';
+            final next = WeightRounder.round(lastWeight * 1.025, ex.equipment);
+            return 'Last ${ex.name}: ${lastWeight}kg — try ${next.toStringAsFixed(1)}kg today.';
           }
         }
       }

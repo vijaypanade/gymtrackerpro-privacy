@@ -90,6 +90,25 @@ class AdaptiveWorkoutDecision {
     required this.computedAt,
   });
 
+  AdaptiveWorkoutDecision copyWith({String? athleteFacingMessage}) =>
+      AdaptiveWorkoutDecision(
+        shouldModifyWorkout:         shouldModifyWorkout,
+        intensityMultiplier:         intensityMultiplier,
+        volumeMultiplier:            volumeMultiplier,
+        shouldReduceAxialLoad:       shouldReduceAxialLoad,
+        shouldInsertDeload:          shouldInsertDeload,
+        shouldSwapExercises:         shouldSwapExercises,
+        shouldReduceFailureTraining: shouldReduceFailureTraining,
+        swaps:                       swaps,
+        suppressedMuscles:           suppressedMuscles,
+        prioritizedMuscles:          prioritizedMuscles,
+        focus:                       focus,
+        reasoning:                   reasoning,
+        athleteFacingMessage:        athleteFacingMessage ?? this.athleteFacingMessage,
+        recoveryAlignedMessage:      recoveryAlignedMessage,
+        computedAt:                  computedAt,
+      );
+
   static AdaptiveWorkoutDecision get baseline => AdaptiveWorkoutDecision(
     shouldModifyWorkout:         false,
     intensityMultiplier:         1.0,
@@ -154,9 +173,19 @@ class AdaptiveInput {
   final double weeklyImprovementPct;
   final bool   isOnPlateau;
   final int    daysSinceLastWorkout;
-  final int    totalWorkouts;
   /// 'muscle_gain' | 'strength' | 'endurance' | 'fat_loss'
   final String goal;
+
+  // ── AI maturity trust gates ────────────────────────────────────────────────
+  /// Whether the AI has earned enough trust to recommend increasing workload.
+  /// Source: aiMaturity.allowedClaims.ui.canShowAdaptiveIncrease
+  /// When false, increase-focused modes (overload, strengthPush, hypertrophyPush)
+  /// fall back to conservative alternatives. Reductions are never gated.
+  final bool canShowAdaptiveIncrease;
+  /// Whether the AI may make forward projections about the athlete's performance.
+  /// Source: aiMaturity.allowedClaims.content.canMakePrediction
+  /// Any future prediction language in generated messages must check this flag.
+  final bool canMakePrediction;
 
   // ── Exercise context ──────────────────────────────────────────────────────
   /// Today's planned exercise names — used for swap matching.
@@ -188,11 +217,12 @@ class AdaptiveInput {
     required this.weeklyImprovementPct,
     required this.isOnPlateau,
     required this.daysSinceLastWorkout,
-    required this.totalWorkouts,
     required this.goal,
     required this.todayExerciseNames,
     required this.todayExerciseCategories,
     required this.now,
+    required this.canShowAdaptiveIncrease,
+    required this.canMakePrediction,
   });
 }
 
@@ -237,8 +267,6 @@ class AdaptiveProgrammingService {
   static final List<_SwapRule> _kSwapRules = _buildSwapRules();
 
   static AdaptiveWorkoutDecision compute(AdaptiveInput i) {
-    if (i.totalWorkouts < 3) return AdaptiveWorkoutDecision.baseline;
-
     // ── 1. Focus mode ─────────────────────────────────────────────────────
     final focus = _focus(i);
 
@@ -334,20 +362,23 @@ class AdaptiveProgrammingService {
         (i.recoveryCollapseRiskLevel >= 1 && i.recoveryScore < 70)) {
       return AdaptiveTrainingFocus.recovery;
     }
-    // 4. Overload — prime conditions
-    if (i.recoveryScore >= 85 &&
+    // 4. Overload — prime conditions; requires canShowAdaptiveIncrease
+    if (i.canShowAdaptiveIncrease &&
+        i.recoveryScore >= 85 &&
         i.momentumLevel >= 2 &&
         !i.highFatigue &&
         i.overreachingRiskLevel <= 1 &&
         i.overloadReadinessLevel >= 3) {
       return AdaptiveTrainingFocus.overload;
     }
-    // 5. Strength push — peaking momentum + strength goal
-    if (i.momentumLevel >= 3 && i.goal == 'strength' && i.recoveryScore >= 72) {
+    // 5. Strength push — peaking momentum + strength goal; requires canShowAdaptiveIncrease
+    if (i.canShowAdaptiveIncrease &&
+        i.momentumLevel >= 3 && i.goal == 'strength' && i.recoveryScore >= 72) {
       return AdaptiveTrainingFocus.strengthPush;
     }
-    // 6. Hypertrophy push — plateau + muscle gain goal
-    if (i.plateauRiskLevel >= 2 && i.goal == 'muscle_gain' && i.recoveryScore >= 65) {
+    // 6. Hypertrophy push — plateau + muscle gain goal; requires canShowAdaptiveIncrease
+    if (i.canShowAdaptiveIncrease &&
+        i.plateauRiskLevel >= 2 && i.goal == 'muscle_gain' && i.recoveryScore >= 65) {
       return AdaptiveTrainingFocus.hypertrophyPush;
     }
     // 7. Technical session — moderate recovery zone
@@ -435,14 +466,12 @@ class AdaptiveProgrammingService {
     final hasLeg   = suppressed.any(legSet.contains);
     final hasUpper = suppressed.any(upperSet.contains);
     if (hasLeg && !hasUpper) {
-      return 'Lower-body recovery is still progressing. '
-          'Today\'s upper-body focus aligns well.';
+      return "Your legs are still recovering — great time to work on upper body today.";
     }
     if (hasUpper && !hasLeg) {
-      return 'Upper-body recovery is ongoing. '
-          'Your current session selection supports this.';
+      return "Your upper body is still recovering — today's lower body session gives it time to rest.";
     }
-    return 'Recovery conditions support your planned session today.';
+    return "Your body's recovery looks good for today's session.";
   }
 
   // ── Athlete-facing message ────────────────────────────────────────────────
@@ -455,47 +484,47 @@ class AdaptiveProgrammingService {
   ) {
     switch (focus) {
       case AdaptiveTrainingFocus.overload:
-        return 'Recovery and momentum support heavier compound loading today.';
+        return "You're feeling great today — push harder than usual, your body is ready for it.";
 
       case AdaptiveTrainingFocus.recovery:
         if (i.suppressedMuscles.contains('back') &&
             _conflictsWithToday(['back'], i.todayExerciseCategories)) {
-          return 'Back fatigue is elevated — shifting pull volume toward chest-supported work.';
+          return "Your back is still recovering — switching to exercises that take pressure off it today.";
         }
         if (i.suppressedMuscles.any(
                 (m) => ['legs', 'quads', 'hamstrings', 'glutes'].contains(m)) &&
             _conflictsWithToday(
                 ['legs', 'quads', 'hamstrings', 'glutes'], i.todayExerciseCategories)) {
-          return 'Leg fatigue is elevated — redirecting to upper body or machine work today.';
+          return "Your legs are still tired — let's work upper body or use machines instead today.";
         }
         // Suppressed muscles don't affect today's session — no false warning.
         if (i.suppressedMuscles.isNotEmpty &&
             !_conflictsWithToday(i.suppressedMuscles, i.todayExerciseCategories)) {
           return '';
         }
-        return 'Recovery is suppressed. Leave 1–2 reps in reserve and prioritize movement quality.';
+        return "Your body needs a bit more time to recover. Stop each set a little early and focus on good form.";
 
       case AdaptiveTrainingFocus.deload:
-        return 'Technique and recovery take priority this session.';
+        return 'Easy day today — use lighter weights and just focus on moving well.';
 
       case AdaptiveTrainingFocus.comebackSession:
         return i.daysSinceLastWorkout >= 4
-            ? 'Shorter session today keeps momentum rebuilding without excess fatigue.'
-            : 'Short session is enough. Showing up matters more than duration today.';
+            ? "Great that you're back — just a short session today to get your body moving again. Every session counts."
+            : "Just showing up today is a win — even a short workout is enough. Let's do this.";
 
       case AdaptiveTrainingFocus.hypertrophyPush:
-        return 'Stimulus change supports adaptation breakthrough. Extend rep ranges today.';
+        return "Good time to try doing more reps than usual — your body is ready for a new challenge.";
 
       case AdaptiveTrainingFocus.strengthPush:
-        return 'Momentum and recovery are aligned for compound strength work today.';
+        return "Great day to go heavier than usual — your body is well-rested and ready for it.";
 
       case AdaptiveTrainingFocus.technicalSession:
-        return 'Moderate fatigue — focus on quality movement over maximal load today.';
+        return "You're a bit tired today — focus on doing each rep with good form rather than going heavy.";
 
       case AdaptiveTrainingFocus.maintain:
         // Only show message if modifications are still needed despite maintain focus
         if (reduceAxial || swaps.isNotEmpty) {
-          return 'Session adjustments recommended based on current recovery signals.';
+          return "I've adjusted today's session slightly based on how your body is recovering.";
         }
         return '';
     }

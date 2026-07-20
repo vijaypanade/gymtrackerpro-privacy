@@ -6,12 +6,13 @@
 //   ④ Rarity: Normal / Strong / Elite / Legendary
 //   ⑤ Visual: scale + shake + XP explosion + micro-vibration
 //   ⑥ Continue loop — "Next Set Ready" / "Push Next Target"
-import 'dart:math';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:screenshot/screenshot.dart';
-import 'package:share_plus/share_plus.dart';
 import 'dart:io';
+import 'dart:math';
+import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../utils/app_constants.dart';
@@ -440,7 +441,7 @@ class _PRScreen extends StatefulWidget {
 class _PRScreenState extends State<_PRScreen>
     with TickerProviderStateMixin {
 
-  final ScreenshotController _screenshotCtrl = ScreenshotController();
+  final GlobalKey _repaintKey = GlobalKey();
 
   late AnimationController _trophyC, _cardC, _weightC, _shimmerC;
   late Animation<double> _trophy, _card, _weightScale, _shimmer;
@@ -602,24 +603,55 @@ class _PRScreenState extends State<_PRScreen>
   }
 
 
+  bool _shareBusy = false;
+
+  Future<File?> _captureCard() async {
+    try {
+      final boundary = _repaintKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      // Let any pending frame settle before capturing.
+      await Future.delayed(const Duration(milliseconds: 60));
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+      final dir = await getTemporaryDirectory();
+      final f = File(
+          '${dir.path}/pr_${DateTime.now().millisecondsSinceEpoch}.png');
+      await f.writeAsBytes(byteData.buffer.asUint8List());
+      return f;
+    } catch (e) {
+      debugPrint('PR capture error: $e');
+      return null;
+    }
+  }
+
   Future<void> _sharePR() async {
+    if (_shareBusy) return;
+    _shareBusy = true;
     HapticFeedback.mediumImpact();
     try {
-      final image = await _screenshotCtrl.capture(
-        delay: const Duration(milliseconds: 100),
-        pixelRatio: 3.0,
-      );
-      if (image == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/pr_${DateTime.now().millisecondsSinceEpoch}.png');
-      await file.writeAsBytes(image);
+      final file = await _captureCard();
+      if (file == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not capture — try again.')),
+          );
+        }
+        return;
+      }
+      // Share while dialog is still visible — Flutter overlays are not UIKit
+      // modals, so UIActivityViewController presents without conflict.
       await Share.shareXFiles(
         [XFile(file.path)],
         text: '🔥 New PR: ${_formatName(widget.exerciseName)} — $_prValue\n'
-              'Powered by LiftOn 💪',
+            'Powered by LiftOn 💪',
       );
     } catch (e) {
       debugPrint('Share PR error: $e');
+    } finally {
+      _shareBusy = false;
     }
   }
 
@@ -634,8 +666,8 @@ class _PRScreenState extends State<_PRScreen>
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
-              child: Screenshot(
-                controller: _screenshotCtrl,
+              child: RepaintBoundary(
+                key: _repaintKey,
                 child: Container(
                   color: Colors.black,
                   padding: const EdgeInsets.all(14),

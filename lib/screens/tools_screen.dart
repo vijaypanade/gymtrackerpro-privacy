@@ -82,10 +82,10 @@ class ToolsScreen extends StatelessWidget {
               title: Column(crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min, children: [
                 Text('HEALTH TOOLS', style: TextStyle(fontFamily: 'Rajdhani',
-                    color: AppColors.textPrimary, fontSize: 20,
+                    color: AppColors.textPrimary, fontSize: 22,
                     fontWeight: FontWeight.w900, letterSpacing: 1.8)),
                 Text('Your daily toolkit', style: TextStyle(fontFamily: 'Inter',
-                    color: AppColors.textMuted, fontSize: 11)),
+                    color: AppColors.textMuted, fontSize: 13)),
               ]),
             ),
             SliverPadding(
@@ -135,7 +135,7 @@ class ToolsScreen extends StatelessWidget {
                     _toolDivider(),
                     _ToolCard(
                       title: 'Voice Coach',
-                      subtitle: 'Multi-language workout coaching',
+                      subtitle: 'English workout coaching',
                       icon: Icons.mic_none_rounded,
                       color: AppColors.gold,
                       tag: 'New',
@@ -148,6 +148,11 @@ class ToolsScreen extends StatelessWidget {
                 const _SLabel(text: 'SMART REMINDERS'),
                 const SizedBox(height: AppSpacing.sm),
                 const _RemindersCard(),
+
+                const SizedBox(height: AppSpacing.lg),
+                const _SLabel(text: 'DISPLAY'),
+                const SizedBox(height: AppSpacing.sm),
+                const _DisplayCard(),
 
                 const SizedBox(height: AppSpacing.lg),
               ])),
@@ -193,7 +198,7 @@ class _SLabel extends StatelessWidget {
         style: const TextStyle(
           fontFamily: 'Inter',
           color: Color(0xFF8A8A8A),
-          fontSize: 11,
+          fontSize: 13,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.4,
         ),
@@ -284,7 +289,7 @@ class _ToolCardState extends State<_ToolCard>
             style: TextStyle(
               fontFamily: 'Inter',
               color: Colors.white.withValues(alpha: 0.92),
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.2,
             ),
@@ -295,7 +300,7 @@ class _ToolCardState extends State<_ToolCard>
             style: TextStyle(
               fontFamily: 'Inter',
               color: Colors.white.withValues(alpha: 0.42),
-              fontSize: 11.5,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
               height: 1.25,
             ),
@@ -307,7 +312,7 @@ class _ToolCardState extends State<_ToolCard>
             style: TextStyle(
               fontFamily: 'Inter',
               color: Colors.white.withValues(alpha: 0.28),
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.2,
             ),
@@ -393,13 +398,13 @@ class _CalculatorsCardState extends State<_CalculatorsCard>
                 Text('Calculators',
                     style: TextStyle(fontFamily: 'Inter',
                         color: Colors.white.withValues(alpha: 0.92),
-                        fontSize: 15, fontWeight: FontWeight.w600,
+                        fontSize: 16, fontWeight: FontWeight.w600,
                         letterSpacing: -0.2)),
                 const SizedBox(height: 3),
                 Text('BMI · Calories · 1RM · Body Stats',
                     style: TextStyle(fontFamily: 'Inter',
                         color: Colors.white.withValues(alpha: 0.38),
-                        fontSize: 11.5)),
+                        fontSize: 13)),
               ],
             )),
             Icon(Icons.arrow_forward_ios_rounded,
@@ -547,11 +552,11 @@ class _CalcRow extends StatelessWidget {
             children: [
               Text(title, style: TextStyle(fontFamily: 'Inter',
                   color: Colors.white.withValues(alpha: 0.90),
-                  fontSize: 14, fontWeight: FontWeight.w600)),
+                  fontSize: 15, fontWeight: FontWeight.w600)),
               const SizedBox(height: 2),
               Text(subtitle, style: TextStyle(fontFamily: 'Inter',
                   color: Colors.white.withValues(alpha: 0.38),
-                  fontSize: 11)),
+                  fontSize: 13)),
             ],
           )),
           Icon(Icons.arrow_forward_ios_rounded,
@@ -621,7 +626,7 @@ class _SheetWrap extends StatelessWidget {
                   color: AppColors.textPrimary, fontSize: 22,
                   fontWeight: FontWeight.w800)),
               Text(subtitle, style: const TextStyle(fontFamily: 'Inter',
-                  color: AppColors.textMuted, fontSize: 12)),
+                  color: AppColors.textMuted, fontSize: 14)),
             ])),
           ]),
           const SizedBox(height: AppSpacing.xl),
@@ -719,14 +724,14 @@ class _BMISheetState extends State<_BMISheet>
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(_cat, style: TextStyle(fontFamily: 'Inter',
-                        color: _catColor, fontSize: 13,
+                        color: _catColor, fontSize: 14,
                         fontWeight: FontWeight.w700)),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   _BMIArcBar(bmi: _bmi!, progress: _animA.value),
                   const SizedBox(height: AppSpacing.md),
                   Text(_bmiAdvice(_bmi!), style: const TextStyle(fontFamily: 'Inter',
-                      color: AppColors.textSecondary, fontSize: 12,
+                      color: AppColors.textSecondary, fontSize: 14,
                       height: 1.5), textAlign: TextAlign.center),
                 ]),
               ),
@@ -875,7 +880,7 @@ class _CalorieSheetState extends State<_CalorieSheet>
       ]),
       const SizedBox(height: AppSpacing.lg),
       const Text('Activity Level', style: TextStyle(fontFamily: 'Inter',
-          color: AppColors.textMuted, fontSize: 12,
+          color: AppColors.textMuted, fontSize: 13,
           fontWeight: FontWeight.w600)),
       const SizedBox(height: AppSpacing.sm),
       Wrap(spacing: 8, runSpacing: 8,
@@ -901,7 +906,7 @@ class _CalorieSheetState extends State<_CalorieSheet>
               ),
               child: Text('${_actEmoji[a]} $a', style: TextStyle(fontFamily: 'Inter',
                   color: sel ? AppColors.gold : AppColors.textSecondary,
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: sel ? FontWeight.w700 : FontWeight.w400)),
             ),
           );
@@ -951,7 +956,7 @@ class _CalorieSheetState extends State<_CalorieSheet>
                         Text(label, style: TextStyle(fontFamily: 'Inter',
                             color: isMain ? AppColors.gold
                                 : AppColors.textSecondary,
-                            fontSize: 13, fontWeight: isMain
+                            fontSize: 14, fontWeight: isMain
                             ? FontWeight.w700 : FontWeight.w500)),
                         Text('$value kcal', style: TextStyle(fontFamily: 'Rajdhani',
                             color: color, fontSize: 18,
@@ -1047,17 +1052,17 @@ class _AIWorkoutGeneratorState extends State<_AIWorkoutGenerator> {
           const Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Workout Generator', style: TextStyle(fontFamily: 'Rajdhani',
-                color: AppColors.textPrimary, fontSize: 17,
+                color: AppColors.textPrimary, fontSize: 18,
                 fontWeight: FontWeight.w800)),
             Text('Personalised for your body & goal',
                 style: TextStyle(fontFamily: 'Inter',
-                    color: AppColors.textMuted, fontSize: 11)),
+                    color: AppColors.textMuted, fontSize: 13)),
           ])),
         ]),
 
         const SizedBox(height: AppSpacing.lg),
         const Text('YOUR GOAL', style: TextStyle(fontFamily: 'Inter',
-            color: AppColors.textMuted, fontSize: 10,
+            color: AppColors.textMuted, fontSize: 12,
             fontWeight: FontWeight.w800, letterSpacing: 1)),
         const SizedBox(height: AppSpacing.sm),
         Row(children: _goals.map((g) {
@@ -1082,7 +1087,7 @@ class _AIWorkoutGeneratorState extends State<_AIWorkoutGenerator> {
                 const SizedBox(height: 3),
                 Text(g, style: TextStyle(fontFamily: 'Inter',
                     color: sel ? c : AppColors.textMuted,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: sel ? FontWeight.w700 : FontWeight.w400),
                     textAlign: TextAlign.center),
               ]),
@@ -1152,12 +1157,12 @@ class _GeneratedResult extends StatelessWidget {
           Text('🗓️', style: TextStyle(fontSize: 16)),
           SizedBox(width: AppSpacing.sm),
           Text('YOUR PLAN', style: TextStyle(fontFamily: 'Inter',
-              color: AppColors.gold, fontSize: 10,
+              color: AppColors.gold, fontSize: 12,
               fontWeight: FontWeight.w800, letterSpacing: 1)),
         ]),
         const SizedBox(height: AppSpacing.xs),
         Text(result.summary, style: const TextStyle(fontFamily: 'Inter',
-            color: AppColors.textMuted, fontSize: 11, height: 1.4)),
+            color: AppColors.textMuted, fontSize: 13, height: 1.4)),
         const SizedBox(height: AppSpacing.md),
         ...entry.value.take(5).toList().asMap().entries.map((e) {
           final n  = e.value;
@@ -1178,7 +1183,7 @@ class _GeneratedResult extends StatelessWidget {
                 Text(ex['emoji'] ?? '💪'),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(child: Text(n, style: const TextStyle(fontFamily: 'Inter',
-                    color: AppColors.textPrimary, fontSize: 13,
+                    color: AppColors.textPrimary, fontSize: 15,
                     fontWeight: FontWeight.w600))),
               ]),
             ),
@@ -1191,7 +1196,7 @@ class _GeneratedResult extends StatelessWidget {
                     color: AppColors.gold, size: 16),
                 SizedBox(width: 6),
                 Text('Added to today\'s plan', style: TextStyle(fontFamily: 'Inter',
-                    color: AppColors.gold, fontSize: 13,
+                    color: AppColors.gold, fontSize: 14,
                     fontWeight: FontWeight.w600)),
               ])
             : SizedBox(
@@ -1201,7 +1206,7 @@ class _GeneratedResult extends StatelessWidget {
                   icon: const Icon(Icons.add_rounded,
                       color: AppColors.gold, size: 16),
                   label: const Text('Add to Today', style: TextStyle(fontFamily: 'Rajdhani',
-                      color: AppColors.gold, fontSize: 15,
+                      color: AppColors.gold, fontSize: 16,
                       fontWeight: FontWeight.w700)),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
@@ -1286,13 +1291,13 @@ class _SplitStyleCardState extends State<_SplitStyleCard> {
                             title: const Text('Change training style?',
                                 style: TextStyle(fontFamily: 'Rajdhani',
                                     color: AppColors.textPrimary,
-                                    fontSize: 18, fontWeight: FontWeight.w800)),
+                                    fontSize: 20, fontWeight: FontWeight.w800)),
                             content: Text(
                               style == SplitStyle.myOwnWay
                                   ? 'Your current plan will be cleared. Your workout history is safe.'
                                   : 'This will replace your current plan with a ${style.label} plan. Your workout history is safe.',
                               style: const TextStyle(fontFamily: 'Inter',
-                                  color: AppColors.textMuted, fontSize: 13, height: 1.4)),
+                                  color: AppColors.textMuted, fontSize: 15, height: 1.4)),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx, false),
@@ -1336,7 +1341,7 @@ class _SplitStyleCardState extends State<_SplitStyleCard> {
                                 color: selected
                                     ? AppColors.gold
                                     : Colors.white.withValues(alpha: 0.65),
-                                fontSize: 13,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w700)),
                       ),
                     );
@@ -1358,7 +1363,7 @@ class _SplitStyleCardState extends State<_SplitStyleCard> {
                     Expanded(child: Text(
                       'Go to Planner to add your own exercises.',
                       style: const TextStyle(fontFamily: 'Inter',
-                          color: AppColors.textMuted, fontSize: 11, height: 1.4),
+                          color: AppColors.textMuted, fontSize: 13, height: 1.4),
                     )),
                   ]),
                 ),
@@ -1427,7 +1432,7 @@ class _DaysPerWeekRow extends StatelessWidget {
       children: [
         Text('Gym days / week:',
             style: GoogleFonts.inter(
-                color: AppColors.textSecondary, fontSize: 12)),
+                color: AppColors.textSecondary, fontSize: 14)),
         const SizedBox(height: 6),
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -1456,7 +1461,7 @@ class _DaysPerWeekRow extends StatelessWidget {
                   child: Text('$days',
                       style: GoogleFonts.rajdhani(
                           color: selected ? Colors.black : AppColors.textMuted,
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w800)),
                 ),
               ),
@@ -1567,10 +1572,10 @@ class _RRow extends StatelessWidget {
       Expanded(child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(label, style: const TextStyle(fontFamily: 'Inter',
-            color: AppColors.textPrimary, fontSize: 13,
+            color: AppColors.textPrimary, fontSize: 15,
             fontWeight: FontWeight.w600)),
         Text(sub, style: const TextStyle(fontFamily: 'Inter',
-            color: AppColors.textMuted, fontSize: 11)),
+            color: AppColors.textMuted, fontSize: 13)),
       ])),
       Switch(
         value: value, onChanged: onChanged,
@@ -1580,6 +1585,40 @@ class _RRow extends StatelessWidget {
       ),
     ]),
   );
+}
+
+// ════════════════════════════════════════════════
+// DISPLAY PREFERENCES
+// ════════════════════════════════════════════════
+class _DisplayCard extends StatelessWidget {
+  const _DisplayCard();
+
+  @override
+  Widget build(BuildContext context) =>
+      Selector<AppProvider, String>(
+        selector: (_, p) => p.profile.weightUnit,
+        builder: (context, unit, _) {
+          final p = context.read<AppProvider>();
+          return Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.04), width: 0.6),
+            ),
+            child: _RRow(
+              icon: Icons.straighten_rounded,
+              label: 'Weight Unit',
+              sub: unit == 'lbs' ? 'Displaying in lbs' : 'Displaying in kg',
+              value: unit == 'lbs',
+              color: const Color(0xFF38BDF8),
+              onChanged: (v) => p.updateProfile(
+                p.profile.copyWith(weightUnit: v ? 'lbs' : 'kg'),
+              ),
+            ),
+          );
+        },
+      );
 }
 
 class _Div extends StatelessWidget {
@@ -1603,7 +1642,7 @@ class _LField extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(label, style: const TextStyle(fontFamily: 'Inter',
-          color: AppColors.textMuted, fontSize: 11)),
+          color: AppColors.textMuted, fontSize: 13)),
       const SizedBox(height: 5),
       TextField(
         controller: ctrl,
@@ -1614,7 +1653,7 @@ class _LField extends StatelessWidget {
               RegExp(isInt ? r'[0-9]' : r'[0-9.]')),
         ],
         style: const TextStyle(fontFamily: 'Inter',
-            color: AppColors.textPrimary, fontSize: 14),
+            color: AppColors.textPrimary, fontSize: 16),
         decoration: InputDecoration(
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(
@@ -1693,14 +1732,14 @@ class _OneRmSheetState extends State<_OneRmSheet> {
         const SizedBox(height: AppSpacing.xl),
         Center(child: Column(children: [
           const Text('Your Estimated 1RM', style: TextStyle(fontFamily: 'Inter',
-              color: AppColors.textMuted, fontSize: 12)),
+              color: AppColors.textMuted, fontSize: 14)),
           const SizedBox(height: 4),
           Text('${_oneRm!.toStringAsFixed(1)} kg', style: const TextStyle(fontFamily: 'Rajdhani',
               color: AppColors.textSecondary, fontSize: 48, fontWeight: FontWeight.w800)),
         ])),
         const SizedBox(height: AppSpacing.lg),
         const Text('TRAINING ZONES', style: TextStyle(fontFamily: 'Inter',
-            color: AppColors.textMuted, fontSize: 10,
+            color: AppColors.textMuted, fontSize: 12,
             fontWeight: FontWeight.w800, letterSpacing: 1.4)),
         const SizedBox(height: AppSpacing.sm),
         ..._zones.map((z) {
@@ -1724,19 +1763,19 @@ class _OneRmSheetState extends State<_OneRmSheet> {
                 ),
                 child: Center(child: Text('$pct%', style: TextStyle(
                     fontFamily: 'Rajdhani', color: col,
-                    fontSize: 13, fontWeight: FontWeight.w800))),
+                    fontSize: 14, fontWeight: FontWeight.w800))),
               ),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(z['label'] as String, style: const TextStyle(fontFamily: 'Inter',
-                    color: AppColors.textPrimary, fontSize: 12,
+                    color: AppColors.textPrimary, fontSize: 14,
                     fontWeight: FontWeight.w600)),
                 Text('~${z['reps']} reps', style: const TextStyle(fontFamily: 'Inter',
-                    color: AppColors.textMuted, fontSize: 10)),
+                    color: AppColors.textMuted, fontSize: 12)),
               ])),
               Text('${weight.toStringAsFixed(1)} kg', style: const TextStyle(
                   fontFamily: 'Rajdhani', color: AppColors.textPrimary,
-                  fontSize: 15, fontWeight: FontWeight.w700)),
+                  fontSize: 16, fontWeight: FontWeight.w700)),
             ]),
           );
         }),
@@ -1762,12 +1801,6 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
   late AnimationController _waveC;
   late Animation<double> _waveA;
 
-  static const _languages = [
-    {'code': 'en', 'name': 'English', 'flag': '🇬🇧', 'native': 'English'},
-    {'code': 'hi', 'name': 'Hindi', 'flag': '🇮🇳', 'native': 'हिंदी'},
-    {'code': 'mr', 'name': 'Marathi', 'flag': '🇮🇳', 'native': 'मराठी'},
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -1777,10 +1810,15 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
 
-    _waveA = CurvedAnimation(
-      parent: _waveC,
-      curve: Curves.easeInOut,
-    );
+    _waveA = CurvedAnimation(parent: _waveC, curve: Curves.easeInOut);
+
+    // Sync personality from user profile (only if user hasn't overridden it)
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final profile = context.read<AppProvider>().profile;
+      await _vc.syncWithProfile(profile.trainerType);
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -1812,26 +1850,41 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 44, height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.borderMedium,
-                    borderRadius: BorderRadius.circular(2),
+              // Handle + close
+              Row(
+                children: [
+                  const Spacer(),
+                  Container(
+                    width: 44, height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.borderMedium,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.close_rounded,
+                            color: Color(0xFF666666), size: 20),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 8),
 
               // Header
               Container(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1A1A1A),
                   borderRadius: BorderRadius.circular(24),
@@ -1842,8 +1895,8 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
                 ),
                 child: Row(children: [
                   Container(
-                    width: 56,
-                    height: 56,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: const Color(0xFFD4AF37)
                           .withValues(alpha: 0.10),
@@ -1852,7 +1905,7 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
                         BoxShadow(
                           color: const Color(0xFFD4AF37)
                               .withValues(alpha: 0.10),
-                          blurRadius: 24,
+                          blurRadius: 20,
                         ),
                       ],
                     ),
@@ -1864,19 +1917,19 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            _waveBar(12 + (8 * t)),
-                            const SizedBox(width: 3),
-                            _waveBar(22 - (6 * t)),
-                            const SizedBox(width: 3),
-                            _waveBar(10 + (10 * t)),
+                            _waveBar(10 + (6 * t)),
                             const SizedBox(width: 3),
                             _waveBar(18 - (5 * t)),
+                            const SizedBox(width: 3),
+                            _waveBar(8 + (8 * t)),
+                            const SizedBox(width: 3),
+                            _waveBar(14 - (4 * t)),
                           ],
                         );
                       },
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1890,24 +1943,14 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
                             letterSpacing: 2.2,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           'Real-time coaching during every set',
                           style: GoogleFonts.inter(
                             color: Colors.white.withValues(alpha: 0.92),
-                            fontSize: 17,
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
                             height: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Hear reps, rest timers, and motivation while you train.',
-                          style: GoogleFonts.inter(
-                            color: Colors.white.withValues(alpha: 0.42),
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w500,
-                            height: 1.35,
                           ),
                         ),
                       ],
@@ -1915,7 +1958,7 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
                   ),
                 ]),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
 
               // Coach toggles
               Container(
@@ -1969,52 +2012,117 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
-              // Language section
-              Text('LANGUAGE',
+              // ── Trainer Style ─────────────────────────────────────────────
+              Text('TRAINER STYLE',
                   style: GoogleFonts.rajdhani(
                     color: AppColors.textMuted,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 2,
                   )),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
+              Row(children: [
+                _VcStyleChip(label: 'Friendly',     icon: Icons.emoji_emotions_outlined,   value: 'friendly',     current: _vc.trainerPersonality, onTap: () async { await _vc.setPersonality('friendly');     setState(() {}); }),
+                const SizedBox(width: 8),
+                _VcStyleChip(label: 'Strict',       icon: Icons.gps_fixed_rounded,         value: 'strict',       current: _vc.trainerPersonality, onTap: () async { await _vc.setPersonality('strict');       setState(() {}); }),
+                const SizedBox(width: 8),
+                _VcStyleChip(label: 'Military',     icon: Icons.military_tech_rounded,     value: 'military',     current: _vc.trainerPersonality, onTap: () async { await _vc.setPersonality('military');     setState(() {}); }),
+                const SizedBox(width: 8),
+                _VcStyleChip(label: 'Hype',         icon: Icons.local_fire_department_outlined, value: 'motivational', current: _vc.trainerPersonality, onTap: () async { await _vc.setPersonality('motivational'); setState(() {}); }),
+              ]),
 
+              const SizedBox(height: 12),
+
+              // ── Voice Gender ──────────────────────────────────────────────
+              Text('VOICE GENDER',
+                  style: GoogleFonts.rajdhani(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  )),
+              const SizedBox(height: 8),
+              Row(children: [
+                _VcGenderChip(label: 'Default', icon: Icons.tune_rounded,          value: 'default', current: _vc.voiceGender, onTap: () async { await _vc.setVoiceGender('default'); setState(() {}); }),
+                const SizedBox(width: 8),
+                _VcGenderChip(label: 'Male',    icon: Icons.person_rounded,        value: 'male',    current: _vc.voiceGender, onTap: () async { await _vc.setVoiceGender('male');    setState(() {}); }),
+                const SizedBox(width: 8),
+                _VcGenderChip(label: 'Female',  icon: Icons.person_2_rounded,      value: 'female',  current: _vc.voiceGender, onTap: () async { await _vc.setVoiceGender('female');  setState(() {}); }),
+              ]),
+
+              const SizedBox(height: 4),
+              Text('Voice selection uses device installed voices.',
+                  style: GoogleFonts.inter(
+                    color: AppColors.textMuted.withValues(alpha: 0.55),
+                    fontSize: 11,
+                  )),
+
+              const SizedBox(height: 12),
+
+              // ── Volume ────────────────────────────────────────────────────
+              Text('VOLUME',
+                  style: GoogleFonts.rajdhani(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  )),
+              const SizedBox(height: 6),
               Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    width: 0.6,
+                  color: AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderSoft),
+                ),
+                child: Column(children: [
+                  Row(children: [
+                    Icon(
+                      _vc.volume < 0.3
+                          ? Icons.volume_mute_rounded
+                          : _vc.volume < 0.7
+                              ? Icons.volume_down_rounded
+                              : Icons.volume_up_rounded,
+                      color: AppColors.gold, size: 18),
+                    const SizedBox(width: 8),
+                    Text('${(_vc.volume * 100).round()}%',
+                        style: GoogleFonts.rajdhani(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                        )),
+                  ]),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: AppColors.gold,
+                      inactiveTrackColor: AppColors.borderMedium,
+                      thumbColor: AppColors.gold,
+                      overlayColor: AppColors.gold.withValues(alpha: 0.2),
+                      trackHeight: 3,
+                    ),
+                    child: Slider(
+                      min: 0.0,
+                      max: 1.0,
+                      value: _vc.volume,
+                      onChanged: _vc.enabled
+                          ? (v) async {
+                              await _vc.setVolume(v);
+                              setState(() {});
+                            }
+                          : null,
+                    ),
                   ),
-                ),
-                child: Column(
-                  children: [
-                    for (int i = 0; i < _languages.length; i++) ...[
-                      _languageTile(_languages[i]),
-
-                      if (i != _languages.length - 1)
-                        Divider(
-                          height: 1,
-                          thickness: 0.6,
-                          color: Colors.white.withValues(alpha: 0.05),
-                          indent: 72,
-                          endIndent: 18,
-                        ),
-                    ],
-                  ],
-                ),
+                ]),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // Speech rate slider
               Text('VOICE SPEED',
                   style: GoogleFonts.rajdhani(
                     color: AppColors.textMuted,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 2,
                   )),
@@ -2045,7 +2153,7 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
                               : 'Fast',
                           style: GoogleFonts.rajdhani(
                             color: AppColors.textSecondary,
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                           )),
                     ]),
@@ -2073,7 +2181,7 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
               // Test button
               SizedBox(
@@ -2089,7 +2197,7 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
                   label: Text('Test Voice',
                       style: GoogleFonts.rajdhani(
                         fontWeight: FontWeight.w900,
-                        fontSize: 15,
+                        fontSize: 16,
                         letterSpacing: 1,
                       )),
                   style: ElevatedButton.styleFrom(
@@ -2139,13 +2247,13 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
               Text(title,
                   style: GoogleFonts.rajdhani(
                     color: AppColors.textPrimary,
-                    fontSize: 15,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                   )),
               Text(subtitle,
                   style: GoogleFonts.rajdhani(
                     color: AppColors.textMuted,
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   )),
             ],
@@ -2156,82 +2264,107 @@ class _VoiceCoachSheetState extends State<_VoiceCoachSheet>
     );
   }
 
-  Widget _languageTile(Map<String, String> lang) {
-    final isSelected = _vc.language == lang['code'];
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () async {
-        H.selection();
-        await _vc.setLanguage(lang['code']!);
-        await _vc.testVoice();
-        setState(() {});
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 15,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFFFD700).withValues(alpha: 0.05)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  lang['native']!.substring(0, 1),
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+}
+
+// ════════════════════════════════════════════════
+// VOICE COACH — STYLE & GENDER CHIP HELPERS
+// ════════════════════════════════════════════════
+class _VcStyleChip extends StatelessWidget {
+  final String label, value, current;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _VcStyleChip({
+    required this.label, required this.icon, required this.value,
+    required this.current, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = value == current;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () { H.selection(); onTap(); },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.gold.withValues(alpha: 0.14)
+                : const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? AppColors.gold.withValues(alpha: 0.55)
+                  : Colors.white.withValues(alpha: 0.06),
+              width: selected ? 1.2 : 0.6,
             ),
-
-            const SizedBox(width: 14),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lang['name']!,
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    lang['native']!,
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withValues(alpha: 0.42),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            if (isSelected)
-              const Icon(
-                Icons.check_rounded,
-                color: Color(0xFFD4AF37),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon,
                 size: 18,
-              ),
-          ],
+                color: selected ? AppColors.gold : AppColors.textMuted),
+            const SizedBox(height: 4),
+            Text(label,
+                style: GoogleFonts.inter(
+                  color: selected ? AppColors.gold : AppColors.textMuted,
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                )),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _VcGenderChip extends StatelessWidget {
+  final String label, value, current;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _VcGenderChip({
+    required this.label, required this.icon, required this.value,
+    required this.current, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = value == current;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () { H.selection(); onTap(); },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? const Color(0xFF38BDF8).withValues(alpha: 0.12)
+                : const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFF38BDF8).withValues(alpha: 0.50)
+                  : Colors.white.withValues(alpha: 0.06),
+              width: selected ? 1.2 : 0.6,
+            ),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon,
+                size: 18,
+                color: selected
+                    ? const Color(0xFF38BDF8)
+                    : AppColors.textMuted),
+            const SizedBox(height: 4),
+            Text(label,
+                style: GoogleFonts.inter(
+                  color: selected
+                      ? const Color(0xFF38BDF8)
+                      : AppColors.textMuted,
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                )),
+          ]),
         ),
       ),
     );
@@ -2345,10 +2478,10 @@ class _MealHeroCardState extends State<_MealHeroCard>
             const SizedBox(width: 10),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Meal Log', style: GoogleFonts.rajdhani(
-                  color: AppColors.textPrimary, fontSize: 16,
+                  color: AppColors.textPrimary, fontSize: 18,
                   fontWeight: FontWeight.w800, letterSpacing: 0.3)),
               Text("Today's nutrition", style: GoogleFonts.inter(
-                  color: AppColors.textMuted, fontSize: 10)),
+                  color: AppColors.textMuted, fontSize: 12)),
             ]),
             const Spacer(),
             Container(
@@ -2360,7 +2493,7 @@ class _MealHeroCardState extends State<_MealHeroCard>
                     color: AppColors.gold.withValues(alpha: 0.35), width: 0.8),
               ),
               child: Text('Add Food', style: GoogleFonts.inter(
-                  color: AppColors.gold, fontSize: 11, fontWeight: FontWeight.w600)),
+                  color: AppColors.gold, fontSize: 13, fontWeight: FontWeight.w600)),
             ),
           ]),
 
@@ -2385,7 +2518,7 @@ class _MealHeroCardState extends State<_MealHeroCard>
                           color: AppColors.textPrimary, fontSize: 22,
                           fontWeight: FontWeight.w900)),
                       Text('kcal', style: GoogleFonts.inter(
-                          color: AppColors.textMuted, fontSize: 9)),
+                          color: AppColors.textMuted, fontSize: 11)),
                     ],
                   )),
                 ),
@@ -2475,9 +2608,9 @@ class _HeroStatRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(children: [
     Text('$label  ', style: GoogleFonts.inter(
-        color: AppColors.textMuted, fontSize: 11)),
+        color: AppColors.textMuted, fontSize: 13)),
     Text(value, style: GoogleFonts.inter(
-        color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+        color: color, fontSize: 13, fontWeight: FontWeight.w700)),
   ]);
 }
 
@@ -2609,10 +2742,10 @@ class _MealLogSheetState extends State<_MealLogSheet> {
               child: Row(children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('Meal Log', style: GoogleFonts.rajdhani(
-                      color: AppColors.textPrimary, fontSize: 20,
+                      color: AppColors.textPrimary, fontSize: 22,
                       fontWeight: FontWeight.w800, letterSpacing: 0.3)),
                   Text(dateStr, style: GoogleFonts.inter(
-                      color: AppColors.textMuted, fontSize: 11)),
+                      color: AppColors.textMuted, fontSize: 13)),
                 ]),
                 const Spacer(),
                 if (!_loading && _kcal > 0)
@@ -2628,7 +2761,7 @@ class _MealLogSheetState extends State<_MealLogSheet> {
                           color: _green, size: 13),
                       const SizedBox(width: 4),
                       Text('$_kcal kcal', style: GoogleFonts.rajdhani(
-                          color: _green, fontSize: 13, fontWeight: FontWeight.w700)),
+                          color: _green, fontSize: 14, fontWeight: FontWeight.w700)),
                     ]),
                   ),
               ]),
@@ -2713,7 +2846,7 @@ class _MacroBar extends StatelessWidget {
     return Row(children: [
       SizedBox(width: 52,
         child: Text(label, style: GoogleFonts.inter(
-            color: AppColors.textMuted, fontSize: 10.5,
+            color: AppColors.textMuted, fontSize: 12,
             fontWeight: FontWeight.w500))),
       Expanded(
         child: ClipRRect(
@@ -2802,12 +2935,12 @@ class _MealSectionState extends State<_MealSection> {
           ),
           const SizedBox(width: 10),
           Text(widget.mealType, style: GoogleFonts.inter(
-              color: AppColors.textPrimary, fontSize: 13,
+              color: AppColors.textPrimary, fontSize: 15,
               fontWeight: FontWeight.w700)),
           if (totalKcal > 0) ...[
             const SizedBox(width: 6),
             Text('$totalKcal kcal', style: GoogleFonts.inter(
-                color: widget.color, fontSize: 11, fontWeight: FontWeight.w600)),
+                color: widget.color, fontSize: 13, fontWeight: FontWeight.w600)),
           ],
           const Spacer(),
           GestureDetector(
@@ -2829,7 +2962,7 @@ class _MealSectionState extends State<_MealSection> {
           Text('Nothing logged yet',
             style: GoogleFonts.inter(
                 color: AppColors.textMuted.withValues(alpha: 0.40),
-                fontSize: 11)),
+                fontSize: 13)),
         ] else ...[
           const SizedBox(height: 8),
           ..._items.map((e) => Padding(
@@ -2861,13 +2994,13 @@ class _MealSectionState extends State<_MealSection> {
                     children: [
                       if (e.foods.isNotEmpty)
                         Text(e.foods.first, style: GoogleFonts.inter(
-                            color: AppColors.textPrimary, fontSize: 12,
+                            color: AppColors.textPrimary, fontSize: 14,
                             fontWeight: FontWeight.w500),
                           maxLines: 1, overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 3),
                       Row(children: [
                         Text('${e.kcal} kcal', style: GoogleFonts.inter(
-                            color: AppColors.orange, fontSize: 10,
+                            color: AppColors.orange, fontSize: 12,
                             fontWeight: FontWeight.w600)),
                         const SizedBox(width: 6),
                         _MacroPill('P', '${e.protein}g', const Color(0xFF42A5F5)),
@@ -3068,7 +3201,7 @@ class _MealLogFormState extends State<_MealLogForm> {
     if (kcal <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Select a food or enter calories first',
-          style: GoogleFonts.inter(color: Colors.white, fontSize: 13)),
+          style: GoogleFonts.inter(color: Colors.white, fontSize: 14)),
         backgroundColor: const Color(0xFF2A1A1A),
         duration: const Duration(seconds: 2),
       ));
@@ -3147,11 +3280,11 @@ class _MealLogFormState extends State<_MealLogForm> {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Add to ${widget.mealType}',
                 style: GoogleFonts.rajdhani(
-                    color: AppColors.textPrimary, fontSize: 18,
+                    color: AppColors.textPrimary, fontSize: 20,
                     fontWeight: FontWeight.w900, letterSpacing: 0.2)),
               Text('Select category or search below',
                 style: GoogleFonts.inter(
-                    color: AppColors.textMuted, fontSize: 10)),
+                    color: AppColors.textMuted, fontSize: 12)),
             ]),
           ]),
           const SizedBox(height: 14),
@@ -3178,7 +3311,7 @@ class _MealLogFormState extends State<_MealLogForm> {
                     ),
                     child: Text(kv.key,
                       style: GoogleFonts.inter(
-                        fontSize: 11,
+                        fontSize: 13,
                         color: active ? Colors.black : AppColors.textMuted,
                         fontWeight: active ? FontWeight.w700 : FontWeight.w600,
                         letterSpacing: 0.3,
@@ -3208,7 +3341,7 @@ class _MealLogFormState extends State<_MealLogForm> {
                 const SizedBox(width: 8),
                 Text('Searching nutrition data…',
                   style: GoogleFonts.inter(
-                    fontSize: 11, color: AppColors.textMuted)),
+                    fontSize: 13, color: AppColors.textMuted)),
               ]),
             ),
           if (_suggestions.isNotEmpty)
@@ -3257,23 +3390,23 @@ class _MealLogFormState extends State<_MealLogForm> {
                                 Text(s.name,
                                   maxLines: 1, overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.inter(
-                                    fontSize: 13, color: AppColors.textPrimary,
+                                    fontSize: 15, color: AppColors.textPrimary,
                                     fontWeight: FontWeight.w500)),
                                 const SizedBox(height: 2),
                                 Row(children: [
                                   Text('${s.kcal.round()} kcal',
                                     style: GoogleFonts.inter(
-                                      fontSize: 11, color: AppColors.orange,
+                                      fontSize: 12, color: AppColors.orange,
                                       fontWeight: FontWeight.w700)),
                                   Text('  ·  P${s.protein.round()}  C${s.carbs.round()}  F${s.fats.round()}',
                                     style: GoogleFonts.inter(
-                                      fontSize: 10, color: AppColors.textMuted)),
+                                      fontSize: 11, color: AppColors.textMuted)),
                                 ]),
                               ],
                             )),
                             Text('/ 100g',
                               style: GoogleFonts.inter(
-                                fontSize: 10, color: AppColors.textMuted)),
+                                fontSize: 11, color: AppColors.textMuted)),
                           ]),
                         ),
                       ),
@@ -3359,10 +3492,10 @@ class _MealLogFormState extends State<_MealLogForm> {
                       Icon(Icons.check_circle_rounded, color: _green, size: 14),
                       const SizedBox(width: 8),
                       Expanded(child: Text(name, style: GoogleFonts.inter(
-                          color: AppColors.textPrimary, fontSize: 12),
+                          color: AppColors.textPrimary, fontSize: 14),
                         maxLines: 1, overflow: TextOverflow.ellipsis)),
                       Text('${e.kcal} kcal', style: GoogleFonts.inter(
-                          color: AppColors.orange, fontSize: 11,
+                          color: AppColors.orange, fontSize: 12,
                           fontWeight: FontWeight.w600)),
                     ]),
                   );
@@ -3482,13 +3615,13 @@ class _MLField extends StatelessWidget {
     keyboardType: keyboardType,
     style: GoogleFonts.inter(
         color: AppColors.textPrimary,
-        fontSize: large ? 14 : 13,
+        fontSize: large ? 16 : 14,
         fontWeight: large ? FontWeight.w600 : FontWeight.w400),
     decoration: InputDecoration(
       hintText: hint,
       hintStyle: GoogleFonts.inter(
           color: AppColors.textMuted.withValues(alpha: 0.55),
-          fontSize: large ? 13 : 11.5),
+          fontSize: large ? 14 : 12.5),
       prefixIcon: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Icon(icon, size: large ? 18 : 15, color: color),

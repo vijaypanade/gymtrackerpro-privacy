@@ -277,7 +277,7 @@ class _StatusChip extends StatelessWidget {
         status,
         style: TextStyle(
           fontFamily: 'Inter',
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: FontWeight.w800,
           color: color,
           letterSpacing: 1.5,
@@ -318,7 +318,7 @@ class _ScoreRing extends StatelessWidget {
                 : 'REST',
             style: const TextStyle(
               fontFamily: 'Inter',
-              fontSize: 9,
+              fontSize: 10,
               fontWeight: FontWeight.w800,
               color: Colors.white70,
               letterSpacing: 0.5,
@@ -354,7 +354,7 @@ class _StatBox extends StatelessWidget {
             value,
             style: TextStyle(
               fontFamily: 'Rajdhani',
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.w900,
               color: color,
               height: 1,

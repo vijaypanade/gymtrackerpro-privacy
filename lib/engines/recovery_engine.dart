@@ -1,10 +1,15 @@
 // lib/engines/recovery_engine.dart
 // Single authoritative recovery computation for LiftOn.
-// Pure Dart — no Flutter, no Provider, no UI logic.
+// No Provider, no I/O.
 // Inputs: training timestamps + weekly volume + age + streak + subjective readiness.
 // Output: RecoveryState (the only recovery truth the app should consume).
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Color;
+
+import '../brain/policy/mission_selection_engine.dart' show MissionType;
 import '../models/recovery_state.dart';
+import '../utils/app_constants.dart';
 
 // ── Recovery target hours by muscle ───────────────────────────────────────────
 // Based on: Schoenfeld 2010 SRA curve, Kraemer & Ratamess 2004 NSCA position stand.
@@ -74,9 +79,12 @@ class RecoveryEngineInput {
   final int    readiness;              // 0 = not set today; 1–5 subjective
   final DateTime now;
 
-  // Health Connect signals — both optional (null = no data → no influence)
-  final double? sleepHours;     // last night's sleep duration in hours
-  final int?    todayStepCount; // total steps logged today
+  // Health signals — all optional (null = no data → no influence on score)
+  final double? sleepHours;       // last night's sleep, hours
+  final int?    todayStepCount;   // total steps today
+  final double? restingHeartRate; // bpm, most recent overnight reading
+  final double? hrv;              // SDNN ms, overnight average
+  final double? hrvBaseline;      // EMA baseline from SharedPrefs (null = not yet established)
 
   // Nutrition signal — today's protein intake as % of goal.
   // Null = no data → no influence. One lightweight modifier among many;
@@ -94,14 +102,74 @@ class RecoveryEngineInput {
     required this.now,
     this.sleepHours,
     this.todayStepCount,
+    this.restingHeartRate,
+    this.hrv,
+    this.hrvBaseline,
     this.proteinAdherencePct,
   });
+}
+
+// ── HRV readiness classification ─────────────────────────────────────────────
+// Single source of truth for HRV state used by both the engine modifier and
+// any UI that needs a semantic HRV label. Thresholds mirror _hrvModifier so
+// the classification and the score adjustment are always in sync.
+
+enum HrvReadiness { elevated, normal, suppressed, unavailable }
+
+// ── Recovery presentation ─────────────────────────────────────────────────────
+// Derives the semantic label + chip colour for any UI surface.
+// Mission intent overrides score when the AI has explicitly decided to protect
+// recovery — a high numeric score does not mean "Ready" in that case.
+
+@immutable
+class RecoveryPresentation {
+  final String label;
+  final Color  chipColor;
+  const RecoveryPresentation({required this.label, required this.chipColor});
 }
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 class RecoveryEngine {
   RecoveryEngine._();
+
+  /// Semantic label + chip colour for the readiness state visible on home chips.
+  /// Mission intent (protectRecovery / recoverySession) overrides a high score;
+  /// all other states derive from [overallScore] thresholds.
+  static RecoveryPresentation readinessPresentation(
+      int overallScore, MissionType mission, bool isRestDay) {
+    if (isRestDay) {
+      return const RecoveryPresentation(label: 'Rest', chipColor: AppColors.blue);
+    }
+    if (mission == MissionType.protectRecovery ||
+        mission == MissionType.recoverySession) {
+      return const RecoveryPresentation(label: 'Recovering', chipColor: AppColors.orange);
+    }
+    if (overallScore >= 70) {
+      return const RecoveryPresentation(label: 'Ready', chipColor: AppColors.green);
+    }
+    if (overallScore >= 50) {
+      return const RecoveryPresentation(label: 'Adapting', chipColor: AppColors.goldSoft);
+    }
+    return const RecoveryPresentation(label: 'Recovering', chipColor: AppColors.orange);
+  }
+
+  /// Classifies HRV relative to the athlete's personal baseline.
+  /// Uses % deviation when baseline is available; falls back to static
+  /// population bands for the first few days before baseline is established.
+  static HrvReadiness hrvReadiness(double? hrv, double? baseline) {
+    if (hrv == null || hrv <= 0) return HrvReadiness.unavailable;
+    if (baseline != null && baseline > 0) {
+      final pct = (hrv - baseline) / baseline;
+      if (pct >=  0.05) return HrvReadiness.elevated;
+      if (pct >= -0.05) return HrvReadiness.normal;
+      return HrvReadiness.suppressed;
+    }
+    // Fallback: population bands — same order as _hrvModifier's static path.
+    if (hrv >= 50) return HrvReadiness.elevated;
+    if (hrv >= 30) return HrvReadiness.normal;
+    return HrvReadiness.suppressed;
+  }
 
   /// Compute a fresh [RecoveryState] from the provided inputs.
   /// Cheap enough to call on every provider rebuild — no I/O, no async.
@@ -124,8 +192,10 @@ class RecoveryEngine {
     overall -= _agePenalty(input.age);
     overall -= _streakPenalty(input.streak, input.readiness);
     overall += _readinessDelta(input.readiness);
-    // Health Connect modifiers — small contextual nudges, never override training signal.
+    // Health modifiers — small contextual nudges, never override training signal.
+    overall += _hrvModifier(input.hrv, input.hrvBaseline);
     overall += _sleepModifier(input.sleepHours);
+    overall += _rhrModifier(input.restingHeartRate);
     overall += _stepsModifier(input.todayStepCount, overall);
     overall += _proteinModifier(input.proteinAdherencePct);
     final overallClamped = _clampScore(overall, _kOverallScoreFloor, _kOverallScoreCeil);
@@ -301,6 +371,44 @@ class RecoveryEngine {
   }
 
   // ── Health Connect modifiers (small, bounded) ─────────────────────────────
+
+  // HRV modifier — deviation from personal EMA baseline (RFC-002.8).
+  // HRV is the strongest single biometric recovery signal (max influence: -12 to +5).
+  // Uses % deviation so the modifier is personal, not population-average thresholds.
+  // When no baseline exists (first days of use), falls back to broad static bands.
+  static double _hrvModifier(double? hrv, double? baseline) {
+    if (hrv == null || hrv <= 0) return 0.0;
+    if (baseline != null && baseline > 0) {
+      final pct = (hrv - baseline) / baseline;
+      if (pct >=  0.15) return  5.0;
+      if (pct >=  0.05) return  2.0;
+      if (pct >= -0.05) return  0.0;
+      if (pct >= -0.15) return -5.0;
+      if (pct >= -0.25) return -8.0;
+      return -12.0;
+    }
+    // Fallback: static population bands — used only until baseline is established.
+    if (hrv >= 70) return  3.0;
+    if (hrv >= 50) return  1.0;
+    if (hrv >= 30) return  0.0;
+    if (hrv >= 20) return -3.0;
+    return -6.0;
+  }
+
+  // Resting heart rate modifier using conservative static thresholds.
+  // Personal baseline calibration comes in RFC-002.8 with HRV.
+  // Max influence: -8 to +2 points. Null = no reading = no effect.
+  //   ≤ 55 bpm  → +2   (athlete-level cardiovascular fitness)
+  //   56–70 bpm →  0   (normal resting range — no influence)
+  //   71–80 bpm → −4   (mildly elevated — fatigue or stress signal)
+  //   > 80 bpm  → −8   (significantly elevated — strong recovery suppressor)
+  static double _rhrModifier(double? rhr) {
+    if (rhr == null || rhr <= 0) return 0.0;
+    if (rhr <= 55) return  2.0;
+    if (rhr <= 70) return  0.0;
+    if (rhr <= 80) return -4.0;
+    return -8.0;
+  }
 
   // Sleep below 7h nudges overall down; 8h+ gives a small boost.
   // Max influence: -8 to +3 points. Null = no data = no effect.

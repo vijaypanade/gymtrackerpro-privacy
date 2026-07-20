@@ -84,7 +84,7 @@ class _StatsScreenState extends State<StatsScreen>
             children: [
               Text('Analytics', style: AppTextStyles.h2),
               Text(_subtitle(ap.coachInsight.badge), style: GoogleFonts.inter(
-                  color: AppColors.textMuted.withValues(alpha: 0.78), fontSize: 10.5)),
+                  color: AppColors.textMuted.withValues(alpha: 0.78), fontSize: 12)),
             ],
           ),
         ),
@@ -96,7 +96,7 @@ class _StatsScreenState extends State<StatsScreen>
           labelColor: AppColors.gold,
           unselectedLabelColor: AppColors.textMuted,
           labelStyle: GoogleFonts.inter(
-              fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.6),
+              fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6),
           dividerColor: AppColors.divider.withValues(alpha: 0.28),
           tabs: const [
             Tab(text: 'OVERVIEW'),
@@ -201,6 +201,12 @@ class _HeroCompactPanel extends StatelessWidget {
     WeekRating.recoveryWeek => AppColors.textMuted,
   };
 
+  static String _calibrationMessage(int sessions) {
+    if (sessions == 0) return 'Complete your first workout to unlock AI coaching.';
+    final remaining = 3 - sessions;
+    return 'Log $remaining more ${remaining == 1 ? 'session' : 'sessions'} to activate personalized insights.';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Selector<AppProvider, ({
@@ -209,17 +215,24 @@ class _HeroCompactPanel extends StatelessWidget {
       String insightTitle,
       String badge,
       Color accent,
+      int totalWorkouts,
     })>(
       selector: (_, ap) => (
-        review:       ap.weeklyReviewData,
-        recovery:     ap.getOverallRecovery(),
-        insightTitle: ap.coachInsight.title,
-        badge:        ap.coachInsight.badge,
-        accent:       ap.coachInsight.accentColor,
+        review:        ap.weeklyReviewData,
+        recovery:      ap.getOverallRecovery(),
+        insightTitle:  ap.coachInsight.title,
+        badge:         ap.coachInsight.badge,
+        accent:        ap.coachInsight.accentColor,
+        totalWorkouts: ap.streak.totalWorkouts,
       ),
       builder: (ctx, d, __) {
         final c   = d.review.hasData ? _rColor(d.review.rating) : AppColors.gold;
-        final msg = d.insightTitle.isNotEmpty ? d.insightTitle : '${d.recovery}% recovery — system online.';
+        // Gate confident AI coaching behind sufficient data.
+        // Trending/stable/primed language is only valid with 3+ logged sessions.
+        final hasEnoughData = d.totalWorkouts >= 3;
+        final msg = hasEnoughData
+            ? (d.insightTitle.isNotEmpty ? d.insightTitle : '${d.recovery}% recovery — system online.')
+            : _calibrationMessage(d.totalWorkouts);
 
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
@@ -265,7 +278,7 @@ class _HeroCompactPanel extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 // Badge + arrow on its own row
                 Row(children: [
-                  if (d.badge.isNotEmpty)
+                  if (hasEnoughData && d.badge.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                       decoration: BoxDecoration(
@@ -279,11 +292,26 @@ class _HeroCompactPanel extends StatelessWidget {
                         color: d.accent.withValues(alpha: 0.80),
                         fontSize: 8, fontWeight: FontWeight.w700, letterSpacing: 0.7,
                       )),
+                    )
+                  else if (!hasEnoughData)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.textMuted.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(AppRadii.pill),
+                        border: Border.all(
+                            color: AppColors.textMuted.withValues(alpha: 0.15), width: 0.5),
+                      ),
+                      child: Text('CALIBRATING', style: TextStyle(
+                        fontFamily: 'Inter',
+                        color: AppColors.textMuted.withValues(alpha: 0.55),
+                        fontSize: 8, fontWeight: FontWeight.w700, letterSpacing: 0.7,
+                      )),
                     ),
                   const Spacer(),
                   Text('Discuss with Coach', style: GoogleFonts.inter(
                     color: AppColors.textMuted.withValues(alpha: 0.45),
-                    fontSize: 10, fontWeight: FontWeight.w400)),
+                    fontSize: 12, fontWeight: FontWeight.w400)),
                   const SizedBox(width: 3),
                   Icon(Icons.arrow_forward_rounded,
                     size: 11, color: AppColors.textMuted.withValues(alpha: 0.38)),
@@ -293,7 +321,7 @@ class _HeroCompactPanel extends StatelessWidget {
                 _TypewriterText(
                   text: msg,
                   style: GoogleFonts.inter(
-                    color: AppColors.textSecondary, fontSize: 12.5,
+                    color: AppColors.textSecondary, fontSize: 14,
                     fontWeight: FontWeight.w400, height: 1.55)),
               ]),
             ),
@@ -312,7 +340,7 @@ class _HeroStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
     Text(value, style: GoogleFonts.rajdhani(
-      color: AppColors.textPrimary, fontSize: 18,
+      color: AppColors.textPrimary, fontSize: 20,
       fontWeight: FontWeight.w700, height: 1.0)),
     const SizedBox(height: 2),
     Text(label, style: GoogleFonts.inter(
@@ -436,7 +464,7 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
               Text(systemLine,
                 style: GoogleFonts.inter(
                   color: AppColors.textMuted.withValues(alpha: 0.38),
-                  fontSize: 9.5, fontWeight: FontWeight.w500,
+                  fontSize: 11, fontWeight: FontWeight.w500,
                   height: 1.4, letterSpacing: 0.1,
                   fontStyle: FontStyle.italic)),
               const SizedBox(height: 6),
@@ -450,7 +478,7 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
                 Expanded(child: Text(sleepLine,
                   style: GoogleFonts.inter(
                     color: AppColors.textMuted.withValues(alpha: 0.30),
-                    fontSize: 9.0, fontWeight: FontWeight.w400,
+                    fontSize: 11, fontWeight: FontWeight.w400,
                     height: 1.4, letterSpacing: 0.1,
                     fontStyle: FontStyle.italic))),
               ]),
@@ -465,7 +493,7 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
                 Text('All muscles primed — ready to train.',
                   style: GoogleFonts.inter(
                     color: AppColors.gold.withValues(alpha: 0.72),
-                    fontSize: 11, fontWeight: FontWeight.w500)),
+                    fontSize: 12, fontWeight: FontWeight.w500)),
               ]),
             ],
             ...toShow.asMap().entries.map((e) {
@@ -519,7 +547,7 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
                           color: isLimiting
                               ? scoreColor.withValues(alpha: 0.90)
                               : AppColors.textSecondary,
-                          fontSize: 10.5, fontWeight: FontWeight.w600),
+                          fontSize: 12, fontWeight: FontWeight.w600),
                         overflow: TextOverflow.ellipsis),
                     ),
                     const SizedBox(width: 10),
@@ -539,7 +567,7 @@ class _StatsRecoveryRailState extends State<_StatsRecoveryRail>
                     const SizedBox(width: 10),
                     Text('$score',
                       style: GoogleFonts.rajdhani(
-                        color: scoreColor, fontSize: 14.5,
+                        color: scoreColor, fontSize: 15,
                         fontWeight: FontWeight.w900, height: 1.0)),
                     const SizedBox(width: 7),
                     SizedBox(
@@ -669,7 +697,7 @@ class _BadgesGridState extends State<_BadgesGrid> {
                 _showAll ? 'Show Less' : 'View All Achievements',
                 style: GoogleFonts.inter(
                   color: AppColors.textMuted,
-                  fontSize: 11.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1185,10 +1213,10 @@ class _ForwardRow extends StatelessWidget {
         text: TextSpan(children: [
           TextSpan(text: '$label  ', style: GoogleFonts.inter(
             color: AppColors.textMuted.withValues(alpha: 0.50),
-            fontSize: 11.5, fontWeight: FontWeight.w400, height: 1.4)),
+            fontSize: 13, fontWeight: FontWeight.w400, height: 1.4)),
           TextSpan(text: value, style: GoogleFonts.inter(
             color: AppColors.textSecondary,
-            fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.4)),
+            fontSize: 13, fontWeight: FontWeight.w600, height: 1.4)),
         ]),
       )),
     ],
@@ -1212,7 +1240,7 @@ class _LockedAdvancedStats extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Text('Advanced Analytics', style: GoogleFonts.rajdhani(
-            color: AppColors.textPrimary, fontSize: 16,
+            color: AppColors.textPrimary, fontSize: 17,
             fontWeight: FontWeight.w800)),
         const SizedBox(width: 8),
         Container(
@@ -1257,12 +1285,12 @@ class _LockedAdvancedStats extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text('Premium Analytics', style: GoogleFonts.rajdhani(
-                color: AppColors.textPrimary, fontSize: 16,
+                color: AppColors.textPrimary, fontSize: 17,
                 fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             Text('See exactly what\'s limiting your progress',
                 style: GoogleFonts.inter(
-                    color: AppColors.textSecondary, fontSize: 12),
+                    color: AppColors.textSecondary, fontSize: 14),
                 textAlign: TextAlign.center),
             const SizedBox(height: 16),
             const Wrap(
@@ -1289,7 +1317,7 @@ class _LockedAdvancedStats extends StatelessWidget {
               child: Text('Unlock Advanced Analytics',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.rajdhani(
-                      color: Colors.black, fontSize: 15,
+                      color: Colors.black, fontSize: 16,
                       fontWeight: FontWeight.w900)),
             ),
           ]),
@@ -1313,7 +1341,7 @@ class _ProChip extends StatelessWidget {
       border: Border.all(color: AppColors.gold.withValues(alpha: 0.30)),
     ),
     child: Text(label, style: GoogleFonts.inter(
-        color: AppColors.gold, fontSize: 11, fontWeight: FontWeight.w600)),
+        color: AppColors.gold, fontSize: 13, fontWeight: FontWeight.w600)),
   );
 }
 
@@ -1390,7 +1418,7 @@ class _ProgressTabState extends State<_ProgressTab> {
                         name.replaceAll('_', ' '),
                         style: GoogleFonts.inter(
                           color: sel ? Colors.black : AppColors.textSecondary,
-                          fontSize: 10.5,
+                          fontSize: 12,
                           fontWeight: sel ? FontWeight.w700 : FontWeight.w400,
                         ),
                       ),
@@ -1457,7 +1485,7 @@ class _ExerciseChart extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           Text('Consistency creates the data that shapes your progression.',
               style: GoogleFonts.inter(
-                  color: AppColors.textMuted, fontSize: 10.5,
+                  color: AppColors.textMuted, fontSize: 12,
                   height: 1.55), textAlign: TextAlign.center),
         ])),
       );
@@ -1500,7 +1528,7 @@ class _ExerciseChart extends StatelessWidget {
             const SizedBox(height: 2),
             Row(children: [
               Text('Best: ', style: GoogleFonts.inter(
-                  color: AppColors.textMuted, fontSize: 12)),
+                  color: AppColors.textMuted, fontSize: 13)),
               Text(
                 hasWeight ? '${pr}kg'
                     : '${exLogs.map((l) => l.reps).reduce((a, b) => a > b ? a : b)} reps',
@@ -1525,7 +1553,7 @@ class _ExerciseChart extends StatelessWidget {
               Icon(tIcon, size: 11, color: tColor),
               const SizedBox(width: 3),
               Text(tLabel, style: GoogleFonts.inter(
-                  color: tColor, fontSize: 11, fontWeight: FontWeight.w700)),
+                  color: tColor, fontSize: 12, fontWeight: FontWeight.w700)),
             ],
           ),
           ),
@@ -1841,7 +1869,7 @@ class _AthleteIdentityCard extends StatelessWidget {
               letterSpacing: 0.9)),
           const SizedBox(height: 3),
           Text(summary, style: GoogleFonts.inter(
-              color: AppColors.textSecondary, fontSize: 12,
+              color: AppColors.textSecondary, fontSize: 13,
               fontWeight: FontWeight.w400, height: 1.4)),
         ])),
       ]),
@@ -1912,13 +1940,13 @@ class _HistoryCard extends StatelessWidget {
             Row(children: [
               Text('${entry.exerciseCount} exercises',
                   style: GoogleFonts.inter(
-                      color: AppColors.textMuted, fontSize: 11)),
+                      color: AppColors.textMuted, fontSize: 12)),
               if (entry.durationMinutes > 0) ...[
                 Text(' · ', style: GoogleFonts.inter(
-                    color: AppColors.textMuted, fontSize: 11)),
+                    color: AppColors.textMuted, fontSize: 12)),
                 Text('${entry.durationMinutes}min',
                     style: GoogleFonts.inter(
-                        color: AppColors.textMuted, fontSize: 11)),
+                        color: AppColors.textMuted, fontSize: 12)),
               ],
             ]),
             if (milestoneLabel.isNotEmpty) ...[
@@ -1951,7 +1979,7 @@ class _HistoryCard extends StatelessWidget {
                       color: accent.withValues(alpha: 0.20), width: 0.5),
                 ),
                 child: Text(volText, style: GoogleFonts.rajdhani(
-                    color: accent, fontSize: 11,
+                    color: accent, fontSize: 12,
                     fontWeight: FontWeight.w800)),
               ),
             if (entry.xpEarned > 0) ...[
@@ -2000,7 +2028,7 @@ class _OnboardingEvolutionSection extends StatelessWidget {
         // Narrative
         if (narrative.isNotEmpty) ...[
           Text(narrative, style: GoogleFonts.inter(
-            color: AppColors.textSecondary, fontSize: 12.5,
+            color: AppColors.textSecondary, fontSize: 14,
             fontWeight: FontWeight.w400, height: 1.5,
             fontStyle: FontStyle.italic)),
           const SizedBox(height: AppSpacing.md),
@@ -2130,7 +2158,7 @@ class _FatigueProgressionCardState extends State<_FatigueProgressionCard>
                 _insight(fatigue, progression),
                 style: GoogleFonts.inter(
                   color: AppColors.textPrimary.withValues(alpha: 0.86),
-                  fontSize: 14, fontWeight: FontWeight.w300, height: 1.65),
+                  fontSize: 15, fontWeight: FontWeight.w300, height: 1.65),
               ),
               const SizedBox(height: 16),
 
@@ -2315,7 +2343,7 @@ class _MovementMasterySectionState extends State<_MovementMasterySection> {
           Text(
             'Your first few sessions teach LiftOn how your body adapts.',
             style: GoogleFonts.inter(
-                color: AppColors.textMuted, fontSize: 12, height: 1.55),
+                color: AppColors.textMuted, fontSize: 14, height: 1.55),
             textAlign: TextAlign.center,
           ),
         ]),
@@ -2344,7 +2372,7 @@ class _MovementMasterySectionState extends State<_MovementMasterySection> {
                 _showAll ? 'Show Less' : 'View All Movement Intelligence',
                 style: GoogleFonts.inter(
                   color: AppColors.gold.withValues(alpha: 0.65),
-                  fontSize: 11.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -2466,7 +2494,7 @@ class _MasteryCard extends StatelessWidget {
             Text(
               _formatName(mastery.exercise),
               style: GoogleFonts.rajdhani(
-                color: AppColors.textPrimary, fontSize: 18,
+                color: AppColors.textPrimary, fontSize: 20,
                 fontWeight: FontWeight.w900, height: 1.1),
               overflow: TextOverflow.ellipsis,
             ),
@@ -2534,7 +2562,7 @@ class _Label extends StatelessWidget {
           text.toUpperCase(),
           style: GoogleFonts.inter(
             color: AppColors.textSecondary.withValues(alpha: 0.68),
-            fontSize: 10.5,
+            fontSize: 12,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.4,
           ),
@@ -3107,7 +3135,7 @@ class _AnalyticsHeroInsightCardState extends State<_AnalyticsHeroInsightCard>
                             const SizedBox(height: AppSpacing.md),
                             Text(r.subtitle, style: GoogleFonts.inter(
                               color: AppColors.textMuted.withValues(alpha: 0.52),
-                              fontSize: 11.5, fontWeight: FontWeight.w300,
+                              fontSize: 13, fontWeight: FontWeight.w300,
                               height: 1.62)),
                           ],
                         ],

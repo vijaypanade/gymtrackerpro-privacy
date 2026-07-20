@@ -8,13 +8,14 @@
 //   • Share / Save via Screenshot — same pipeline as pr_celebration
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../providers/user_provider.dart';
@@ -163,7 +164,7 @@ class _CertificateScreen extends StatefulWidget {
 
 class _CertificateScreenState extends State<_CertificateScreen>
     with SingleTickerProviderStateMixin {
-  final ScreenshotController _shot = ScreenshotController();
+  final GlobalKey _repaintKey = GlobalKey();
 
   late final AnimationController _entryC;
   late final Animation<double> _fade;
@@ -258,16 +259,24 @@ class _CertificateScreenState extends State<_CertificateScreen>
   // ── Share / Save ───────────────────────────────────────────────────────────
 
   Future<File?> _capture() async {
-    final img = await _shot.capture(
-      delay: const Duration(milliseconds: 80),
-      pixelRatio: 3.0,
-    );
-    if (img == null) return null;
-    final dir = await getTemporaryDirectory();
-    final f = File(
-        '${dir.path}/lifton_certificate_${DateTime.now().millisecondsSinceEpoch}.png');
-    await f.writeAsBytes(img);
-    return f;
+    try {
+      final boundary = _repaintKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      await Future.delayed(const Duration(milliseconds: 60));
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+      final dir = await getTemporaryDirectory();
+      final f = File(
+          '${dir.path}/lifton_certificate_${DateTime.now().millisecondsSinceEpoch}.png');
+      await f.writeAsBytes(byteData.buffer.asUint8List());
+      return f;
+    } catch (e) {
+      debugPrint('Certificate capture error: $e');
+      return null;
+    }
   }
 
   Future<void> _share() async {
@@ -276,13 +285,20 @@ class _CertificateScreenState extends State<_CertificateScreen>
     HapticFeedback.mediumImpact();
     try {
       final f = await _capture();
-      if (f != null) {
-        await Share.shareXFiles(
-          [XFile(f.path)],
-          text: '🏆 ${_formatName(widget.exerciseName)} — $_prValue\n'
-              'Certified by LiftOn 💪',
-        );
+      if (f == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Could not capture certificate — try again.')),
+          );
+        }
+        return;
       }
+      await Share.shareXFiles(
+        [XFile(f.path)],
+        text: '🏆 ${_formatName(widget.exerciseName)} — $_prValue\n'
+            'Certified by LiftOn 💪',
+      );
     } catch (e) {
       debugPrint('Certificate share error: $e');
     } finally {
@@ -310,8 +326,8 @@ class _CertificateScreenState extends State<_CertificateScreen>
                 opacity: _fade,
                 child: ScaleTransition(
                   scale: _scale,
-                  child: Screenshot(
-                    controller: _shot,
+                  child: RepaintBoundary(
+                    key: _repaintKey,
                     child: _certificateBody(displayName),
                   ),
                 ),

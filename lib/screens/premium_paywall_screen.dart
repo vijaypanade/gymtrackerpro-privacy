@@ -30,7 +30,7 @@ import '../utils/app_constants.dart';
 
 // ── Plan data model ──────────────────────────────────────────────────────────
 
-enum _PlanId { monthly, quarterly, yearly }
+enum _PlanId { monthly, yearly }
 
 class _Plan {
   final _PlanId  id;
@@ -63,29 +63,20 @@ const _kPlans = [
     id:        _PlanId.yearly,
     productId: BillingProducts.yearly,
     title:     'Yearly',
-    price:     '₹999',
+    price:     '₹1499',
     period:    '/year',
-    perMonth:  'Only ₹83/month',
+    perMonth:  'Only ₹125/month',
     badge:     'BEST VALUE',
-    savings:   'Save 44%',
+    savings:   'Save 17%',
     isHero:    true,
   ),
   _Plan(
     id:        _PlanId.monthly,
     productId: BillingProducts.monthly,
     title:     'Monthly',
-    price:     '₹149',
+    price:     '₹150',
     period:    '/month',
     badge:     'MOST POPULAR',
-  ),
-  _Plan(
-    id:        _PlanId.quarterly,
-    productId: BillingProducts.quarterly,
-    title:     '3 Months',
-    price:     '₹349',
-    period:    '/3 mo',
-    perMonth:  '₹116/mo',
-    savings:   'Save 22%',
   ),
 ];
 
@@ -290,7 +281,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
                     child: Text('Skip',
                         style: GoogleFonts.inter(
                           color: AppColors.textMuted,
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                         )),
                   ),
@@ -362,7 +353,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     color: AppColors.textSecondary,
-                    fontSize: 14,
+                    fontSize: 15,
                     height: 1.55,
                   ),
                 ),
@@ -400,7 +391,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
                 'Go Premium for unlimited coaching, every day.',
                 style: GoogleFonts.inter(
                   color: AppColors.goldSoft,
-                  fontSize: 13,
+                  fontSize: 14,
                   height: 1.45,
                 ),
               ),
@@ -430,7 +421,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
               'PREMIUM INCLUDES',
               style: GoogleFonts.inter(
                 color: AppColors.goldAmber,
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.8,
               ),
@@ -462,13 +453,13 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
                           Text(label,
                               style: GoogleFonts.inter(
                                 color: AppColors.textPrimary,
-                                fontSize: 14,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w600,
                               )),
                           Text(sub,
                               style: GoogleFonts.inter(
                                 color: AppColors.textMuted,
-                                fontSize: 12,
+                                fontSize: 13,
                                 height: 1.4,
                               )),
                         ],
@@ -490,7 +481,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
 
   Widget _buildPricingSection() {
     final heroplan = _kPlans.firstWhere((p) => p.isHero); // yearly
-    final sidePlans = _kPlans.where((p) => !p.isHero).toList(); // monthly + quarterly
+    final sidePlans = _kPlans.where((p) => !p.isHero).toList(); // monthly
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -501,7 +492,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
             'CHOOSE YOUR PLAN',
             style: GoogleFonts.inter(
               color: AppColors.textMuted,
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.8,
             ),
@@ -521,7 +512,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
           ),
           const SizedBox(height: 10),
 
-          // ── Side-by-side cards (Monthly + Quarterly) ──────────────────────
+          // ── Monthly card ──────────────────────────────────────────────────
           Row(
             children: sidePlans.map((plan) {
               return Expanded(
@@ -551,14 +542,11 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
 
   Widget _buildCtaSection() {
     final plan = _kPlans.firstWhere((p) => p.id == _selected);
-    final isYearly    = _selected == _PlanId.yearly;
-    final isQuarterly = _selected == _PlanId.quarterly;
+    final isYearly = _selected == _PlanId.yearly;
 
     final trialLine = isYearly
         ? '${plan.price}/year billed after trial ends'
-        : isQuarterly
-            ? '${plan.price} billed after 14-day trial'
-            : '${plan.price}/month billed after 14-day trial';
+        : '${plan.price}/month billed after 14-day trial';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -627,7 +615,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               color: AppColors.textMuted,
-              fontSize: 12,
+              fontSize: 13,
               height: 1.4,
             ),
           ),
@@ -637,7 +625,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               color: AppColors.textDisabled.withValues(alpha: 0.6),
-              fontSize: 11,
+              fontSize: 12,
             ),
           ),
         ],
@@ -771,7 +759,7 @@ class _HeroPlanCard extends StatelessWidget {
                     plan.savings!,
                     style: GoogleFonts.inter(
                       color: AppColors.gold,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -816,7 +804,7 @@ class _HeroPlanCard extends StatelessWidget {
                 plan.perMonth!,
                 style: GoogleFonts.inter(
                   color: AppColors.goldSoft,
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -834,7 +822,7 @@ class _HeroPlanCard extends StatelessWidget {
                   '14-day free trial included',
                   style: GoogleFonts.inter(
                     color: AppColors.gold,
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -847,7 +835,7 @@ class _HeroPlanCard extends StatelessWidget {
   }
 }
 
-// ── Side plan card (Monthly / Quarterly) ─────────────────────────────────────
+// ── Side plan card (Monthly) ──────────────────────────────────────────────────
 
 class _SidePlanCard extends StatelessWidget {
   final _Plan     plan;
@@ -909,7 +897,7 @@ class _SidePlanCard extends StatelessWidget {
                   plan.savings!,
                   style: GoogleFonts.inter(
                     color: AppColors.gold,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -930,7 +918,7 @@ class _SidePlanCard extends StatelessWidget {
               plan.period,
               style: GoogleFonts.inter(
                 color: AppColors.textMuted,
-                fontSize: 11,
+                fontSize: 12,
               ),
             ),
 
@@ -940,7 +928,7 @@ class _SidePlanCard extends StatelessWidget {
                 plan.perMonth!,
                 style: GoogleFonts.inter(
                   color: AppColors.textSecondary,
-                  fontSize: 11,
+                  fontSize: 12,
                 ),
               ),
             ],
@@ -953,7 +941,7 @@ class _SidePlanCard extends StatelessWidget {
                   plan.title,
                   style: GoogleFonts.inter(
                     color: AppColors.textSecondary,
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1024,7 +1012,7 @@ class _FooterLink extends StatelessWidget {
               label,
               style: GoogleFonts.inter(
                 color: AppColors.textMuted,
-                fontSize: 12,
+                fontSize: 13,
                 decoration: TextDecoration.underline,
                 decorationColor: AppColors.textDisabled,
               ),

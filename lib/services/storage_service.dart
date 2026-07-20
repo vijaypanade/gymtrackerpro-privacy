@@ -58,6 +58,27 @@ class StorageKeys {
   static const String dailyMission      = 'daily_mission_v1';
   static const String weeklyNarrative   = 'weekly_narrative_v1';
   static const String weeklyStoryViewed = 'weekly_story_viewed_v1';
+  // RFC-PLANNER-UX-001 — {snoozeKey: 'yyyy-MM-dd'} map; entries expire daily.
+  static const String plannerInsightSnooze = 'planner_insight_snooze_v1';
+
+  // RFC-002.5: history cloud sync migration flag.
+  // Stores an int version; 0 (absent) = backfill not yet run, 1 = complete.
+  // NOTE: stored in SharedPreferences as a convenience; on reinstall the flag
+  // is cleared and backfillHistoryIfNeeded() runs again — this is safe because
+  // the backfill is fully idempotent (set() by UUID). A future RFC may migrate
+  // this flag to the Firestore user document for true reinstall-persistence.
+  static const String historySyncMigrationVersion = 'history_sync_migration_v';
+  // Tracks consecutive backfill failures to prevent infinite retry (RC-4).
+  static const String historySyncAttempts = 'history_sync_attempts';
+
+  // RFC-002.6B: ISO-8601 timestamp of the last successful health workout sync.
+  // HealthSyncEngine uses this as the `since` anchor for incremental fetches.
+  // Absent (null) on first sync — HealthSyncEngine defaults to epoch (2020-01-01).
+  static const String healthLastSyncDate = 'health_last_sync_date';
+
+  // Exponential moving average of overnight HRV (SDNN, ms). Updated each time a
+  // new HRV reading arrives. Absent until the first Apple Watch overnight measurement.
+  static const String hrvBaseline = 'health_hrv_baseline_v1';
 
   // Hive box names
   static const String hiveWorkoutBox  = 'workoutBox';

@@ -132,8 +132,8 @@ class AthleteTimelineEngine {
         date:      pr.date,
         title:     'PR — ${pr.exercise}',
         detail:    pr.isRepPR
-            ? '${pr.reps} reps @ ${pr.weight.toStringAsFixed(1)} kg (rep PR)'
-            : '${pr.weight.toStringAsFixed(1)} kg × ${pr.reps} (weight PR)',
+            ? '${pr.reps} reps @ ${_fmtKg(pr.weight)} (rep PR)'
+            : '${_fmtKg(pr.weight)} × ${pr.reps} (weight PR)',
         value:     pr.weight,
         valueUnit: 'kg',
         exercise:  pr.exercise,
@@ -228,6 +228,9 @@ class AthleteTimelineEngine {
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────
+
+  static String _fmtKg(double kg) =>
+      kg == kg.truncateToDouble() ? '${kg.toInt()} kg' : '${kg.toStringAsFixed(1)} kg';
 
   DateTime? _firstDate(List<WorkoutLog> logs) {
     if (logs.isEmpty) return null;

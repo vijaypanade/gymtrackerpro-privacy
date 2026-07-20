@@ -905,6 +905,7 @@ class _ExercisePreviewSheetState extends State<ExercisePreviewSheet>
   late final Animation<double> _fade;
   late final Animation<Offset> _slide;
   bool _thumbError = false;
+  bool _dismissing = false;
 
   @override
   void initState() {
@@ -1119,20 +1120,54 @@ class _ExercisePreviewSheetState extends State<ExercisePreviewSheet>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // drag handle
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 4),
-                  child: Container(
-                    width: 44, height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(2),
+                // drag handle + close button (swipe-down to dismiss)
+                GestureDetector(
+                  onVerticalDragEnd: (d) {
+                    if (!_dismissing && (d.primaryVelocity ?? 0) > 200) {
+                      _dismissing = true;
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: Padding(
+                  padding: const EdgeInsets.only(top: 20, bottom: 4),
+                  child: Row(children: [
+                    const SizedBox(width: 48),
+                    Expanded(
+                      child: Center(
+                        child: Container(
+                          width: 44, height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 28, top: 16),
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.close_rounded,
+                            color: Color(0xFF888888), size: 22),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ]),
                   ),
                 ),
 
                 Flexible(
+                  child: NotificationListener<OverscrollNotification>(
+                    onNotification: (n) {
+                      if (!_dismissing && n.overscroll < 0) {
+                        _dismissing = true;
+                        Navigator.pop(context);
+                      }
+                      return false;
+                    },
                   child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1158,6 +1193,7 @@ class _ExercisePreviewSheetState extends State<ExercisePreviewSheet>
                         _buildAddButton(),
                       ],
                     ),
+                  ),
                   ),
                 ),
               ],

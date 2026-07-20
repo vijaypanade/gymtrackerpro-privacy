@@ -108,12 +108,17 @@ class TrainingAdjustmentService {
     required RecoveryState recovery,
     required CoachContext  context,
     DayPlan? day,
+    bool canShowAdaptiveIncrease = false,
   }) {
     final score    = recovery.overallScore;
     final limiting = recovery.primaryLimitingMuscle;
+    final bool peakUnlocked = score >= 90 && !recovery.highFatigue &&
+        canShowAdaptiveIncrease;
 
     // ── Intensity multiplier ──────────────────────────────────────────────
-    final double intensityMult = score >= 90 && !recovery.highFatigue
+    // 1.10 increase requires canShowAdaptiveIncrease — AI must know the
+    // athlete well enough to push beyond planned load.
+    final double intensityMult = peakUnlocked
         ? 1.10
         : score >= 75 ? 1.00
         : score >= 60 ? 0.92
@@ -123,8 +128,8 @@ class TrainingAdjustmentService {
     // ── Volume multiplier ─────────────────────────────────────────────────
     final double volumeMult = recovery.needsDeload || score < 45
         ? 0.65
-        : score < 60                          ? 0.80
-        : score >= 90 && !recovery.highFatigue ? 1.10
+        : score < 60      ? 0.80
+        : peakUnlocked    ? 1.10
         : 1.00;
 
     // ── Rep range ─────────────────────────────────────────────────────────
@@ -150,12 +155,13 @@ class TrainingAdjustmentService {
 
     // ── Directive copy ────────────────────────────────────────────────────
     final (headline, directive) = _messaging(
-      score:       score,
-      limiting:    limiting,
-      needsDeload: recovery.needsDeload,
-      highFatigue: recovery.highFatigue,
-      goal:        context.goal,
-      level:       context.level,
+      score:                   score,
+      limiting:                limiting,
+      needsDeload:             recovery.needsDeload,
+      highFatigue:             recovery.highFatigue,
+      goal:                    context.goal,
+      level:                   context.level,
+      canShowAdaptiveIncrease: canShowAdaptiveIncrease,
     );
 
     final modified = intensityMult != 1.0 ||
@@ -189,6 +195,7 @@ class TrainingAdjustmentService {
     required bool   highFatigue,
     required String goal,
     required String level,
+    required bool   canShowAdaptiveIncrease,
   }) {
     if (needsDeload) {
       return (
@@ -196,7 +203,9 @@ class TrainingAdjustmentService {
         'Keep spinal loading controlled. Trim sets to 60% of normal. No training to failure today.',
       );
     }
-    if (score >= 90 && !highFatigue) {
+    // Overload message is an increase prescription — requires canShowAdaptiveIncrease.
+    // Without it, a high recovery score still earns "Ready to train effectively".
+    if (score >= 90 && !highFatigue && canShowAdaptiveIncrease) {
       return (
         'Peak readiness — overload is on the table',
         'Recovery is elevated — today supports overload work. Push compound lifts and chase new rep targets.',

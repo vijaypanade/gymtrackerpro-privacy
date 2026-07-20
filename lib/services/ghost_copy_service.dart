@@ -52,9 +52,13 @@ class GhostCopyService {
     final gapWeeks = (gapDays / 7).ceil().clamp(1, 99);
 
     ex.ghostWeekGap   = gapWeeks;
-    ex.previousWeight = log.weight;
+    ex.previousWeight = log.weight;  // show actual last-session weight in UI
 
-    final target = _targetWeight(log.weight, gapWeeks);
+    // RFC-006: use plannedWeight as the progressive overload baseline so a
+    // temporary adaptive deload (e.g. 95 kg) never permanently reduces the
+    // next week's target (which should progress from 100 kg).
+    final baseline = log.plannedWeight ?? log.weight;
+    final target = _targetWeight(baseline, gapWeeks);
     for (final s in ex.sets) {
       s.weight = target;
     }

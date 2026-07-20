@@ -7,6 +7,7 @@ import '../models/workout_log.dart';
 import '../providers/app_provider.dart';
 import '../services/progression_service.dart';
 import '../utils/app_constants.dart';
+import '../utils/weight_converter.dart';
 
 // ── Data model ────────────────────────────────────────────────────────────────
 class _PREntry {
@@ -115,7 +116,9 @@ class _PRWallScreenState extends State<PRWallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final logs   = context.read<AppProvider>().logs;
+    final ap     = context.read<AppProvider>();
+    final logs   = ap.logs;
+    final weightUnit = ap.profile.weightUnit;
     final all    = _computePRs(logs);
     final muscles = ['All', ...all.map((e) => e.muscleGroup).toSet()
         .toList()..sort((a, b) {
@@ -186,10 +189,11 @@ class _PRWallScreenState extends State<PRWallScreen> {
                     final entry  = filtered[i];
                     final isTop  = i == 0 && _selectedMuscle == 'All';
                     return _PRCard(
-                      entry:  entry,
-                      isTop:  isTop,
-                      rank:   i + 1,
-                      color:  _colorFor(entry.muscleGroup),
+                      entry:      entry,
+                      isTop:      isTop,
+                      rank:       i + 1,
+                      color:      _colorFor(entry.muscleGroup),
+                      weightUnit: weightUnit,
                     );
                   },
                   childCount: filtered.length,
@@ -267,19 +271,19 @@ class _PRCard extends StatelessWidget {
   final bool     isTop;
   final int      rank;
   final Color    color;
+  final String   weightUnit;
 
   const _PRCard({
     required this.entry,
     required this.isTop,
     required this.rank,
     required this.color,
+    this.weightUnit = 'kg',
   });
 
   @override
   Widget build(BuildContext context) {
-    final weightStr = entry.prWeight % 1 == 0
-        ? '${entry.prWeight.toInt()} kg'
-        : '${entry.prWeight} kg';
+    final weightStr = WeightConverter.display(entry.prWeight, weightUnit);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),

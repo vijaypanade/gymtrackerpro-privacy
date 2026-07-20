@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'main_shell.dart';
 import 'login_screen.dart';
+import '../providers/app_provider.dart';
 import '../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -109,11 +111,24 @@ class _SplashScreenState extends State<SplashScreen>
     // Navigate when BOTH min visual hold (2.5 s) AND providers are ready
     Future.wait<void>([
       Future<void>.delayed(const Duration(milliseconds: 2500)),
-      widget.readyFuture ?? Future<void>.value(),
+      (widget.readyFuture ?? Future<void>.value()).catchError((_) {}),
     ]).then((_) {
       providerReady = true;
       if (!mounted) return;
-      final isLoggedIn = AuthService.instance.currentUser != null;
+      bool isLoggedIn = false;
+      try {
+        isLoggedIn = AuthService.instance.currentUser != null;
+        // iOS Keychain persists auth credentials across reinstalls even
+        // though local Hive data is wiped. Detect reinstall by checking
+        // whether the user has any local data — if both name and workout
+        // count are empty, send to LoginScreen to trigger cloud restore.
+        if (isLoggedIn) {
+          final ap = context.read<AppProvider>();
+          final hasLocalData = ap.user.name.isNotEmpty ||
+              ap.workout.streak.totalWorkouts > 0;
+          if (!hasLocalData) isLoggedIn = false;
+        }
+      } catch (_) {}
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, __, ___) =>

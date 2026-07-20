@@ -49,7 +49,6 @@ class _WorkoutSplitPlannerScreenState
         context,
         trigger: PaywallTrigger.aiLimitHit,
         onUpgrade: () => p.refreshMonetization(),
-        onAdComplete: () => p.refreshMonetization(),
       );
       return;
     }

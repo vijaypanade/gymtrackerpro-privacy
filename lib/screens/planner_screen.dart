@@ -43,7 +43,6 @@ import '../utils/exercise_difficulty_helper.dart';
 import '../utils/exercise_equipment_helper.dart';
 import '../utils/exercise_ai_badge_helper.dart';
 import '../services/exercise_intelligence_service.dart';
-import '../services/weekly_evolution_service.dart';
 import 'ai_chat_screen.dart';
 import 'main_shell.dart';
 import '../widgets/confetti_celebration.dart';
@@ -52,19 +51,26 @@ import '../engines/pr_engine.dart' as pre;
 import '../utils/haptics.dart';
 import '../widgets/planner/planner_video_widgets.dart';
 import '../widgets/planner/session_prophecy_card.dart';
+import '../widgets/planner/insight_card.dart';
+import '../ai/generators/planner_coaching_arbiter.dart';
 import '../utils/launch_beacon.dart';
 import '../services/recovery_session_service.dart';
 import '../services/ghost_copy_service.dart';
 import '../services/exercise_gif_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import '../utils/weight_converter.dart';
 // ════════════════════════════════════════════════
 // HAPTICS HELPER — consistent system
 // ════════════════════════════════════════════════
+/// Formats a weight value in the user's preferred unit, dropping trailing .0.
+String _fmtKg(double kg, [String unit = 'kg']) => WeightConverter.display(kg, unit);
+
 /// Combines feedback message with next target for compact header display.
 /// Same logic as PR celebration screen.
 String _buildHeaderMessage(
-    pre.WorkoutFeedback? fb, String fallback, PlannedExercise ex) {
+    pre.WorkoutFeedback? fb, String fallback, PlannedExercise ex,
+    [String unit = 'kg']) {
   if (fb == null) return fallback;
 
   // Deterministic per-exercise variation — same exercise always gets same coaching
@@ -155,9 +161,9 @@ String _buildHeaderMessage(
     final current = ex.sets.isNotEmpty ? ex.sets.first.weight : 0.0;
     final suggested = fb.nextWeight;
     if (suggested <= current + 0.01) {
-      next = '→ Maintain ${current.toStringAsFixed(1)} kg';
+      next = '→ Maintain ${_fmtKg(current, unit)}';
     } else {
-      next = '→ ${suggested.toStringAsFixed(1)} kg';
+      next = '→ ${_fmtKg(suggested, unit)}';
     }
   }
   return '$coaching\n$next';
@@ -191,7 +197,7 @@ void showBadgesDialog(BuildContext context, List<AppBadge> badges) {
           const Icon(Icons.workspace_premium_rounded, color: AppColors.gold, size: 38),
           const SizedBox(height: AppSpacing.sm),
           Text('Achievement Unlocked', style: GoogleFonts.inter(
-              color: AppColors.gold, fontSize: 11,
+              color: AppColors.gold, fontSize: 13,
               fontWeight: FontWeight.w700, letterSpacing: 0.3)),
           const SizedBox(height: AppSpacing.lg),
           ...badges.map((b) => Padding(
@@ -212,7 +218,7 @@ void showBadgesDialog(BuildContext context, List<AppBadge> badges) {
                     color: AppColors.gold, fontSize: 17,
                     fontWeight: FontWeight.w700)),
                 Text(b.description, style: GoogleFonts.inter(
-                    color: AppColors.textSecondary, fontSize: 12)),
+                    color: AppColors.textSecondary, fontSize: 14)),
               ])),
             ]),
           )),
@@ -296,7 +302,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: Stack(children: [
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: Stack(children: [
         Column(children: [
 
         // ── PREMIUM APP BAR ───────────────────────
@@ -337,7 +346,52 @@ class _PlannerScreenState extends State<PlannerScreen> {
         // for set toggles and exercise list changes.
         Expanded(child: _DayBody(key: ValueKey(safe), idx: safe, name: _names[safe])),
         ]),
+
+        // ── KEYBOARD DONE TOOLBAR ─────────────────
+        // Floats above numeric keyboard — tap Done to dismiss.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          child: AnimatedOpacity(
+            opacity: MediaQuery.of(context).viewInsets.bottom > 0 ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 150),
+            child: Material(
+              color: const Color(0xFF1C1C1E),
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Color(0xFF2C2C2E), width: 0.6),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    GestureDetector(
+                      onTap: () => FocusScope.of(context).unfocus(),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 10),
+                        child: Text(
+                          'Done',
+                          style: GoogleFonts.inter(
+                            color: AppColors.gold,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ]),
+      ),
     );
   }
 }
@@ -412,7 +466,7 @@ class _PlannerAppBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
           Text('WEEKLY PLANNER', style: GoogleFonts.rajdhani(
-              color: AppColors.textPrimary, fontSize: 16,
+              color: AppColors.textPrimary, fontSize: 18,
               fontWeight: FontWeight.w800, letterSpacing: 0.5)),
           const SizedBox(height: 1),
           // Workout stats pill — Selector on scalar values so set-toggles
@@ -439,7 +493,7 @@ class _PlannerAppBar extends StatelessWidget {
                       color: s.isDone
                           ? AppColors.textMuted.withValues(alpha: 0.55)
                           : color,
-                      fontSize: 11, fontWeight: FontWeight.w500,
+                      fontSize: 13, fontWeight: FontWeight.w500,
                     ),
                   ),
                 ]);
@@ -450,7 +504,7 @@ class _PlannerAppBar extends StatelessWidget {
                     : '$dayName · No workout',
                 style: GoogleFonts.inter(
                   color: AppColors.textMuted.withValues(alpha: 0.75),
-                  fontSize: 9.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
               );
@@ -487,7 +541,7 @@ class _SessionPill extends StatelessWidget {
       Text(svc.elapsedFormatted,
           style: GoogleFonts.rajdhani(
               color: AppColors.gold,
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w700)),
     ]),
   );
@@ -508,7 +562,7 @@ class _SessionPill extends StatelessWidget {
       Text('Ready to Train',
           style: GoogleFonts.inter(
               color: AppColors.gold.withValues(alpha: 0.80),
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.3)),
     ]),
@@ -544,89 +598,25 @@ class _SessionPill extends StatelessWidget {
 // Shows ONE banner at a time, highest priority first.
 // Priority: Overtraining > Injury > Comeback > RecoveryDirective > Adaptive > NewWeek > AI
 // ════════════════════════════════════════════════
-enum _ActiveBanner { overtraining, injury, comeback, recoveryDirective, adaptive, newWeek, ai }
-
+// RFC-PLANNER-UX-001 — banner priority lives in AppProvider.activePlannerBanner
+// (single source shared with the coaching arbiter). Max 1 banner, no
+// "+N more" meta-counter: hidden insights simply don't exist for the user.
 class _ContextualBannerSlot extends StatelessWidget {
   final int dayIdx;
   const _ContextualBannerSlot({required this.dayIdx});
 
   @override
   Widget build(BuildContext context) {
-    return Selector<AppProvider,
-        ({_ActiveBanner which, int extraCount})>(
-      selector: (_, ap) {
-        final overtraining      = ap.overTrainingRisk > 60;
-        final hasRisk           = ap.injuryRisks.isNotEmpty;
-        final comeback          = ap.showComebackBanner;
-        final recoveryDirective = ap.trainingAdjustment.isModified;
-        final adaptive          = ap.shouldSuggestPlanRefresh;
-        final newWeek           = ap.showNewWeekBanner;
-
-        _ActiveBanner which;
-        int extra = 0;
-
-        if (overtraining) {
-          which = _ActiveBanner.overtraining;
-          if (hasRisk)           extra++;
-          if (comeback)          extra++;
-          if (recoveryDirective) extra++;
-          if (adaptive)          extra++;
-          if (newWeek)           extra++;
-        } else if (hasRisk) {
-          which = _ActiveBanner.injury;
-          if (comeback)          extra++;
-          if (recoveryDirective) extra++;
-          if (adaptive)          extra++;
-          if (newWeek)           extra++;
-        } else if (comeback) {
-          which = _ActiveBanner.comeback;
-          if (recoveryDirective) extra++;
-          if (adaptive)          extra++;
-          if (newWeek)           extra++;
-        } else if (recoveryDirective) {
-          which = _ActiveBanner.recoveryDirective;
-          if (adaptive) extra++;
-          if (newWeek)  extra++;
-        } else if (adaptive) {
-          which = _ActiveBanner.adaptive;
-          if (newWeek)   extra++;
-        } else if (newWeek) {
-          which = _ActiveBanner.newWeek;
-        } else {
-          which = _ActiveBanner.ai;
-        }
-
-        return (which: which, extraCount: extra);
-      },
-      builder: (_, s, __) {
-        final banner = switch (s.which) {
-          _ActiveBanner.overtraining      => const _OvertrainingBanner(),
-          _ActiveBanner.injury            => const _InjuryRiskBanner(),
-          _ActiveBanner.comeback          => const _ComebackBanner(),
-          _ActiveBanner.recoveryDirective => const _RecoveryDirectiveBanner(),
-          _ActiveBanner.adaptive          => const _AdaptivePlanBanner(),
-          _ActiveBanner.newWeek           => const _NewWeekBanner(),
-          _ActiveBanner.ai                => _AIBanner(dayIdx: dayIdx),
-        };
-
-        if (s.extraCount == 0) return banner;
-
-        return Column(mainAxisSize: MainAxisSize.min, children: [
-          banner,
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg, 0, AppSpacing.lg, 4),
-            child: Row(children: [
-              const Icon(Icons.info_outline_rounded,
-                  color: AppColors.textMuted, size: 10),
-              const SizedBox(width: 4),
-              Text('+${s.extraCount} more ${s.extraCount == 1 ? "insight" : "insights"}',
-                  style: GoogleFonts.inter(
-                      color: AppColors.textMuted, fontSize: 9.5,
-                      fontWeight: FontWeight.w500)),
-            ]),
-          ),
-        ]);
+    return Selector<AppProvider, PlannerBannerType>(
+      selector: (_, ap) => ap.activePlannerBanner,
+      builder: (_, which, __) => switch (which) {
+        PlannerBannerType.overtraining      => const _OvertrainingBanner(),
+        PlannerBannerType.injury            => const _InjuryRiskBanner(),
+        PlannerBannerType.comeback          => const _ComebackBanner(),
+        PlannerBannerType.recoveryDirective => const _RecoveryDirectiveBanner(),
+        PlannerBannerType.adaptive          => const _AdaptivePlanBanner(),
+        PlannerBannerType.newWeek           => const _NewWeekBanner(),
+        PlannerBannerType.ai                => _AIBanner(dayIdx: dayIdx),
       },
     );
   }
@@ -640,8 +630,11 @@ class _RecoveryDirectiveBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<AppProvider,
-        ({String headline, String directive, double intensity, double volume})>(
+    return Selector<AppProvider, ({
+      String headline, String directive,
+      double intensity, double volume,
+      bool declined, bool active,
+    })>(
       selector: (_, ap) {
         final a = ap.trainingAdjustment;
         return (
@@ -649,14 +642,19 @@ class _RecoveryDirectiveBanner extends StatelessWidget {
           directive: a.coachDirective,
           intensity: a.intensityMultiplier,
           volume:    a.volumeMultiplier,
+          declined:  ap.adaptiveDeclinedToday,
+          active:    ap.adaptiveSession != null,
         );
       },
-      builder: (_, d, __) {
+      builder: (ctx, d, __) {
         final col = d.intensity >= 1.05
             ? AppColors.gold
             : d.intensity >= 0.90
                 ? AppColors.goldSoft
                 : AppColors.textSecondary;
+
+        // Once user made a choice, show compact advisory only (no more buttons).
+        final choiceMade = d.declined || d.active;
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -668,42 +666,110 @@ class _RecoveryDirectiveBanner extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadii.md),
               border: Border.all(color: col.withValues(alpha: 0.22), width: 1),
             ),
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.tune_rounded, color: col, size: 18),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        d.headline,
-                        style: GoogleFonts.inter(
-                          color: col,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
-                        ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      d.active ? Icons.auto_awesome_rounded : Icons.tune_rounded,
+                      color: col, size: 18,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            d.active ? 'ADAPTIVE MODE ACTIVE' : d.headline,
+                            style: GoogleFonts.inter(
+                              color: col,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          if (d.directive.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              d.active
+                                  ? 'Weights adjusted for today\'s recovery.'
+                                  : d.directive,
+                              style: GoogleFonts.inter(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 6),
+                          _AdjustmentPills(
+                              intensityMult: d.intensity,
+                              volumeMult:    d.volume),
+                        ],
                       ),
-                      if (d.directive.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          d.directive,
-                          style: GoogleFonts.inter(
-                            color: AppColors.textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                    ),
+                  ],
+                ),
+                // Action buttons — only shown once per day before a choice is made.
+                if (!choiceMade) ...[
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          H.medium();
+                          context.read<AppProvider>().startAdaptiveSession();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: col.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: col.withValues(alpha: 0.30), width: 0.8),
+                          ),
+                          child: Center(
+                            child: Text('Start Adaptive Workout',
+                                style: GoogleFonts.inter(
+                                  color: col,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                )),
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 6),
-                      _AdjustmentPills(
-                          intensityMult: d.intensity,
-                          volumeMult:    d.volume),
-                    ],
-                  ),
-                ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          H.light();
+                          context.read<AppProvider>().declineAdaptiveSession();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.10),
+                                width: 0.8),
+                          ),
+                          child: Center(
+                            child: Text('Use Original Plan',
+                                style: GoogleFonts.inter(
+                                  color: AppColors.textMuted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                )),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ]),
+                ],
               ],
             ),
           ),
@@ -804,7 +870,7 @@ class _AIBanner extends StatelessWidget {
               Text('TODAY',
                 style: GoogleFonts.inter(
                   color: AppColors.goldAmber.withValues(alpha: 0.60),
-                  fontSize: 9, fontWeight: FontWeight.w700,
+                  fontSize: 11, fontWeight: FontWeight.w700,
                   letterSpacing: 1.6,
                 ),
               ),
@@ -815,7 +881,7 @@ class _AIBanner extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
                   color: AppColors.textPrimary.withValues(alpha: 0.90),
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   height: 1.35,
                 ),
@@ -828,7 +894,7 @@ class _AIBanner extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     color: AppColors.textSecondary.withValues(alpha: 0.70),
-                    fontSize: 11.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w400,
                     height: 1.4,
                   ),
@@ -926,10 +992,10 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(reason, style: GoogleFonts.inter(
-                    color: AppColors.gold, fontSize: 11,
+                    color: AppColors.gold, fontSize: 13,
                     fontWeight: FontWeight.w700)),
                 Text(action, style: GoogleFonts.inter(
-                    color: AppColors.textMuted, fontSize: 10)),
+                    color: AppColors.textMuted, fontSize: 12)),
               ],
             )),
             const SizedBox(width: AppSpacing.sm),
@@ -940,7 +1006,7 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
                     strokeWidth: 1.5, color: AppColors.gold)),
                 const SizedBox(height: 3),
                 Text('Reading your data', style: GoogleFonts.inter(
-                    color: AppColors.textMuted, fontSize: 8.5)),
+                    color: AppColors.textMuted, fontSize: 11)),
               ])
             else if (data.plateau)
               GestureDetector(
@@ -950,7 +1016,6 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
                     await PaywallSheet.show(ctx,
                       trigger:      PaywallTrigger.aiLimitHit,
                       onUpgrade:    () => p.refreshMonetization(),
-                      onAdComplete: () => p.refreshMonetization(),
                     );
                     return;
                   }
@@ -963,7 +1028,7 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
                     if (insight.isNotEmpty && ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                         content: Text(insight,
-                            style: GoogleFonts.inter(fontSize: 12.5)),
+                            style: GoogleFonts.inter(fontSize: 14)),
                         backgroundColor: const Color(0xFF1C1C1C),
                         behavior: SnackBarBehavior.floating,
                         duration: const Duration(seconds: 3),
@@ -984,7 +1049,7 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text('Refresh', style: GoogleFonts.inter(
-                      color: Colors.black, fontSize: 11,
+                      color: Colors.black, fontSize: 13,
                       fontWeight: FontWeight.w800)),
                 ),
               )
@@ -1000,7 +1065,7 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
                             color: AppColors.gold, size: 16),
                         const SizedBox(width: 8),
                         Text('Deload applied — all weights reduced to 60 %',
-                            style: GoogleFonts.inter(fontSize: 12.5,
+                            style: GoogleFonts.inter(fontSize: 14,
                                 color: Colors.white)),
                       ]),
                       backgroundColor: const Color(0xFF1C1C1C),
@@ -1026,7 +1091,7 @@ class _AdaptivePlanBannerState extends State<_AdaptivePlanBanner> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text('Apply', style: GoogleFonts.inter(
-                      color: Colors.black, fontSize: 11,
+                      color: Colors.black, fontSize: 13,
                       fontWeight: FontWeight.w800)),
                 ),
               ),
@@ -1096,7 +1161,7 @@ class _NewWeekBannerState extends State<_NewWeekBanner> {
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(child: Text('New week — plan updated',
                   style: GoogleFonts.rajdhani(
-                      color: AppColors.textPrimary, fontSize: 15,
+                      color: AppColors.textPrimary, fontSize: 16,
                       fontWeight: FontWeight.w800))),
                 GestureDetector(
                   onTap: () => ctx.read<AppProvider>().dismissNewWeekBanner(),
@@ -1107,7 +1172,7 @@ class _NewWeekBannerState extends State<_NewWeekBanner> {
               const SizedBox(height: 4),
               Text('Last week: $pct$vol · Progressive plan ready',
                 style: GoogleFonts.inter(
-                    color: AppColors.textSecondary, fontSize: 11)),
+                    color: AppColors.textSecondary, fontSize: 13)),
               const SizedBox(height: AppSpacing.sm),
               Row(children: [
                 Expanded(
@@ -1118,7 +1183,7 @@ class _NewWeekBannerState extends State<_NewWeekBanner> {
                         padding: const EdgeInsets.symmetric(vertical: 8)),
                     child: Text('Dismiss',
                       style: GoogleFonts.inter(
-                          color: AppColors.textMuted, fontSize: 12)),
+                          color: AppColors.textMuted, fontSize: 14)),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -1131,7 +1196,7 @@ class _NewWeekBannerState extends State<_NewWeekBanner> {
                                 strokeWidth: 1.5, color: AppColors.gold)),
                           const SizedBox(height: 4),
                           Text('Preparing plan...', style: GoogleFonts.inter(
-                              color: AppColors.textMuted, fontSize: 9)),
+                              color: AppColors.textMuted, fontSize: 11)),
                         ]))
                       : GoldButton(
                           text: 'Upgrade to Pro',
@@ -1142,7 +1207,6 @@ class _NewWeekBannerState extends State<_NewWeekBanner> {
                               await PaywallSheet.show(ctx,
                                 trigger:      PaywallTrigger.aiLimitHit,
                                 onUpgrade:    () => p.refreshMonetization(),
-                                onAdComplete: () => p.refreshMonetization(),
                               );
                               return;
                             }
@@ -1155,7 +1219,7 @@ class _NewWeekBannerState extends State<_NewWeekBanner> {
                               if (insight.isNotEmpty && ctx.mounted) {
                                 ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                                   content: Text(insight,
-                                      style: GoogleFonts.inter(fontSize: 12.5)),
+                                      style: GoogleFonts.inter(fontSize: 14)),
                                   backgroundColor: const Color(0xFF1C1C1C),
                                   behavior: SnackBarBehavior.floating,
                                   duration: const Duration(seconds: 3),
@@ -1237,11 +1301,11 @@ class _ComebackBannerState extends State<_ComebackBanner> {
               children: [
                 Text('${data.days}-day gap — comeback time',
                   style: GoogleFonts.rajdhani(
-                      color: AppColors.textPrimary, fontSize: 14,
+                      color: AppColors.textPrimary, fontSize: 15,
                       fontWeight: FontWeight.w800)),
                 Text('$science. Use $intensity of last weights today.',
                   style: GoogleFonts.inter(
-                      color: AppColors.textSecondary, fontSize: 10.5,
+                      color: AppColors.textSecondary, fontSize: 13,
                       height: 1.4)),
               ],
             )),
@@ -1253,7 +1317,7 @@ class _ComebackBannerState extends State<_ComebackBanner> {
                       strokeWidth: 1.5, color: AppColors.orange)),
                 const SizedBox(height: 3),
                 Text('Reading your data', style: GoogleFonts.inter(
-                    color: AppColors.textMuted, fontSize: 8.5)),
+                    color: AppColors.textMuted, fontSize: 11)),
               ])
             else
               GestureDetector(
@@ -1263,7 +1327,6 @@ class _ComebackBannerState extends State<_ComebackBanner> {
                     await PaywallSheet.show(ctx,
                       trigger:      PaywallTrigger.aiLimitHit,
                       onUpgrade:    () => p.refreshMonetization(),
-                      onAdComplete: () => p.refreshMonetization(),
                     );
                     return;
                   }
@@ -1276,7 +1339,7 @@ class _ComebackBannerState extends State<_ComebackBanner> {
                     if (insight.isNotEmpty && ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                         content: Text(insight,
-                            style: GoogleFonts.inter(fontSize: 12.5)),
+                            style: GoogleFonts.inter(fontSize: 14)),
                         backgroundColor: const Color(0xFF1C1C1C),
                         behavior: SnackBarBehavior.floating,
                         duration: const Duration(seconds: 3),
@@ -1298,7 +1361,7 @@ class _ComebackBannerState extends State<_ComebackBanner> {
                   ),
                   child: Text('Adjust Plan',
                     style: GoogleFonts.inter(
-                        color: AppColors.orange, fontSize: 11,
+                        color: AppColors.orange, fontSize: 13,
                         fontWeight: FontWeight.w700)),
                 ),
               ),
@@ -1583,17 +1646,22 @@ class _DayIndicator extends StatelessWidget {
         width: 28,
         height: 28,
         decoration: BoxDecoration(
-          color: AppColors.red.withValues(alpha: 0.10),
+          color: AppColors.textMuted.withValues(alpha: 0.06),
           shape: BoxShape.circle,
           border: Border.all(
-            color: AppColors.red.withValues(alpha: 0.24),
+            color: AppColors.textMuted.withValues(alpha: 0.14),
             width: 0.8,
           ),
         ),
-        child: const Icon(
-          Icons.close_rounded,
-          color: AppColors.red,
-          size: 13,
+        child: Center(
+          child: Container(
+            width: 8,
+            height: 1.5,
+            decoration: BoxDecoration(
+              color: AppColors.textMuted.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(1),
+            ),
+          ),
         ),
       );
     }
@@ -1719,77 +1787,124 @@ class _DayBodyState extends State<_DayBody> {
     super.dispose();
   }
 
+  // Structural key for _DayBody Selector — excludes weight/reps values so that
+  // typing into a _Num field does not rebuild the ListView (which would evict
+  // slivers and null-crash the caret-reveal post-frame callback).
+  static String _structKey(AppProvider p, int idx) {
+    if (p.weekPlan.isEmpty) return '';
+    final safe = idx.clamp(0, p.weekPlan.length - 1);
+    final day  = p.weekPlan[safe];
+    final buf  = StringBuffer()
+      ..write(p.weekPlan.length)
+      ..write('|')
+      ..write(safe)
+      ..write('|')
+      ..write(day.id)
+      ..write('|')
+      ..write(day.isRestDay)
+      ..write('|')
+      ..write(day.isCompleted)
+      ..write('|')
+      ..write(p.todayIndex)
+      ..write('|')
+      ..write(p.isComebackSession)
+      ..write('|')
+      ..write(p.plannerAdaptiveState.index)
+      ..write('|')
+      ..write(p.recoverySuggestion.shouldSuggestAlternative)
+      ..write('|')
+      ..write(p.yesterdayMissedPlan?.id ?? '-')
+      ..write('|')
+      ..write(p.streak.totalWorkouts)
+      ..write('|')
+      ..write(p.onboardingComplete)
+      ..write('|')
+      ..write(p.isHighIntimidation)
+      ..write('|');
+    for (final ex in day.exercises) {
+      buf..write(ex.id)..write('[');
+      for (final s in ex.sets) {
+        buf..write(s.id)..write(':')..write(s.done)..write(',');
+      }
+      buf.write(']');
+    }
+    return buf.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final p  = context.watch<AppProvider>();
-    final wp = p.weekPlan;
-    if (wp.isEmpty) return const SizedBox.shrink();
-    final safe = widget.idx.clamp(0, wp.length - 1);
-    final day  = wp[safe];
-    final col  = AppColors.dayColors[safe % AppColors.dayColors.length];
+    return Selector<AppProvider, String>(
+      selector: (_, p) => _structKey(p, widget.idx),
+      builder: (context, _, __) {
+        final p  = context.read<AppProvider>();
+        final wp = p.weekPlan;
+        if (wp.isEmpty) return const SizedBox.shrink();
+        final safe = widget.idx.clamp(0, wp.length - 1);
+        final day  = wp[safe];
+        final col  = AppColors.dayColors[safe % AppColors.dayColors.length];
 
-    return ListView(
-      controller: _scroll,
-      cacheExtent: 600,
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 90),
-      children: [
-        _DayHeader(day: day, name: widget.name, color: col, idx: safe),
-        const SizedBox(height: AppSpacing.md),
-        if (day.isRestDay)
-          _RestCard(idx: safe, color: col)
-        else ...[
-          if (safe == p.todayIndex && !day.isCompleted) ...[
-            // Phase 2: comeback + recovery session both active → single WELCOME BACK card
-            if (p.isComebackSession &&
-                p.plannerAdaptiveState == PlannerAdaptiveState.interventionRequired &&
-                p.recoverySuggestion.shouldSuggestAlternative)
-              _WelcomeBackCard(suggestion: p.recoverySuggestion)
+        return ListView(
+          controller: _scroll,
+          cacheExtent: 600,
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 90),
+          children: [
+            _DayHeader(day: day, name: widget.name, color: col, idx: safe),
+            const SizedBox(height: AppSpacing.md),
+            if (day.isRestDay)
+              _RestCard(idx: safe, color: col)
             else ...[
-              // Phase 1: comebackSession adaptive card suppressed — top banner covers it
-              if (p.plannerAdaptiveState == PlannerAdaptiveState.interventionRequired &&
-                  !p.isComebackSession)
-                _AdaptiveDecisionCard(idx: safe)
-              else if (p.plannerAdaptiveState == PlannerAdaptiveState.recoveryAligned)
-                _RecoveryAlignedInsight(message: p.recoveryAlignedMessage),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
-                child: (p.recoverySuggestion.shouldSuggestAlternative &&
-                        !day.exercises.any((ex) => ex.sets.any((s) => s.done)))
-                    ? _RecoverySessionCard(suggestion: p.recoverySuggestion)
-                    : (p.yesterdayMissedPlan != null &&
-                            p.streak.totalWorkouts > 0)
-                        ? _MissedDayRecoveryCard(missed: p.yesterdayMissedPlan!)
-                        : const SizedBox.shrink(),
-              ),
+              if (safe == p.todayIndex && !day.isCompleted) ...[
+                // Phase 2: comeback + recovery session both active → single WELCOME BACK card
+                if (p.isComebackSession &&
+                    p.plannerAdaptiveState == PlannerAdaptiveState.interventionRequired &&
+                    p.recoverySuggestion.shouldSuggestAlternative)
+                  _WelcomeBackCard(suggestion: p.recoverySuggestion)
+                else ...[
+                  // Phase 1: comebackSession adaptive card suppressed — top banner covers it
+                  if (p.plannerAdaptiveState == PlannerAdaptiveState.interventionRequired &&
+                      !p.isComebackSession)
+                    _AdaptiveDecisionCard(idx: safe),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                    child: (p.recoverySuggestion.shouldSuggestAlternative &&
+                            !day.exercises.any((ex) => ex.sets.any((s) => s.done)))
+                        ? _RecoverySessionCard(suggestion: p.recoverySuggestion)
+                        : (p.yesterdayMissedPlan != null &&
+                                p.streak.totalWorkouts > 0)
+                            ? _MissedDayRecoveryCard(missed: p.yesterdayMissedPlan!)
+                            : const SizedBox.shrink(),
+                  ),
+                ],
+                if (!p.onboardingComplete && p.isHighIntimidation)
+                  const _OnboardingConfidenceNote(),
+                // RFC-PLANNER-UX-001 — single coaching slot, max 1 insight.
+                // Arbiter owns priority, confidence floor, snooze, and the
+                // critical-banner override. Renders nothing when nothing earned.
+                _CoachingSlot(day: day, idx: safe),
+              ],
+              if (day.exercises.isEmpty)
+                _EmptyDay(idx: safe, color: col, p: p)
+              else ...[
+                ...day.exercises.asMap().entries.map((e) =>
+                    RepaintBoundary(
+                      key: ValueKey(e.value.id),
+                      child: _ExCard(ex: e.value, idx: safe, color: col,
+                          entryDelay: e.key * 50),
+                    )),
+                const SizedBox(height: AppSpacing.sm),
+                _AddBtn(idx: safe, color: col),
+                if (!day.isCompleted) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _CompleteBtn(idx: safe),
+                ],
+              ],
             ],
-            if (p.topWeeklyAdjustment != null)
-              _WeeklyAdjustmentBanner(adjustment: p.topWeeklyAdjustment!),
-            if (!p.onboardingComplete && p.isHighIntimidation)
-              const _OnboardingConfidenceNote(),
-            // Session Prophecy — pre-workout prediction (today only)
-            SessionProphecyCard(day: day, idx: safe),
           ],
-          if (day.exercises.isEmpty)
-            _EmptyDay(idx: safe, color: col, p: p)
-          else ...[
-            ...day.exercises.asMap().entries.map((e) =>
-                RepaintBoundary(
-                  key: ValueKey(e.value.id),
-                  child: _ExCard(ex: e.value, idx: safe, color: col,
-                      entryDelay: e.key * 50),
-                )),
-            const SizedBox(height: AppSpacing.sm),
-            _AddBtn(idx: safe, color: col),
-            if (!day.isCompleted) ...[
-              const SizedBox(height: AppSpacing.sm),
-              _CompleteBtn(idx: safe),
-            ],
-          ],
-        ],
-      ],
+        );
+      },
     );
   }
 }
@@ -1880,7 +1995,7 @@ class _DayHeader extends StatelessWidget {
                       child: Text(
                         day.title.isEmpty ? 'Workout' : _fixTitleGrammar(day.title),
                         style: GoogleFonts.rajdhani(
-                            color: AppColors.textPrimary, fontSize: 15,
+                            color: AppColors.textPrimary, fontSize: 17,
                             fontWeight: FontWeight.w800),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
@@ -1912,7 +2027,7 @@ class _DayHeader extends StatelessWidget {
               Text('$setCount sets  •  Complete',
                   style: GoogleFonts.inter(
                       color: AppColors.textMuted.withValues(alpha: 0.50),
-                      fontSize: 10, fontWeight: FontWeight.w500))
+                      fontSize: 12, fontWeight: FontWeight.w500))
             else ...[
               _StatChip(Icons.fitness_center_rounded, '$exCount ex'),
               const SizedBox(width: 5),
@@ -1947,7 +2062,7 @@ class _StatChip extends StatelessWidget {
       Icon(icon, color: AppColors.textMuted, size: 11),
       const SizedBox(width: 4),
       Text(label, style: GoogleFonts.inter(
-          color: AppColors.textSecondary, fontSize: 11,
+          color: AppColors.textSecondary, fontSize: 12,
           fontWeight: FontWeight.w600)),
     ]),
   );
@@ -2017,7 +2132,7 @@ class _AdaptiveDecisionCard extends StatelessWidget {
                       d.label.toUpperCase(),
                       style: GoogleFonts.inter(
                         color: col,
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.8,
                       ),
@@ -2030,7 +2145,7 @@ class _AdaptiveDecisionCard extends StatelessWidget {
                   d.message,
                   style: GoogleFonts.inter(
                     color: AppColors.textSecondary,
-                    fontSize: 12.5,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                     height: 1.45,
                   ),
@@ -2044,7 +2159,7 @@ class _AdaptiveDecisionCard extends StatelessWidget {
                     'SUGGESTED SWAPS',
                     style: GoogleFonts.inter(
                       color: AppColors.textMuted,
-                      fontSize: 8.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.9,
                     ),
@@ -2059,7 +2174,7 @@ class _AdaptiveDecisionCard extends StatelessWidget {
                             s.original,
                             style: GoogleFonts.inter(
                               color: AppColors.textMuted,
-                              fontSize: 11,
+                              fontSize: 13,
                               fontWeight: FontWeight.w500,
                               decoration: TextDecoration.lineThrough,
                             ),
@@ -2076,7 +2191,7 @@ class _AdaptiveDecisionCard extends StatelessWidget {
                             s.replacement,
                             style: GoogleFonts.inter(
                               color: AppColors.textSecondary,
-                              fontSize: 11,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -2100,120 +2215,28 @@ class _AdaptiveDecisionCard extends StatelessWidget {
 // Calm contextual line shown when recovery conditions exist but don't
 // conflict with today's planned session. No warning, no modal.
 // ════════════════════════════════════════════════
-class _RecoveryAlignedInsight extends StatelessWidget {
-  final String message;
-  const _RecoveryAlignedInsight({required this.message});
+// RFC-PLANNER-UX-001 — the single coaching slot below the day header.
+// Reads AppProvider.plannerCoachingInsight (arbiter-selected, cached).
+// Prophecy insights expand into the full SessionProphecyCard; the rest
+// expand into their body text. Dismiss (×) snoozes for the rest of today.
+class _CoachingSlot extends StatelessWidget {
+  final DayPlan day;
+  final int idx;
+  const _CoachingSlot({required this.day, required this.idx});
 
   @override
   Widget build(BuildContext context) {
-    if (message.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 2,
-            height: 34,
-            margin: const EdgeInsets.only(top: 1, right: 10),
-            decoration: BoxDecoration(
-              color: AppColors.gold.withValues(alpha: 0.40),
-              borderRadius: BorderRadius.circular(1),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              message,
-              style: GoogleFonts.inter(
-                color: AppColors.textSecondary.withValues(alpha: 0.75),
-                fontSize: 12.5,
-                fontWeight: FontWeight.w500,
-                height: 1.50,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════
-// WEEKLY ADJUSTMENT BANNER — Phase 14
-// Advisory-only. Never auto-edits the plan.
-// ════════════════════════════════════════════════
-class _WeeklyAdjustmentBanner extends StatelessWidget {
-  final WeeklyAdjustment adjustment;
-  const _WeeklyAdjustmentBanner({required this.adjustment});
-
-  Color _col() => switch (adjustment.priority) {
-    AdjustmentPriority.high     => AppColors.orange,
-    AdjustmentPriority.moderate => AppColors.goldSoft,
-    AdjustmentPriority.low      => AppColors.textMuted,
-  };
-
-  IconData _icon() => switch (adjustment.type) {
-    WeeklyAdjustmentType.reduceVolume       => Icons.compress_rounded,
-    WeeklyAdjustmentType.increaseVolume     => Icons.expand_rounded,
-    WeeklyAdjustmentType.shiftFrequency     => Icons.sync_rounded,
-    WeeklyAdjustmentType.rotateExercise     => Icons.swap_horiz_rounded,
-    WeeklyAdjustmentType.reduceAxialLoad    => Icons.arrow_downward_rounded,
-    WeeklyAdjustmentType.addRecoveryDay     => Icons.hotel_rounded,
-    WeeklyAdjustmentType.increaseIntensity  => Icons.trending_up_rounded,
-    WeeklyAdjustmentType.technicalFocus     => Icons.precision_manufacturing_rounded,
-    WeeklyAdjustmentType.restoreConsistency => Icons.calendar_today_rounded,
-    WeeklyAdjustmentType.reduceHingeLoading => Icons.accessibility_new_rounded,
-    WeeklyAdjustmentType.swapMovement       => Icons.compare_arrows_rounded,
-    WeeklyAdjustmentType.recoveryEmphasis   => Icons.self_improvement_rounded,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final col = _col();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: col.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(AppRadii.lg),
-          border: Border.all(color: col.withValues(alpha: 0.22), width: 0.8),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: col.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-              ),
-              child: Icon(_icon(), color: col, size: 14),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(child: Text(
-              adjustment.title.toUpperCase(),
-              style: GoogleFonts.inter(
-                color: col, fontSize: 9,
-                fontWeight: FontWeight.w800, letterSpacing: 0.8),
-              overflow: TextOverflow.ellipsis,
-            )),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: col.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text('THIS WEEK', style: GoogleFonts.inter(
-                color: col.withValues(alpha: 0.70), fontSize: 7.5,
-                fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-            ),
-          ]),
-          const SizedBox(height: AppSpacing.sm),
-          Text(adjustment.athleteFacingMessage, style: GoogleFonts.inter(
-            color: AppColors.textSecondary, fontSize: 12.5,
-            fontWeight: FontWeight.w500, height: 1.45)),
-        ]),
-      ),
+    final insight = context.select<AppProvider, PlannerCoachingInsight?>(
+        (ap) => ap.plannerCoachingInsight);
+    if (insight == null) return const SizedBox.shrink();
+    return InsightCard(
+      key: ValueKey(insight.snoozeKey),
+      insight: insight,
+      onDismiss: () =>
+          context.read<AppProvider>().snoozePlannerInsight(insight.snoozeKey),
+      expandedChild: insight.type == CoachingInsightType.prophecy
+          ? SessionProphecyCard(day: day, idx: idx)
+          : null,
     );
   }
 }
@@ -2247,7 +2270,7 @@ class _OnboardingConfidenceNote extends StatelessWidget {
             'Short, consistent sessions build lasting momentum — there\'s no rush.',
             style: GoogleFonts.inter(
               color: AppColors.textMuted,
-              fontSize: 11.5,
+              fontSize: 13,
               fontWeight: FontWeight.w400,
               height: 1.45,
               fontStyle: FontStyle.italic,
@@ -2303,7 +2326,7 @@ class _HeaderMenu extends StatelessWidget {
         Icon(ic, color: c ?? AppColors.textSecondary, size: 17),
         const SizedBox(width: AppSpacing.sm),
         Text(t, style: GoogleFonts.inter(
-            color: c ?? AppColors.textPrimary, fontSize: 13)),
+            color: c ?? AppColors.textPrimary, fontSize: 15)),
       ]));
 
   void _renameDialog(BuildContext context) {
@@ -2312,7 +2335,7 @@ class _HeaderMenu extends StatelessWidget {
       backgroundColor: AppColors.bgCard,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text('Rename Workout', style: GoogleFonts.rajdhani(
-          color: AppColors.textPrimary, fontSize: 18,
+          color: AppColors.textPrimary, fontSize: 20,
           fontWeight: FontWeight.w700)),
       content: TextField(
         controller: ctrl, autofocus: true,
@@ -2391,12 +2414,12 @@ class _RestCard extends StatelessWidget {
     child: Column(children: [
 
       Text('Rest Day', style: GoogleFonts.rajdhani(
-          color: AppColors.textPrimary, fontSize: 20,
+          color: AppColors.textPrimary, fontSize: 22,
           fontWeight: FontWeight.w700)),
       const SizedBox(height: AppSpacing.xs),
       Text('Recovery is where the gains happen.\nYou\'ve earned this.',
           style: GoogleFonts.inter(color: AppColors.textMuted,
-              fontSize: 12, height: 1.4),
+              fontSize: 14, height: 1.4),
           textAlign: TextAlign.center),
       const SizedBox(height: 18),
       OutlinedButton(
@@ -2612,7 +2635,7 @@ class _EmptyDayState extends State<_EmptyDay> with TickerProviderStateMixin {
               ),
               child: Text(statusLine, style: GoogleFonts.inter(
                 color: color.withValues(alpha: 0.85),
-                fontSize: 8.5, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
             ),
 
             const SizedBox(height: 10),
@@ -2620,14 +2643,14 @@ class _EmptyDayState extends State<_EmptyDay> with TickerProviderStateMixin {
             // ── Headline ──
             Text('No exercises planned', style: GoogleFonts.rajdhani(
               color: AppColors.textPrimary,
-              fontSize: 21, fontWeight: FontWeight.w700, height: 1.1)),
+              fontSize: 22, fontWeight: FontWeight.w700, height: 1.1)),
 
             const SizedBox(height: 6),
 
             // ── Subtext from live data ──
             Text(subLine, style: GoogleFonts.inter(
               color: AppColors.textMuted,
-              fontSize: 12, height: 1.45),
+              fontSize: 14, height: 1.45),
               textAlign: TextAlign.center),
 
             const SizedBox(height: 24),
@@ -2700,7 +2723,7 @@ class _AddBtn extends StatelessWidget {
         const SizedBox(width: 6),
         Text('Add Exercise', style: GoogleFonts.inter(
             color: AppColors.textMuted,
-            fontSize: 13, fontWeight: FontWeight.w500)),
+            fontSize: 15, fontWeight: FontWeight.w500)),
       ]),
     ),
   );
@@ -2720,7 +2743,7 @@ class _DialogStat extends StatelessWidget {
           color: AppColors.textPrimary, fontSize: 16,
           fontWeight: FontWeight.w800)),
       Text(label, style: GoogleFonts.inter(
-          color: AppColors.textMuted, fontSize: 9.5,
+          color: AppColors.textMuted, fontSize: 11,
           fontWeight: FontWeight.w500)),
     ],
   );
@@ -2778,7 +2801,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
           const SizedBox(width: AppSpacing.sm),
           Flexible(
             child: Text('Session Complete', style: GoogleFonts.rajdhani(
-                color: AppColors.textPrimary, fontSize: 20,
+                color: AppColors.textPrimary, fontSize: 22,
                 fontWeight: FontWeight.w700),
               overflow: TextOverflow.ellipsis),
           ),
@@ -2813,7 +2836,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
             const SizedBox(height: AppSpacing.md),
           ],
           Text('How long did you train?', style: GoogleFonts.inter(
-              color: AppColors.textSecondary, fontSize: 13)),
+              color: AppColors.textSecondary, fontSize: 15)),
           const SizedBox(height: AppSpacing.md),
           // ── Preset chips ──────────────────────────────────
           Row(children: [
@@ -2908,12 +2931,12 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                       title: const Text('No sets logged',
                           style: TextStyle(fontFamily: 'Rajdhani',
                               color: AppColors.textPrimary,
-                              fontSize: 18, fontWeight: FontWeight.w800)),
+                              fontSize: 20, fontWeight: FontWeight.w800)),
                       content: const Text(
                           'You haven\'t logged any sets for this workout.\nMark as complete anyway?',
                           style: TextStyle(fontFamily: 'Inter',
                               color: AppColors.textSecondary,
-                              fontSize: 13, height: 1.5)),
+                              fontSize: 15, height: 1.5)),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(_, false),
@@ -3025,7 +3048,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                   const Icon(Icons.hub_rounded, color: AppColors.gold, size: 20),
                   const SizedBox(width: AppSpacing.sm),
                   Text('Session Analyzed', style: GoogleFonts.rajdhani(
-                      color: AppColors.textPrimary, fontSize: 18,
+                      color: AppColors.textPrimary, fontSize: 20,
                       fontWeight: FontWeight.w800)),
                   const Spacer(),
                   Container(
@@ -3040,7 +3063,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                     ),
                     child: Text('$duration min',
                       style: GoogleFonts.rajdhani(
-                        color: AppColors.gold, fontSize: 13,
+                        color: AppColors.gold, fontSize: 14,
                         fontWeight: FontWeight.w700)),
                   ),
                 ]),
@@ -3058,7 +3081,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                     const SizedBox(width: AppSpacing.sm),
                     Text('Reviewing your session...',
                       style: GoogleFonts.inter(
-                        color: AppColors.textMuted, fontSize: 13,
+                        color: AppColors.textMuted, fontSize: 14,
                         fontStyle: FontStyle.italic)),
                   ])
                 else
@@ -3066,7 +3089,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                     insight.isNotEmpty ? insight : 'Session logged.',
                     style: GoogleFonts.inter(
                       color: AppColors.textPrimary,
-                      fontSize: 13, height: 1.55),
+                      fontSize: 15, height: 1.55),
                   ),
                 // ── Weight suggestion chip ────────────────────
                 if (weightMsg.isNotEmpty && !weightMsg.startsWith('🔒')) ...[
@@ -3085,7 +3108,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                     child: Text(weightMsg,
                       style: GoogleFonts.inter(
                         color: AppColors.gold,
-                        fontSize: 12, fontWeight: FontWeight.w500,
+                        fontSize: 13, fontWeight: FontWeight.w500,
                         height: 1.4)),
                   ),
                 ],
@@ -3098,7 +3121,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                           padding:
                               const EdgeInsets.symmetric(vertical: 12)),
                       child: Text('Got it', style: GoogleFonts.inter(
-                          color: AppColors.textMuted, fontSize: 14)),
+                          color: AppColors.textMuted, fontSize: 15)),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -3118,7 +3141,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                       },
                       icon: const Icon(Icons.share_rounded, size: 15),
                       label: Text('Share', style: GoogleFonts.inter(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
+                          fontSize: 14, fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.gold,
                         side: BorderSide(
@@ -3178,12 +3201,18 @@ class _CompleteBtnState extends State<_CompleteBtn> {
 
   @override
   Widget build(BuildContext context) {
-    // Select only isPendingReview for this day — avoids rebuilding on
-    // unrelated AppProvider changes like set toggles in other exercises.
-    final isPending = context.select<AppProvider, bool>((ap) =>
-        ap.weekPlan.length > widget.idx
-            ? ap.weekPlan[widget.idx].isPendingReview
-            : false);
+    // Select only the fields this widget cares about — avoids rebuilding on
+    // unrelated AppProvider changes.
+    final (:isPending, :anySetsLogged) = context.select<AppProvider, ({bool isPending, bool anySetsLogged})>((ap) {
+      final day = ap.weekPlan.length > widget.idx ? ap.weekPlan[widget.idx] : null;
+      return (
+        isPending:      day?.isPendingReview ?? false,
+        anySetsLogged:  day?.exercises.any((ex) => ex.sets.any((s) => s.done)) ?? false,
+      );
+    });
+
+    final buttonLabel = anySetsLogged ? 'Complete Workout' : 'Start Workout';
+    final buttonIcon  = anySetsLogged ? Icons.check_circle_rounded : Icons.fitness_center_rounded;
 
     if (isPending) {
       return Column(
@@ -3208,7 +3237,7 @@ class _CompleteBtnState extends State<_CompleteBtn> {
                   'All exercises complete — review your session',
                   style: GoogleFonts.inter(
                     color: AppColors.gold,
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -3230,8 +3259,8 @@ class _CompleteBtnState extends State<_CompleteBtn> {
               ],
             ),
             child: GoldButton(
-              text: 'Complete Workout',
-              icon: Icons.check_circle_rounded,
+              text: buttonLabel,
+              icon: buttonIcon,
               width: double.infinity,
               onTap: () => _dialog(context),
             ),
@@ -3241,8 +3270,8 @@ class _CompleteBtnState extends State<_CompleteBtn> {
     }
 
     return GoldButton(
-      text: 'Complete Workout',
-      icon: Icons.check_circle_rounded,
+      text: buttonLabel,
+      icon: buttonIcon,
       width: double.infinity,
       onTap: () => _dialog(context),
     );
@@ -3425,14 +3454,14 @@ class _GifExpandSheetState extends State<_GifExpandSheet> {
                     Text(widget.ex.category,
                         style: GoogleFonts.inter(
                           color: AppColors.textMuted,
-                          fontSize: 11,
+                          fontSize: 13,
                         )),
                   ],
                 )),
                 Text('FORM DEMO',
                     style: GoogleFonts.rajdhani(
                       color: AppColors.gold.withValues(alpha: 0.6),
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
                     )),
@@ -3540,7 +3569,7 @@ class _GifExpandSheetState extends State<_GifExpandSheet> {
                       Text('Watch Full Tutorial',
                           style: GoogleFonts.rajdhani(
                             color: Colors.black,
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.5,
                           )),
@@ -3639,7 +3668,7 @@ class _ExCardState extends State<_ExCard>
     final trend   = p.getExerciseTrend(ex.baseId);
     // Smart AI feedback (unified — same logic as PR screen via calculateWorkoutFeedback)
     final feedback = p.computeFeedback(ex);
-    final msg = _buildHeaderMessage(feedback, p.getTrainerMessage(ex), ex);
+    final msg = _buildHeaderMessage(feedback, p.getTrainerMessage(ex), ex, p.profile.weightUnit);
     // Exercise intelligence classification — drives movement pattern chip + axial badge
     final exProfile = ExerciseIntelligenceService.classify(ex.name);
     final showPatternChip = exProfile.axialLoading &&
@@ -3675,7 +3704,7 @@ class _ExCardState extends State<_ExCard>
               const Icon(Icons.delete_rounded,
                   color: AppColors.red, size: 24),
               Text('Remove', style: GoogleFonts.inter(
-                  color: AppColors.red, fontSize: 9.5,
+                  color: AppColors.red, fontSize: 11,
                   fontWeight: FontWeight.w600)),
             ]),
           ),
@@ -3812,7 +3841,7 @@ class _ExCardState extends State<_ExCard>
                       Text(
                         ex.name,
                         style: GoogleFonts.rajdhani(
-                            fontSize: 15, fontWeight: FontWeight.w800,
+                            fontSize: 16, fontWeight: FontWeight.w800,
                             color: (doneSets == totalSets && totalSets > 0)
                                 ? AppColors.textPrimary.withValues(alpha: 0.45)
                                 : AppColors.textPrimary),
@@ -3869,7 +3898,7 @@ class _ExCardState extends State<_ExCard>
                           msg,
                           style: GoogleFonts.inter(
                               color: AppColors.textSecondary.withValues(alpha: 0.70),
-                              fontSize: 10.5,
+                              fontSize: 12,
                               fontWeight: FontWeight.w400,
                               height: 1.3),
                           maxLines: 2,
@@ -3986,11 +4015,11 @@ class _ExCardState extends State<_ExCard>
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18)),
         title: Text('Remove Exercise?', style: GoogleFonts.rajdhani(
-            color: AppColors.textPrimary, fontSize: 18,
+            color: AppColors.textPrimary, fontSize: 20,
             fontWeight: FontWeight.w700)),
         content: Text('Remove "$name" from today\'s plan?',
             style: GoogleFonts.inter(
-                color: AppColors.textSecondary, fontSize: 13)),
+                color: AppColors.textSecondary, fontSize: 15)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false),
               child: Text('Keep it', style: GoogleFonts.inter(
@@ -4094,10 +4123,11 @@ class _AISuggestionBanner extends StatelessWidget {
     } else if (isBW) {
       targetText = '${hint.targetReps} reps — focus on form';
     } else {
-      final wStr = hint.nextWeight == hint.nextWeight.roundToDouble()
-          ? hint.nextWeight.toStringAsFixed(0)
-          : hint.nextWeight.toStringAsFixed(1);
-      targetText = '${wStr}kg × ${hint.targetReps} reps';
+      final dispW = WeightConverter.fromKg(hint.nextWeight, p.profile.weightUnit);
+      final wStr = dispW == dispW.roundToDouble()
+          ? dispW.toStringAsFixed(0)
+          : dispW.toStringAsFixed(1);
+      targetText = '$wStr${WeightConverter.label(p.profile.weightUnit)} × ${hint.targetReps} reps';
     }
 
     return Container(
@@ -4187,26 +4217,26 @@ class _SetsPanel extends StatelessWidget {
         child: Row(children: [
           SizedBox(width: 28, child: Text('SET',
               style: GoogleFonts.inter(color: AppColors.textMuted,
-                  fontSize: 9, fontWeight: FontWeight.w700,
+                  fontSize: 10, fontWeight: FontWeight.w700,
                   letterSpacing: 0.3))),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(isC ? 'MIN' : isBW ? 'REPS' : 'KG',
+          Expanded(child: Text(isC ? 'MIN' : isBW ? 'REPS' : WeightConverter.label(p.profile.weightUnit).toUpperCase(),
               style: GoogleFonts.inter(color: AppColors.textMuted,
-                  fontSize: 9, fontWeight: FontWeight.w700,
+                  fontSize: 10, fontWeight: FontWeight.w700,
                   letterSpacing: 0.3))),
           const SizedBox(width: AppSpacing.sm),
           if (!isC && !isBW)
             Expanded(child: Text('REPS',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(color: AppColors.textMuted,
-                    fontSize: 9, fontWeight: FontWeight.w700,
+                    fontSize: 10, fontWeight: FontWeight.w700,
                     letterSpacing: 0.3)))
           else const Spacer(),
           const SizedBox(width: AppSpacing.sm),
           SizedBox(width: 40, child: Text('RIR',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(color: AppColors.textMuted,
-                  fontSize: 9, fontWeight: FontWeight.w700,
+                  fontSize: 10, fontWeight: FontWeight.w700,
                   letterSpacing: 0.3))),
           const SizedBox(width: 36),
         ]),
@@ -4222,19 +4252,26 @@ class _SetsPanel extends StatelessWidget {
                 size: 10, color: AppColors.textMuted.withValues(alpha: 0.55)),
             const SizedBox(width: 3),
             Text(
-              'Last: ${ex.previousWeight % 1 == 0 ? ex.previousWeight.toInt() : ex.previousWeight} kg',
+              'Last: ${_fmtKg(ex.previousWeight, p.profile.weightUnit)}',
               style: GoogleFonts.inter(
                   color: AppColors.textMuted.withValues(alpha: 0.55),
-                  fontSize: 9.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w500),
             ),
           ]),
         ),
 
-      // Set rows
-      ...ex.sets.asMap().entries.map((e) => _SetRow(
+      // Set rows — pass adaptive data when session is active.
+      ...ex.sets.asMap().entries.map((e) {
+        final adaptive = p.adaptiveSession?.setFor(ex.id, e.value.id);
+        return _SetRow(
+          key: ValueKey('${ex.id}:${e.value.id}'),
           ex: ex, set: e.value, num: e.key + 1,
-          idx: idx, color: color)),
+          idx: idx, color: color,
+          adaptedWeight: adaptive?.adaptedWeight,
+          isOptional:    adaptive?.isOptional ?? false,
+        );
+      }),
 
       // Add set button
       TextButton.icon(
@@ -4244,7 +4281,7 @@ class _SetsPanel extends StatelessWidget {
         },
         icon: Icon(Icons.add_rounded, size: 14, color: color),
         label: Text('Add Set', style: GoogleFonts.rajdhani(
-            fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+            fontSize: 14, fontWeight: FontWeight.w700, color: color)),
       ),
       const SizedBox(height: AppSpacing.xs),
     ]);
@@ -4257,8 +4294,11 @@ class _SetsPanel extends StatelessWidget {
 class _SetRow extends StatelessWidget {
   final PlannedExercise ex; final ExSet set;
   final int num, idx; final Color color;
-  const _SetRow({required this.ex, required this.set,
-      required this.num, required this.idx, required this.color});
+  final double? adaptedWeight; // RFC-006: null when no adaptive session active
+  final bool    isOptional;    // RFC-006: true when volume trim drops this set
+  const _SetRow({super.key, required this.ex, required this.set,
+      required this.num, required this.idx, required this.color,
+      this.adaptedWeight, this.isOptional = false});
 
   @override
   Widget build(BuildContext context) {
@@ -4266,27 +4306,38 @@ class _SetRow extends StatelessWidget {
     final isC  = ex.unit == 'min';
     final isBW = ex.bodyweight;
 
+    // RFC-006: use adapted weight when session is active and not a done set.
+    final displayWeight = (!set.done && adaptedWeight != null)
+        ? adaptedWeight!
+        : set.weight;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 280),
       margin: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm, vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: set.done
-            ? const Color(0xFF131313)
-            : const Color(0xFF0A0A0A),
+        color: isOptional
+            ? const Color(0xFF070707)
+            : set.done
+                ? const Color(0xFF131313)
+                : const Color(0xFF0A0A0A),
         borderRadius: BorderRadius.circular(9),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: isOptional
+              ? Colors.white.withValues(alpha: 0.03)
+              : Colors.white.withValues(alpha: 0.05),
           width: 0.5,
         ),
       ),
-      child: Row(children: [
-        // Set number circle
+      child: Opacity(
+        opacity: isOptional ? 0.45 : 1.0,
+        child: Row(children: [
+        // Set number circle — shows "OPT" label for optional sets.
         Container(
-          width: 24, height: 24,
+          width: isOptional ? 34 : 24, height: 24,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(isOptional ? 5 : 12),
             color: set.done
                 ? AppColors.gold.withValues(alpha: 0.08)
                 : AppColors.bgElevated,
@@ -4297,32 +4348,35 @@ class _SetRow extends StatelessWidget {
               width: 0.7,
             ),
           ),
-          child: Center(child: Text('$num',
+          child: Center(child: Text(isOptional ? 'OPT' : '$num',
               style: GoogleFonts.rajdhani(
                 color: set.done
                     ? AppColors.gold.withValues(alpha: 0.70)
                     : AppColors.textSecondary,
-                fontSize: 11, fontWeight: FontWeight.w700))),
+                fontSize: isOptional ? 8 : 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: isOptional ? 0.5 : 0))),
         ),
         const SizedBox(width: AppSpacing.sm),
 
-        // Input fields
+        // Input fields — show adaptedWeight when session is active.
         Expanded(child: isC
-            ? _Num(value: set.weight, done: set.done, color: color,
+            ? _Num(key: ValueKey('${set.id}:w'), value: displayWeight, done: set.done, color: color,
                 hint: '10', isInt: true,
                 onSave: (v) => p.updateSet(idx, ex.id, set.id, weight: v))
             : isBW
-                ? _Num(value: set.reps.toDouble(), done: set.done,
+                ? _Num(key: ValueKey('${set.id}:r'), value: set.reps.toDouble(), done: set.done,
                     color: color, isInt: true, hint: '10',
                     onSave: (v) => p.updateSet(
                         idx, ex.id, set.id, reps: v.toInt()))
-                : _Num(value: set.weight, done: set.done, color: color,
+                : _Num(key: ValueKey('${set.id}:w'), value: displayWeight, done: set.done, color: color,
                     hint: '20.0',
                     onSave: (v) => p.updateSet(
                         idx, ex.id, set.id, weight: v))),
         const SizedBox(width: AppSpacing.sm),
         if (!isC && !isBW)
           Expanded(child: _Num(
+              key: ValueKey('${set.id}:r'),
               value: set.reps.toDouble(), done: set.done, color: color,
               isInt: true, hint: '10',
               onSave: (v) => p.updateSet(
@@ -4392,7 +4446,7 @@ class _SetRow extends StatelessWidget {
                     SizedBox(width: 8),
                     Text('Session updated',
                         style: TextStyle(fontFamily: 'Inter',
-                            color: Colors.white, fontSize: 13,
+                            color: Colors.white, fontSize: 14,
                             fontWeight: FontWeight.w600)),
                   ]),
                   backgroundColor: const Color(0xFF111100),
@@ -4406,15 +4460,30 @@ class _SetRow extends StatelessWidget {
               return;
             }
 
+            // RFC-006: Resolve effective weight for adaptive sessions.
+            // If the user edited set.weight after the session started
+            // (weight != plannedWeight), honor their override as the actual lift.
+            final adaptiveSet = p.adaptiveSession?.setFor(ex.id, set.id);
+            double? effectiveWeight;
+            double? loggedPlannedWeight;
+            if (adaptiveSet != null) {
+              final userEdited = set.weight != adaptiveSet.plannedWeight;
+              effectiveWeight     = userEdited ? set.weight : adaptiveSet.adaptedWeight;
+              loggedPlannedWeight = adaptiveSet.plannedWeight;
+            }
+
             // Old code used volume (weight×reps) which is WRONG:
             //   50kg×5=250 wouldn't beat 40kg×7=280 even though heavier
-            final prResult   = p.checkPRResult(key, set.weight, set.reps, ex.unit);
+            final prResult   = p.checkPRResult(key, effectiveWeight ?? set.weight, set.reps, ex.unit);
             final isPR       = prResult.isPR;
             final isFirst    = prResult.isFirst;
             final improvePct = prResult.improvePct.clamp(0.0, 999.0);
 
             // ── Toggle (log the set) ──────────────────────────────────
-            p.toggleSetDone(idx, ex.id, set.id);
+            p.toggleSetDone(idx, ex.id, set.id,
+              effectiveWeight: effectiveWeight,
+              plannedWeight:   loggedPlannedWeight,
+            );
 
             // ── Session milestone check ────────────────────────────────
             final milestone = WorkoutSessionService.instance.consumeMilestone();
@@ -4475,7 +4544,7 @@ class _SetRow extends StatelessWidget {
 
                 await showPRCelebration(context,
                   exerciseName:   ex.name,
-                  weight:         set.weight,
+                  weight:         effectiveWeight ?? set.weight,
                   reps:           set.reps,
                   xpEarned:       dynXP,
                   unit:           ex.unit,
@@ -4532,6 +4601,7 @@ class _SetRow extends StatelessWidget {
               color: AppColors.textMuted, size: 15),
         ),
       ]),
+      ),   // Opacity
     );
   }
 }
@@ -4543,7 +4613,7 @@ class _Num extends StatefulWidget {
   final double value; final bool done, isInt;
   final Color color; final String hint;
   final ValueChanged<double> onSave;
-  const _Num({required this.value, required this.done,
+  const _Num({super.key, required this.value, required this.done,
       required this.color, required this.hint,
       this.isInt = false, required this.onSave});
   @override State<_Num> createState() => _NumState();
@@ -4628,7 +4698,8 @@ class _NumState extends State<_Num> {
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
         ),
-        onChanged: _save, onSubmitted: _save,
+        onChanged: _save,
+        onSubmitted: (v) { _save(v); _focus.unfocus(); },
       ),
     );
   }
@@ -4735,8 +4806,6 @@ class _PickerSheetState extends State<_PickerSheet> {
   final FocusNode _searchFocus = FocusNode();
   bool _isFocused = false;
 
-  // Expanded "Why this?" badge explanations keyed by exercise key (Upgrade #8)
-  final Set<String> _expandedExplain = {};
 
   @override
   void initState() {
@@ -4970,7 +5039,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                       duration: const Duration(milliseconds: 240),
                       margin: const EdgeInsets.only(right: AppSpacing.xs + 2),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
+                          horizontal: 14, vertical: 11),
                       decoration: BoxDecoration(
                         color: sel ? AppColors.gold : AppColors.bgCardLight,
                         borderRadius: BorderRadius.circular(20),
@@ -4978,7 +5047,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                             color: sel ? AppColors.gold : AppColors.divider)),
                       child: Text(t, style: GoogleFonts.inter(
                         color: sel ? Colors.black : AppColors.textMuted,
-                        fontWeight: FontWeight.w600, fontSize: 12)),
+                        fontWeight: FontWeight.w600, fontSize: 13)),
                     ),
                   );
                 }),
@@ -5004,6 +5073,10 @@ class _PickerSheetState extends State<_PickerSheet> {
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       Icon(Icons.tune_rounded, size: 13,
                           color: _hasActiveFilters ? AppColors.gold : AppColors.textMuted),
+                      const SizedBox(width: 4),
+                      Text('Filters', style: GoogleFonts.inter(
+                        color: _hasActiveFilters ? AppColors.gold : AppColors.textMuted,
+                        fontSize: 13, fontWeight: FontWeight.w600)),
                       if (_hasActiveFilters) ...[
                         const SizedBox(width: 4),
                         Container(width: 5, height: 5,
@@ -5224,7 +5297,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                       muscle.toUpperCase(),
                       style: GoogleFonts.rajdhani(
                         color: col,
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.6,
                       ),
@@ -5260,7 +5333,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                         fatigueColor == AppColors.red ? 'High fatigue' : 'Moderate fatigue',
                         style: GoogleFonts.inter(
                           color: fatigueColor.withValues(alpha: 0.7),
-                          fontSize: 8.5,
+                          fontSize: 10,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -5310,7 +5383,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                               '$muscle still recovering · avoid heavy compounds today',
                               style: GoogleFonts.inter(
                                 color: Colors.white.withValues(alpha: 0.78),
-                                fontSize: 9.5,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w500,
                                 height: 1.35,
                               ),
@@ -5344,11 +5417,11 @@ class _PickerSheetState extends State<_PickerSheet> {
   }
 
   /// Format stat value for "Last" / "Best" display
-  String _formatStat(double weight, int reps, String unit) {
+  String _formatStat(double weight, int reps, String unit, [String weightUnit = 'kg']) {
     if (unit == 'reps') return '${reps}r';
     if (unit == 'min') return '${weight.toInt()}min';
-    if (weight > 0 && reps > 0) return '${weight.toStringAsFixed(1)}kg×$reps';
-    if (weight > 0) return '${weight.toStringAsFixed(1)}kg';
+    if (weight > 0 && reps > 0) return '${_fmtKg(weight, weightUnit).replaceAll(' ', '')}×$reps';
+    if (weight > 0) return _fmtKg(weight, weightUnit).replaceAll(' ', '');
     return '${reps}r';
   }
 
@@ -5387,8 +5460,6 @@ class _PickerSheetState extends State<_PickerSheet> {
     final type      = ex['type']      as String? ?? '';
     final cat       = ex['muscle']    as String? ?? 'General';
     final equipment = ex['equipment'] as String? ?? '';
-    final movement  =
-        (ex['movement'] as String? ?? '').toLowerCase();
 
     final emoji     = ex['emoji']     as String? ?? '💪';
     final unit      = ex['unit']      as String?
@@ -5449,7 +5520,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                 color: AppColors.gold, size: 18),
             const SizedBox(width: 4),
             Text('Add', style: GoogleFonts.inter(
-                color: AppColors.gold, fontSize: 11,
+                color: AppColors.gold, fontSize: 13,
                 fontWeight: FontWeight.w700)),
           ]),
         ),
@@ -5520,7 +5591,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                             child: Text(name,
                                 style: GoogleFonts.rajdhani(
                                   color: selected ? col : AppColors.textPrimary,
-                                  fontSize: 13.5,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                 ),
                                 maxLines: 1,
@@ -5576,7 +5647,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                                   Text(equipLabel,
                                       style: GoogleFonts.inter(
                                         color: AppColors.textMuted,
-                                        fontSize: 8.5,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.w500,
                                       )),
                                 ],
@@ -5589,43 +5660,9 @@ class _PickerSheetState extends State<_PickerSheet> {
                                 style: GoogleFonts.inter(
                                   color: AppColors.textMuted
                                       .withValues(alpha: 0.6),
-                                  fontSize: 8.5,
+                                  fontSize: 10,
                                 )),
                         ]),
-
-                        const SizedBox(height: 5),
-
-                        Wrap(
-                          spacing: 5,
-                          runSpacing: 5,
-                          children: [
-
-                            if (badge == 'AI Pick')
-                              _miniInsightChip(
-                                'IDEAL TODAY',
-                                AppColors.gold,
-                              ),
-
-                            if (badge == 'Recovery Friendly' ||
-                                badge == 'Joint Friendly')
-                              _miniInsightChip(
-                                'LOW FATIGUE LOAD',
-                                AppColors.goldSoft,
-                              ),
-
-                            if (movement == 'compound')
-                              _miniInsightChip(
-                                'HIGH OUTPUT',
-                                AppColors.gold,
-                              ),
-
-                            if (equipment == 'machine')
-                              _miniInsightChip(
-                                'STABLE FORM',
-                                const Color(0xFFB388FF),
-                              ),
-                          ],
-                        ),
 
                         // Personal stats row — ↺ Last  ⬆ PR
                         if (lastLog != null || bestWt > 0) ...[
@@ -5639,7 +5676,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                               const SizedBox(width: 2),
                               Text(
                                 _formatStat(lastLog.weight,
-                                    lastLog.reps, unit),
+                                    lastLog.reps, unit, p.profile.weightUnit),
                                 style: GoogleFonts.inter(
                                   color: AppColors.textMuted
                                       .withValues(alpha: 0.6),
@@ -5657,7 +5694,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                                       .withValues(alpha: 0.75)),
                               const SizedBox(width: 2),
                               Text(
-                                'PR  ${_formatStat(bestWt, bestReps, unit)}',
+                                'PR  ${_formatStat(bestWt, bestReps, unit, p.profile.weightUnit)}',
                                 style: GoogleFonts.inter(
                                   color: AppColors.gold
                                       .withValues(alpha: 0.75),
@@ -5667,137 +5704,6 @@ class _PickerSheetState extends State<_PickerSheet> {
                               ),
                             ],
                           ]),
-                        ],
-                        // "Why this?" expandable AI explanation (Upgrade #3)
-                        if (badge != null) ...[
-                          const SizedBox(height: 2),
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              H.light();
-                              setState(() {
-                                if (_expandedExplain.contains(key)) {
-                                  _expandedExplain.remove(key);
-                                } else {
-                                  _expandedExplain.add(key);
-                                }
-                              });
-                            },
-                            child: Container(
-                              constraints: const BoxConstraints(minHeight: 36),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 2, vertical: 8),
-                              child: AnimatedSize(
-                                duration: const Duration(milliseconds: 240),
-                                curve: AppCurves.primary,
-                                alignment: Alignment.topLeft,
-                                child: _expandedExplain.contains(key)
-                                    ? Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            height: 0.5,
-                                            margin: const EdgeInsets.only(
-                                                bottom: 6),
-                                            color: AppColors.goldSoft
-                                                .withValues(alpha: 0.20),
-                                          ),
-                                          ..._whyBadge(ex, p, badge)
-                                              .map((r) => Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                            top: 3),
-                                                    child: Row(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Padding(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .only(top: 1),
-                                                          child: Icon(
-                                                            Icons.check_rounded,
-                                                            size: 8,
-                                                            color: AppColors
-                                                                .goldSoft
-                                                                .withValues(
-                                                                    alpha: 0.55),
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                            width: 4),
-                                                        Flexible(
-                                                            child: Text(r,
-                                                                style: GoogleFonts
-                                                                    .inter(
-                                                                  color: AppColors
-                                                                      .textMuted
-                                                                      .withValues(
-                                                                          alpha:
-                                                                              0.72),
-                                                                  fontSize: 7.5,
-                                                                  height: 1.4,
-                                                                ))),
-                                                      ],
-                                                    ),
-                                                  )),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              AnimatedRotation(
-                                                turns: 0.5,
-                                                duration: const Duration(
-                                                    milliseconds: 220),
-                                                curve: AppCurves.primary,
-                                                child: Icon(
-                                                    Icons.expand_more_rounded,
-                                                    size: 9,
-                                                    color: AppColors.goldSoft
-                                                        .withValues(alpha: 0.35)),
-                                              ),
-                                              const SizedBox(width: 2),
-                                              Text('less',
-                                                  style: GoogleFonts.inter(
-                                                    color: AppColors.goldSoft
-                                                        .withValues(alpha: 0.35),
-                                                    fontSize: 7,
-                                                    fontStyle: FontStyle.italic,
-                                                  )),
-                                            ],
-                                          ),
-                                        ],
-                                      )
-                                    : Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          AnimatedRotation(
-                                            turns: 0.0,
-                                            duration: const Duration(
-                                                milliseconds: 220),
-                                            curve: AppCurves.primary,
-                                            child: Icon(
-                                                Icons.expand_more_rounded,
-                                                size: 9,
-                                                color: AppColors.goldSoft
-                                                    .withValues(alpha: 0.45)),
-                                          ),
-                                          const SizedBox(width: 2),
-                                          Text('Why this?',
-                                              style: GoogleFonts.inter(
-                                                color: AppColors.goldSoft
-                                                    .withValues(alpha: 0.45),
-                                                fontSize: 7.5,
-                                                fontStyle: FontStyle.italic,
-                                              )),
-                                        ],
-                                      ),
-                              ),
-                            ),
-                          ),
                         ],
                       ],
                     ),
@@ -5881,29 +5787,6 @@ class _PickerSheetState extends State<_PickerSheet> {
                 ]),
               ),
 
-              // TOP PICK corner badge for featured card (Upgrade #2)
-              if (isFeatured && badge != null)
-                Positioned(
-                  top: 0, left: 0,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 3),
-                    decoration: const BoxDecoration(
-                      color: AppColors.gold,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        bottomRight: Radius.circular(7),
-                      ),
-                    ),
-                    child: Text('TOP PICK',
-                        style: GoogleFonts.inter(
-                          color: Colors.black,
-                          fontSize: 6.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.3,
-                        )),
-                  ),
-                ),
             ]),
           ),
         ),
@@ -5913,70 +5796,6 @@ class _PickerSheetState extends State<_PickerSheet> {
 
 
 
-  Widget _miniInsightChip(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 6,
-        vertical: 3,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(
-          color: color.withValues(alpha: 0.20),
-          width: 0.6,
-        ),
-      ),
-      child: Text(
-        text,
-        style: GoogleFonts.inter(
-          color: color.withValues(alpha: 0.92),
-          fontSize: 6.8,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
-
-  /// Deterministic "Why this?" reasons for an AI badge — no network, no AI.
-  List<String> _whyBadge(Map<String, dynamic> ex, AppProvider p, String badge) {
-    final muscle = (ex['muscle'] as String? ?? '').toLowerCase();
-    final vol = p.weeklyVolumeByMuscle[muscle] ?? 0.0;
-    final reasons = <String>[];
-    if (badge == 'Best for Strength' || badge == 'Power Builder') {
-      reasons.add('strength goal active');
-      if (vol < 5000) reasons.add('$muscle volume low this week');
-      reasons.add('barbell maximises mechanical load');
-    } else if (badge == 'High ROI') {
-      reasons.add('multi-joint = more muscle stimulus');
-      if (vol < 8000) reasons.add('$muscle has capacity for more volume');
-    } else if (badge == 'Volume Builder') {
-      reasons.add('isolation targets growth directly');
-      if (vol < 10000) reasons.add('$muscle has room to grow');
-    } else if (badge == 'AI Pick') {
-      reasons.add("matches today's split focus");
-      if (vol < 5000) reasons.add('$muscle underworked this week');
-    } else if (badge == 'Athletic Transfer') {
-      reasons.add('builds functional strength patterns');
-      reasons.add('compound carryover to daily movement');
-    } else if (badge == 'Stable Movement') {
-      reasons.add('machine guides full range safely');
-      reasons.add('ideal for controlled volume');
-    } else if (badge == 'Joint Friendly') {
-      reasons.add('cable maintains constant tension');
-      reasons.add('reduces joint stress vs free weights');
-    } else if (badge == 'Recovery Friendly') {
-      reasons.add('safe progression for your level');
-      reasons.add('joint-friendly mechanics');
-    } else if (badge == 'Fat Loss') {
-      reasons.add('fat loss goal active');
-      reasons.add('cardio drives direct calorie burn');
-    } else {
-      reasons.add('matches your current training context');
-    }
-    return reasons.take(3).toList();
-  }
 
   /// Retention motivational line — deterministic, calm tone (Upgrade #10)
   /// Deterministic coach insight chips — returns (label, optional category to jump to).
@@ -6096,7 +5915,7 @@ class _PickerSheetState extends State<_PickerSheet> {
             child: Text('RECENTLY USED',
                 style: GoogleFonts.inter(
                   color: AppColors.textMuted,
-                  fontSize: 9,
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.6,
                 )),
@@ -6133,7 +5952,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                       Text(n,
                           style: GoogleFonts.inter(
                             color: AppColors.textPrimary,
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                           maxLines: 1),
@@ -6179,7 +5998,7 @@ class _PickerSheetState extends State<_PickerSheet> {
             child: Text('DIFFICULTY',
                 style: GoogleFonts.inter(
                   color: AppColors.textMuted,
-                  fontSize: 8,
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
                 )),
@@ -6222,7 +6041,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                         style: GoogleFonts.inter(
                           color: sel ? dc : AppColors.textMuted,
                           fontWeight: FontWeight.w600,
-                          fontSize: 11,
+                          fontSize: 13,
                         )),
                   ),
                 );
@@ -6235,7 +6054,7 @@ class _PickerSheetState extends State<_PickerSheet> {
             child: Text('EQUIPMENT',
                 style: GoogleFonts.inter(
                   color: AppColors.textMuted,
-                  fontSize: 8,
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
                 )),
@@ -6279,7 +6098,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                           style: GoogleFonts.inter(
                             color: sel ? AppColors.gold : AppColors.textMuted,
                             fontWeight: FontWeight.w600,
-                            fontSize: 11,
+                            fontSize: 13,
                           )),
                     ]),
                   ),
@@ -6359,7 +6178,7 @@ void _showCustomManage(BuildContext context, Map<String, dynamic> ex, AppProvide
           title: Text('Edit Exercise', style: GoogleFonts.inter(
               color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
           subtitle: Text('Change name, muscle group, or emoji',
-              style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 11)),
+              style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13)),
           onTap: () {
             Navigator.pop(context);
             showModalBottomSheet(
@@ -6392,7 +6211,7 @@ void _showCustomManage(BuildContext context, Map<String, dynamic> ex, AppProvide
           title: Text('Delete Exercise', style: GoogleFonts.inter(
               color: AppColors.red, fontSize: 14, fontWeight: FontWeight.w600)),
           subtitle: Text('Remove from your custom list permanently',
-              style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 11)),
+              style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13)),
           onTap: () async {
             Navigator.pop(context);
             final confirm = await showDialog<bool>(
@@ -6401,11 +6220,11 @@ void _showCustomManage(BuildContext context, Map<String, dynamic> ex, AppProvide
                 backgroundColor: AppColors.bgCard,
                 title: Text('Delete "$name"?',
                     style: GoogleFonts.rajdhani(
-                        color: AppColors.textPrimary, fontSize: 18,
+                        color: AppColors.textPrimary, fontSize: 20,
                         fontWeight: FontWeight.w700)),
                 content: Text('This will remove the custom exercise permanently.',
                     style: GoogleFonts.inter(
-                        color: AppColors.textMuted, fontSize: 13)),
+                        color: AppColors.textMuted, fontSize: 15)),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
@@ -6482,7 +6301,7 @@ class _ExerciseEmptyState extends StatelessWidget {
                   : 'Switch to All to explore every exercise',
               style: GoogleFonts.inter(
                 color: AppColors.textMuted,
-                fontSize: 12,
+                fontSize: 14,
                 height: 1.45,
               ),
               textAlign: TextAlign.center,
@@ -6491,7 +6310,7 @@ class _ExerciseEmptyState extends StatelessWidget {
               const SizedBox(height: 20),
               Text('Quick search:',
                   style: GoogleFonts.inter(
-                      color: AppColors.textMuted, fontSize: 10)),
+                      color: AppColors.textMuted, fontSize: 12)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
@@ -6512,7 +6331,7 @@ class _ExerciseEmptyState extends StatelessWidget {
                       child: Text(s,
                           style: GoogleFonts.inter(
                             color: AppColors.textMuted,
-                            fontSize: 11,
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
                           )),
                     ),
@@ -6627,7 +6446,7 @@ class _CustomSheetState extends State<_CustomSheet> {
           Row(children: [
             Text(_isEdit ? 'Edit Exercise' : 'Custom Exercise',
                 style: GoogleFonts.rajdhani(
-                    color: AppColors.textPrimary, fontSize: 20,
+                    color: AppColors.textPrimary, fontSize: 22,
                     fontWeight: FontWeight.w700)),
             const Spacer(),
             IconButton(icon: const Icon(Icons.close_rounded),
@@ -6694,7 +6513,7 @@ class _CustomSheetState extends State<_CustomSheet> {
                       color: AppColors.textPrimary, fontSize: 14)),
               subtitle: Text(_bw ? 'Tracked in reps' : 'Tracked in kg',
                   style: GoogleFonts.inter(
-                      color: AppColors.textMuted, fontSize: 12)),
+                      color: AppColors.textMuted, fontSize: 13)),
               activeThumbColor: AppColors.gold,
             ),
           ),
@@ -6770,14 +6589,14 @@ class _OvertrainingBannerState extends State<_OvertrainingBanner> {
               children: [
                 Text('Training load increased',
                     style: GoogleFonts.rajdhani(
-                        color: AppColors.textPrimary, fontSize: 14,
+                        color: AppColors.textPrimary, fontSize: 15,
                         fontWeight: FontWeight.w800)),
                 Text(
                   'ACWR elevated — reduce volume 30% today '
                   '(risk ${risk.toStringAsFixed(0)}/100).',
                   style: GoogleFonts.inter(
                       color: AppColors.textSecondary,
-                      fontSize: 10.5, height: 1.4),
+                      fontSize: 12, height: 1.4),
                 ),
               ],
             )),
@@ -6846,7 +6665,7 @@ class _InjuryRiskBannerState extends State<_InjuryRiskBanner> {
                   child: Text('Training Load Note',
                       style: GoogleFonts.rajdhani(
                           color: const Color(0xFFF59E0B),
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w800)),
                 ),
                 GestureDetector(
@@ -6871,7 +6690,7 @@ class _InjuryRiskBannerState extends State<_InjuryRiskBanner> {
                           child: Text(w.message,
                               style: GoogleFonts.inter(
                                   color: AppColors.textSecondary,
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   height: 1.4)),
                         ),
                       ],
@@ -6882,7 +6701,7 @@ class _InjuryRiskBannerState extends State<_InjuryRiskBanner> {
                 'Sleep and nutrition matter more this week.',
                 style: GoogleFonts.inter(
                     color: AppColors.textMuted,
-                    fontSize: 11,
+                    fontSize: 13,
                     fontStyle: FontStyle.italic),
               ),
             ],
@@ -6928,7 +6747,7 @@ class _WelcomeBackCard extends StatelessWidget {
               Text('WELCOME BACK',
                   style: GoogleFonts.inter(
                       color: AppColors.gold,
-                      fontSize: 9, fontWeight: FontWeight.w800,
+                      fontSize: 11, fontWeight: FontWeight.w800,
                       letterSpacing: 1.2)),
             ]),
             const SizedBox(height: 8),

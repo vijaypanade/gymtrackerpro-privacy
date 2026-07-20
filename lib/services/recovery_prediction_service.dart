@@ -120,7 +120,7 @@ class RecoveryPredictionService {
     final score = i.overallScore;
     final days  = i.daysSinceLastWorkout;
 
-    if (score >= 80 && i.strain7d < 35)         return 'System readiness is approaching full capacity.';
+    if (score >= 80 && i.strain7d < 35)         return 'Full system readiness — ready to train.';
     if (days >= 2 && velocity >= 0.65)           return 'Recovery is progressing steadily — readiness is rebuilding.';
     if (score < 45 && i.strain7d > 60)           return 'Recovery demand is elevated. Rest is the active work right now.';
     if (score >= 62 && days >= 1 && score < 80)  return 'Readiness is rebuilding — most muscle groups are recovering well.';

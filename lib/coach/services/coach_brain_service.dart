@@ -91,7 +91,10 @@ class CoachBrainService {
 
   /// P4: Fires when recovery is peak AND memory shows strong progression momentum.
   /// The athlete is in a genuine performance window — celebrate and capitalize.
+  /// "Your training is consistent" is a PATTERN claim — requires Calibrated.
   BrainCoachMessage? _peakWindow(CoachBrainContext ctx) {
+    if (!ctx.aiMaturity.allowedClaims.content.canMakePatternClaim) return null;
+
     final r   = ctx.recoveryState;
     final mem = ctx.athleteMemorySnapshot;
 
@@ -134,15 +137,18 @@ class CoachBrainService {
     );
   }
 
-  /// P3: Fires when decision confidence is high and the focus is overload —
-  /// all signals align for a meaningful training stimulus.
+  /// P3: Fires when the adaptive focus is overload and the AI has enough
+  /// history to claim the athlete has been consistent.
+  /// "You've been consistent" is a PATTERN claim — requires Calibrated.
+  /// The raw 0.72 confidence threshold is retired; maturity owns this gate.
   BrainCoachMessage? _highConfidenceOverload(CoachBrainContext ctx) {
+    if (!ctx.aiMaturity.allowedClaims.content.canMakePatternClaim) return null;
+
     final isOverload = ctx.adaptiveDecision.focus == AdaptiveTrainingFocus.overload ||
                        ctx.adaptiveDecision.focus == AdaptiveTrainingFocus.hypertrophyPush ||
                        ctx.adaptiveDecision.focus == AdaptiveTrainingFocus.strengthPush;
-    final isHighConfidence = ctx.decisionConfidence.overallConfidence >= 0.72;
 
-    if (!(isOverload && isHighConfidence)) return null;
+    if (!isOverload) return null;
 
     return const BrainCoachMessage(
       title:         'Ready to Lift More.',
@@ -221,9 +227,11 @@ class CoachBrainService {
     }
   }
 
-  /// P2: Fires when decision confidence is low — the system has limited data.
+  /// P2: Fires when the AI cannot yet make observations — data is too thin
+  /// for meaningful, personalised coaching. Replaced the raw overallConfidence
+  /// threshold (0.50) with the maturity-owned canMakeObservation gate.
   BrainCoachMessage? _lowConfidence(CoachBrainContext ctx) {
-    if (ctx.decisionConfidence.overallConfidence >= 0.50) return null;
+    if (ctx.aiMaturity.allowedClaims.content.canMakeObservation) return null;
 
     return const BrainCoachMessage(
       title:         'Building Your Profile.',

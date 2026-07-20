@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+platform :ios, '14.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,5 +39,79 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # Suppress deployment target warnings — all pods upgraded to iOS 14
+    target.build_configurations.each do |config|
+      sdk = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f rescue 0
+      if sdk < 14.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      end
+    end
+
+    # Xcode 26 enforces that framework modules cannot include non-modular headers.
+    # firebase_crashlytics headers include Firebase.h, which is non-modular.
+    if target.name == 'firebase_crashlytics'
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      end
+    end
+
+    # Xcode 26 clang rejects -GCC_WARN_INHIBIT_ALL_WARNINGS (parsed as -G)
+    # for arm64 iOS targets. Strip it from BoringSSL-GRPC per-file compiler flags.
+    if target.name == 'BoringSSL-GRPC'
+      target.source_build_phase.files.each do |file|
+        if file.settings && file.settings['COMPILER_FLAGS']
+          file.settings['COMPILER_FLAGS'] =
+            file.settings['COMPILER_FLAGS']
+              .gsub('-GCC_WARN_INHIBIT_ALL_WARNINGS', '')
+              .squeeze(' ').strip
+        end
+      end
+    end
+  end
+
+  # Xcode 26 clang requires explicit template args after the `template` keyword.
+  # gRPC-Core 1.62.x uses `Traits::template CallSeqFactory(...)` without <> args,
+  # which is now a hard parse error. Removing `template` is correct — no ambiguity
+  # exists when there are no explicit template arguments.
+  # Xcode 26: #import <Firebase/Firebase.h> resolves to Headers/Public/Firebase/Firebase.h,
+  # which has no module map → non-modular include error inside framework modules.
+  # The Firebase pod ships a module.modulemap in CoreOnly/Sources/ that clang finds but
+  # which references the wrong copy of Firebase.h, causing redefinition if we add a second.
+  # Fix: move the module map to Headers/Public/Firebase/ (where the header actually lives)
+  # and disable the original so there is exactly one Firebase module definition.
+  coreonly_map = File.join(installer.sandbox.root, 'Firebase/CoreOnly/Sources/module.modulemap')
+  public_firebase_dir = File.join(installer.sandbox.root, 'Headers/Public/Firebase')
+  public_map = File.join(public_firebase_dir, 'module.modulemap')
+  if File.exist?(coreonly_map)
+    File.chmod(0644, coreonly_map)
+    File.rename(coreonly_map, "#{coreonly_map}.bak")
+  end
+  unless File.exist?(public_map)
+    File.write(public_map, "module Firebase {\n  header \"Firebase.h\"\n  export *\n}\n")
+  end
+
+  # Xcode 26: firebase_crashlytics Platform headers use #import <Firebase/Firebase.h>
+  # which is a non-modular header. Replace with the modular FirebaseCrashlytics import.
+  crashlytics_classes = File.join(installer.sandbox.root, '..', '.symlinks', 'plugins',
+                                   'firebase_crashlytics', 'ios', 'Classes')
+  ['Crashlytics_Platform.h', 'ExceptionModel_Platform.h'].each do |hdr|
+    path = File.join(crashlytics_classes, hdr)
+    if File.exist?(path)
+      content = File.read(path)
+      patched = content.gsub('#import <Firebase/Firebase.h>',
+                             '#import <FirebaseCrashlytics/FirebaseCrashlytics.h>')
+      File.write(path, patched) if patched != content
+    end
+  end
+
+  ['gRPC-Core', 'gRPC-C++'].each do |pod_name|
+    basic_seq_h = File.join(installer.sandbox.root, "#{pod_name}/src/core/lib/promise/detail/basic_seq.h")
+    if File.exist?(basic_seq_h)
+      File.chmod(0644, basic_seq_h)
+      content = File.read(basic_seq_h)
+      patched = content.gsub('Traits::template CallSeqFactory', 'Traits::CallSeqFactory')
+      File.write(basic_seq_h, patched) if patched != content
+    end
   end
 end

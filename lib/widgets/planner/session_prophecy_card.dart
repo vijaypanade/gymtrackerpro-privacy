@@ -1,12 +1,17 @@
 // lib/widgets/planner/session_prophecy_card.dart — SESSION PROPHECY
 // Pre-workout prediction card shown at the top of today's day view.
-//   • Picks the day's main lift (first weighted exercise with ≥3 logged sessions)
-//   • Predicts today's target via calculateWorkoutFeedback (same engine as
-//     PR celebration "Next target") — no new engine, presentation only
-//   • Confidence ring driven by AppProvider.readinessScore
-//   • Live verdict: fulfilled ✓ (gold flash) / close — recomputes as sets
-//     are logged because _DayBody watches AppProvider
-//   • Hidden for new users (not enough history) — a wrong prophecy kills trust
+//
+// This widget is PRESENTATION ONLY:
+//   • Renders ProphecyData produced by SessionProphecyGenerator
+//   • Animates entry, pulse, fulfillment
+//   • Owns dismiss state (session-scoped, resets on restart)
+//
+// Trust, data resolution, and claim classification live in
+// lib/ai/generators/session_prophecy_generator.dart.
+//
+// The render site (planner_screen.dart) gates this card on
+// AppProvider.aiMaturity.allowedClaims.ui.canShowSessionProphecy.
+// Before that gate is true the SessionProphecyFallbackCard is shown instead.
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -14,78 +19,18 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import '../../engines/pr_engine.dart';
+import '../../ai/generators/session_prophecy_generator.dart';
 import '../../models/models.dart';
 import '../../providers/app_provider.dart';
 import '../../utils/app_constants.dart';
 
 // ════════════════════════════════════════════════
-// PROPHECY RESOLUTION — pure presentation-side math
+// VERDICT — live check against logged sets
 // ════════════════════════════════════════════════
-
-class _Prophecy {
-  final PlannedExercise ex;
-  final double predWeight;
-  final int    predReps;
-  final double prevBestWeight;
-  final int    prevBestReps;
-  final int    confidence; // 45–92
-  const _Prophecy({
-    required this.ex,
-    required this.predWeight,
-    required this.predReps,
-    required this.prevBestWeight,
-    required this.prevBestReps,
-    required this.confidence,
-  });
-}
 
 enum _Verdict { pending, fulfilled, close }
 
-_Prophecy? _resolveProphecy(AppProvider p, DayPlan day) {
-  for (final ex in day.exercises) {
-    if (!ex.isWeight) continue;
-    final key  = p.getKey(ex.baseId);
-    final logs = p.getLogsForExercise(key).where((l) => l.weight > 0).toList();
-    if (logs.length < 3) continue;
-
-    // Best set so far: heaviest weight, ties by reps
-    var best = logs.first;
-    for (final l in logs) {
-      if (l.weight > best.weight ||
-          (l.weight == best.weight && l.reps > best.reps)) {
-        best = l;
-      }
-    }
-    if (best.weight <= 0) continue;
-
-    final fb = calculateWorkoutFeedback(
-      weight:             best.weight,
-      reps:               best.reps,
-      previousBestWeight: best.weight,
-      previousBestReps:   best.reps,
-      isBodyweight:       ex.isBodyweight,
-      unit:               ex.unit,
-    );
-    if (fb.nextWeight <= 0) continue;
-
-    // Confidence: readiness-weighted, honest bounds
-    final readiness = p.readinessScore.clamp(0.0, 100.0);
-    final conf      = (42 + readiness * 0.5).round().clamp(45, 92);
-
-    return _Prophecy(
-      ex:             ex,
-      predWeight:     fb.nextWeight,
-      predReps:       fb.nextReps,
-      prevBestWeight: best.weight,
-      prevBestReps:   best.reps,
-      confidence:     conf,
-    );
-  }
-  return null;
-}
-
-_Verdict _judge(_Prophecy pr) {
+_Verdict _judge(ProphecyData pr) {
   final sets = pr.ex.sets;
   bool hit = false;
   for (final s in sets) {
@@ -101,7 +46,7 @@ _Verdict _judge(_Prophecy pr) {
 }
 
 // ════════════════════════════════════════════════
-// CARD
+// CARD — predictive-phase renderer
 // ════════════════════════════════════════════════
 
 class SessionProphecyCard extends StatefulWidget {
@@ -158,7 +103,18 @@ class _SessionProphecyCardState extends State<SessionProphecyCard>
     }
 
     final p = context.read<AppProvider>();
-    final prophecy = _resolveProphecy(p, widget.day);
+
+    // Low recovery warning — shown instead of prophecy when readiness is poor.
+    // Only when health is connected (otherwise readiness defaults to 72 = normal).
+    if (p.healthConnectLinked && p.readinessScore < 50) {
+      return _buildRecoveryLowCard();
+    }
+
+    final prophecy = const SessionProphecyGenerator().generate(
+      ap:   p,
+      day:  widget.day,
+      lang: p.aiMaturity.languageProfile,
+    );
     if (prophecy == null) return const SizedBox.shrink();
 
     final verdict = _judge(prophecy);
@@ -186,7 +142,71 @@ class _SessionProphecyCardState extends State<SessionProphecyCard>
     );
   }
 
-  Widget _card(_Prophecy pr, _Verdict verdict, double pulse) {
+  Widget _buildRecoveryLowCard() {
+    return AnimatedBuilder(
+      animation: _entry,
+      builder: (_, __) => Transform.translate(
+        offset: Offset(0, 18 * (1 - _entry.value)),
+        child: Opacity(
+          opacity: _entry.value.clamp(0.0, 1.0),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.md),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0C0C0E),
+              borderRadius: BorderRadius.circular(AppRadii.lg),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 0.7,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+              child: Row(children: [
+                const Text('🌙', style: TextStyle(fontSize: 15)),
+                const SizedBox(width: 10),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RECOVERY LOW',
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.8,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Not the day to go heavy — lighter sets still count.',
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                )),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() =>
+                        SessionProphecyCard._dismissed.add(_dayKey));
+                  },
+                  child: Icon(Icons.close_rounded,
+                    size: 15,
+                    color: Colors.white.withValues(alpha: 0.25)),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _card(ProphecyData pr, _Verdict verdict, double pulse) {
     final fulfilled = verdict == _Verdict.fulfilled;
     final close     = verdict == _Verdict.close;
     const accent    = AppColors.gold;
@@ -457,3 +477,7 @@ class _RingGaugePainter extends CustomPainter {
   @override
   bool shouldRepaint(_RingGaugePainter old) => old.progress != progress;
 }
+
+// RFC-PLANNER-UX-001 amendment to Step 9: the fallback card was removed.
+// When canShowSessionProphecy is false the coaching slot simply renders
+// nothing — no filler copy while the AI earns predictive authority.

@@ -24,6 +24,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart'    as tz;
 
+import '../ai/maturity/ai_maturity_state.dart';
+import '../ai/notifications/notification_message_builder.dart';
+
 // Notification IDs — must be unique per type
 class NotifIds {
   static const streakRisk      = 1001;
@@ -286,8 +289,9 @@ class NotificationService {
   // Use: when readiness score recovers above threshold after low day
   // ─────────────────────────────────────────────────────────
   Future<void> scheduleRecoveryReadyNotification({
-    required int    readiness,
-    required String userName,
+    required int             readiness,
+    required AIMaturityState aiMaturity,
+    required String          userName,
   }) async {
     if (!_initialized) return;
     await _plugin.cancel(NotifIds.recoveryReady);
@@ -299,21 +303,15 @@ class NotificationService {
     // Fire tomorrow 7AM — next morning wake-up
     final fire = DateTime(now.year, now.month, now.day + 1, 7, 0);
 
-    final String title;
-    final String body;
-
-    if (readiness >= 5) {
-      title = 'Fully recovered.';
-      body  = 'Good day to push.';
-    } else {
-      title = 'Recovery looks good.';
-      body  = 'Today\'s workout fits.';
-    }
+    final msg = NotificationMessageBuilder.recoveryReady(
+      readiness:  readiness,
+      aiMaturity: aiMaturity,
+    );
 
     await _scheduleExact(
       id:      NotifIds.recoveryReady,
-      title:   title,
-      body:    body,
+      title:   msg.title,
+      body:    msg.body,
       time:    fire,
       payload: 'recovery_ready',
     );
@@ -361,10 +359,11 @@ class NotificationService {
   // Use: schedule after app open if daysSinceLastWorkout >= 2
   // ─────────────────────────────────────────────────────────
   Future<void> scheduleMomentumProtection({
-    required int    daysMissed,
-    required int    previousStreak,
-    required int    consistencyScore,
-    required String userName,
+    required int              daysMissed,
+    required int              previousStreak,
+    required int              consistencyScore,
+    required AIMaturityState  aiMaturity,
+    required String           userName,
   }) async {
     if (!_initialized) return;
     await _plugin.cancel(NotifIds.momentumProtect);
@@ -373,27 +372,17 @@ class NotificationService {
     final fire = DateTime(now.year, now.month, now.day, 15, 30);
     if (fire.isBefore(now)) return;
 
-    final String title;
-    final String body;
-
-    if (daysMissed >= 4) {
-      title = 'A few days off.';
-      body  = 'One session resets the rhythm.';
-    } else if (previousStreak >= 7 && daysMissed >= 2) {
-      title = 'Missed a couple of days.';
-      body  = 'Let\'s continue today.';
-    } else if (consistencyScore >= 60) {
-      title = 'You usually train around now.';
-      body  = 'A short session fits.';
-    } else {
-      title = 'No session yet.';
-      body  = 'A short one counts.';
-    }
+    final msg = NotificationMessageBuilder.momentumProtection(
+      daysMissed:       daysMissed,
+      previousStreak:   previousStreak,
+      consistencyScore: consistencyScore,
+      aiMaturity:       aiMaturity,
+    );
 
     await _scheduleExact(
       id:      NotifIds.momentumProtect,
-      title:   title,
-      body:    body,
+      title:   msg.title,
+      body:    msg.body,
       time:    fire,
       payload: 'momentum_protect',
     );

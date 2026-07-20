@@ -1,9 +1,10 @@
 // lib/screens/profile_screen.dart — v11.0 ATHLETE IDENTITY
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
-import '../services/health_connect_service.dart';
+import '../services/health_platform_service.dart';
 import '../services/rest_timer_service.dart';
 import 'login_screen.dart';
 
@@ -18,6 +19,7 @@ import '../widgets/shared_widgets.dart';
 import '../widgets/profile_rank_badge.dart';
 import 'main_shell.dart';
 import 'onboarding_screen.dart';
+import '../utils/weight_converter.dart';
 import 'premium_screen.dart';
 import '../utils/app_routes.dart';
 import '../widgets/profile/athlete_timeline_card.dart';
@@ -85,6 +87,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appSnack('Profile updated!'));
   }
 
+  // RFC-002.4 — permanently delete account + purge all cloud and local data.
+  Future<void> _deleteAccount() async {
+    // Step 1: first confirmation
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(children: [
+          Icon(Icons.delete_forever_rounded, color: Colors.red, size: 22),
+          SizedBox(width: 10),
+          Text('Delete Account?', style: TextStyle(
+            fontFamily: 'Rajdhani', color: Colors.red,
+            fontWeight: FontWeight.w900, fontSize: 20)),
+        ]),
+        content: const Text(
+          'This will permanently delete your account and all your data — workouts, history, streaks, and progress.\n\nThis cannot be undone.',
+          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 15, height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.red.withValues(alpha: 0.15),
+              foregroundColor: AppColors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Continue', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Step 2: second confirmation — re-states permanence clearly
+    final doubleConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Are you absolutely sure?', style: TextStyle(
+            fontFamily: 'Rajdhani', color: Colors.red,
+            fontWeight: FontWeight.w900, fontSize: 20)),
+        content: const Text(
+          'You will be asked to sign in with Google to confirm your identity, then your account will be deleted permanently.',
+          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 15, height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Go Back',
+                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Delete My Account', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (doubleConfirmed != true || !mounted) return;
+
+    // Step 3: re-authenticate + delete (Google sign-in sheet appears here)
+    final deleted = await AuthService.instance.deleteAccount();
+    if (!mounted) return;
+
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text(
+          'Could not delete account. Sign out and sign back in, then try again.',
+        ),
+        backgroundColor: AppColors.bgElevated,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      return;
+    }
+
+    // Step 4: clear all local data, then navigate to LoginScreen
+    await context.read<AppProvider>().resetAllData();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      fadeRoute(const LoginScreen()),
+      (_) => false,
+    );
+  }
+
   Future<void> _resetAllData() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -100,7 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ]),
         content: const Text(
           'This will permanently delete all your workout history, logs, streak, and profile. You will go through onboarding again.\n\nThis cannot be undone.',
-          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 13, height: 1.5)),
+          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 15, height: 1.5)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -131,7 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             fontWeight: FontWeight.w900, fontSize: 20)),
         content: const Text(
           'All data will be gone. Tap "Delete" to confirm.',
-          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 13)),
+          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 15)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -175,7 +273,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ]),
         content: const Text(
           'Your data is saved to your account. You can log back in anytime.',
-          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 13)),
+          style: TextStyle(fontFamily: 'Inter', color: Colors.white70, fontSize: 15)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -217,22 +315,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
       double sleepHours,
       int todaySteps,
       double lifetimeKg,
+      double? restingHeartRate,
+      double activeEnergyKcal,
+      SplitStyle splitStyle,
     })>(
       selector: (_, ap, gp) {
         final rs  = ap.recoveryState;
         return (
-          profile:          ap.profile,
-          totalWorkouts:    ap.streak.totalWorkouts,
-          currentStreak:    ap.streak.currentStreak,
-          longestStreak:    ap.streak.longestStreak,
-          xp:               gp.xp,
-          tdee:             ap.tdee,
-          isPremium:        ap.isPremium,
-          healthConnected:  ap.healthConnectLinked,
-          recoveryScore:    rs.overallScore.round(),
-          sleepHours:       ap.coachSleepHours,
-          todaySteps:       ap.healthTodaySteps,
-          lifetimeKg:       ap.lifetimeVolumeKg,
+          profile:           ap.profile,
+          totalWorkouts:     ap.streak.totalWorkouts,
+          currentStreak:     ap.streak.currentStreak,
+          longestStreak:     ap.streak.longestStreak,
+          xp:                gp.xp,
+          tdee:              ap.tdee,
+          isPremium:         ap.isPremium,
+          healthConnected:   ap.healthConnectLinked,
+          recoveryScore:     rs.overallScore.round(),
+          sleepHours:        ap.coachSleepHours,
+          todaySteps:        ap.healthTodaySteps,
+          lifetimeKg:        ap.lifetimeVolumeKg,
+          restingHeartRate:  ap.healthRHR,
+          activeEnergyKcal:  ap.healthActiveEnergyKcal,
+          splitStyle:        ap.splitStyle,
         );
       },
       builder: (context, d, _) {
@@ -263,10 +367,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text('Profile', style: TextStyle(fontFamily: 'Inter',
-                          color: AppColors.textPrimary, fontSize: 20,
+                          color: AppColors.textPrimary, fontSize: 22,
                           fontWeight: FontWeight.w600, letterSpacing: -0.3)),
-                      Text('Your Lifton Identity', style: TextStyle(fontFamily: 'Inter',
-                          color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 11)),
+                      Text('Your LiftOn Identity', style: TextStyle(fontFamily: 'Inter',
+                          color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 13)),
                     ],
                   ),
                   actions: [
@@ -300,7 +404,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           currentStreak: d.currentStreak,
                           longestStreak: d.longestStreak,
                           recoveryScore: d.recoveryScore,
-                          lifetimeKg:   d.lifetimeKg)),
+                          lifetimeKg:   d.lifetimeKg,
+                          splitStyle:   d.splitStyle)),
                       const SizedBox(height: 10),
 
                       // ── P3: ATHLETE TIMELINE ───────────────────────────────
@@ -311,16 +416,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _FI(delay: 70, child: _SubscriptionCard(isPremium: d.isPremium)),
                       const SizedBox(height: 10),
 
-                      // ── P4b: TRAINING STYLE ────────────────────────────────
-                      _FI(delay: 78, child: _TrainingStyleCard(
-                          splitStyle: context.read<AppProvider>().splitStyle)),
-                      const SizedBox(height: 10),
-
                       // ── P5: HEALTH CONNECT ──────────────────────────────────
-                      _FI(delay: 85, child: _HealthConnectCard(
-                        connected:  d.healthConnected,
-                        sleepHours: d.sleepHours,
-                        todaySteps: d.todaySteps,
+                      _FI(delay: 78, child: _HealthConnectCard(
+                        connected:        d.healthConnected,
+                        sleepHours:       d.sleepHours,
+                        todaySteps:       d.todaySteps,
+                        restingHeartRate: d.restingHeartRate,
+                        activeEnergyKcal: d.activeEnergyKcal,
                       )),
                       const SizedBox(height: 10),
 
@@ -378,7 +480,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 style: TextStyle(
                                   fontFamily: 'Inter',
                                   color: AppColors.textMuted.withValues(alpha: 0.45),
-                                  fontSize: 12, fontWeight: FontWeight.w500)),
+                                  fontSize: 14, fontWeight: FontWeight.w500)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+
+                      // ── DELETE ACCOUNT (RFC-002.4) ──────────────────────────
+                      Center(
+                        child: GestureDetector(
+                          onTap: _deleteAccount,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.delete_forever_rounded,
+                                  color: AppColors.red.withValues(alpha: 0.35),
+                                  size: 13),
+                              const SizedBox(width: 5),
+                              Text('Delete Account',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  color: AppColors.red.withValues(alpha: 0.35),
+                                  fontSize: 13, fontWeight: FontWeight.w500)),
                             ]),
                           ),
                         ),
@@ -395,7 +519,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               style: TextStyle(
                                 fontFamily: 'Inter',
                                 color: AppColors.textMuted.withValues(alpha: 0.25),
-                                fontSize: 11, fontWeight: FontWeight.w400)),
+                                fontSize: 13, fontWeight: FontWeight.w400)),
                           ),
                         ),
                       ),
@@ -498,12 +622,14 @@ class _HeroCard extends StatelessWidget {
   final XPSystem xp;
   final int totalWorkouts, currentStreak, longestStreak, recoveryScore;
   final double lifetimeKg;
+  final SplitStyle splitStyle;
 
   const _HeroCard({
     required this.p, required this.xp,
     required this.totalWorkouts, required this.currentStreak,
     required this.longestStreak, required this.recoveryScore,
     required this.lifetimeKg,
+    required this.splitStyle,
   });
 
   // Dynamic statement driven by real signals — no hardcoded generic copy.
@@ -558,7 +684,7 @@ class _HeroCard extends StatelessWidget {
             // User's name — secondary, muted
             Text(p.name, style: TextStyle(fontFamily: 'Inter',
                 color: AppColors.textMuted.withValues(alpha: 0.55),
-                fontSize: 12, fontWeight: FontWeight.w400)),
+                fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: AppSpacing.xs),
             if (topPct.isNotEmpty) ...[
               Container(
@@ -580,7 +706,7 @@ class _HeroCard extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'Inter',
                 color: AppColors.textMuted.withValues(alpha: 0.55),
-                fontSize: 10, fontWeight: FontWeight.w400, letterSpacing: 0.1),
+                fontSize: 12, fontWeight: FontWeight.w400, letterSpacing: 0.1),
             ),
           ])),
         ]),
@@ -591,7 +717,7 @@ class _HeroCard extends StatelessWidget {
 
         // Stat row: Tonnes | Sessions | Streak | BMI
         IntrinsicHeight(child: Row(children: [
-          _heroStat('${(lifetimeKg / 1000).toStringAsFixed(1)}T', 'Lifted'),
+          _heroStat(_formatTonnes(lifetimeKg), 'All-Time Volume'),
           _heroDiv(),
           _heroStat('$totalWorkouts', 'Sessions'),
           _heroDiv(),
@@ -605,8 +731,50 @@ class _HeroCard extends StatelessWidget {
 
         // Rank Journey Strip
         _RankJourneyStrip(currentRank: xp.rank, progress: xp.rankProgress),
+
+        const SizedBox(height: AppSpacing.md),
+        const Divider(color: AppColors.divider, height: 1),
+        const SizedBox(height: AppSpacing.xs),
+
+        // Training Style — merged from standalone card (tap → Tools tab)
+        Builder(builder: (ctx) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            final shell = ctx.findAncestorStateOfType<MainShellState>();
+            shell?.changeTab(3);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(children: [
+              Container(width: 2, height: 12, decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(2))),
+              const SizedBox(width: 8),
+              Text('Training style', style: TextStyle(
+                fontFamily: 'Inter',
+                color: AppColors.textMuted.withValues(alpha: 0.50),
+                fontSize: 13, fontWeight: FontWeight.w400)),
+              const SizedBox(width: 8),
+              Text(
+                splitStyle == SplitStyle.aiAdaptive
+                    ? 'Adaptive Split' : splitStyle.label,
+                style: const TextStyle(
+                  fontFamily: 'Inter', color: AppColors.textPrimary,
+                  fontSize: 13, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Icon(Icons.chevron_right_rounded,
+                color: AppColors.textMuted.withValues(alpha: 0.30), size: 14),
+            ]),
+          ),
+        )),
       ]),
     );
+  }
+
+  /// Formats kg as tonnes with lowercase SI unit, dropping trailing `.0`.
+  static String _formatTonnes(double kg) {
+    final t = kg / 1000;
+    return t == t.truncateToDouble() ? '${t.toInt()}t' : '${t.toStringAsFixed(1)}t';
   }
 
   static Widget _heroStat(String value, String label) => Expanded(
@@ -617,7 +785,7 @@ class _HeroCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
       const SizedBox(height: 3),
       Text(label, style: TextStyle(fontFamily: 'Inter',
-          color: AppColors.textMuted.withValues(alpha: 0.50), fontSize: 9,
+          color: AppColors.textMuted.withValues(alpha: 0.50), fontSize: 11,
           fontWeight: FontWeight.w400, letterSpacing: 0.2),
           textAlign: TextAlign.center),
     ]),
@@ -852,7 +1020,7 @@ class _SubscriptionCard extends StatelessWidget {
         const SizedBox(width: 8),
         const Text('Premium', style: TextStyle(
           fontFamily: 'Inter', color: AppColors.gold,
-          fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0)),
+          fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0)),
         const SizedBox(width: 6),
         Icon(Icons.check_circle_rounded,
             color: AppColors.gold.withValues(alpha: 0.65), size: 12),
@@ -888,7 +1056,7 @@ class _SubscriptionCard extends StatelessWidget {
             const SizedBox(width: 8),
             const Text('Premium', style: TextStyle(
               fontFamily: 'Inter', color: AppColors.textPrimary,
-              fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0)),
+              fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0)),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -899,7 +1067,7 @@ class _SubscriptionCard extends StatelessWidget {
                     color: AppColors.gold.withValues(alpha: 0.30), width: 0.5)),
               child: const Text('Upgrade', style: TextStyle(
                 fontFamily: 'Inter', color: AppColors.gold,
-                fontSize: 11, fontWeight: FontWeight.w700)),
+                fontSize: 13, fontWeight: FontWeight.w700)),
             ),
           ]),
           const SizedBox(height: AppSpacing.md),
@@ -912,7 +1080,7 @@ class _SubscriptionCard extends StatelessWidget {
               Text(f, style: TextStyle(
                 fontFamily: 'Inter',
                 color: AppColors.textMuted.withValues(alpha: 0.80),
-                fontSize: 12, fontWeight: FontWeight.w400)),
+                fontSize: 14, fontWeight: FontWeight.w400)),
             ]),
           )),
           const SizedBox(height: AppSpacing.sm),
@@ -921,7 +1089,7 @@ class _SubscriptionCard extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'Inter',
                 color: AppColors.gold.withValues(alpha: 0.55),
-                fontSize: 11, fontWeight: FontWeight.w500)),
+                fontSize: 13, fontWeight: FontWeight.w500)),
             const SizedBox(width: 4),
             Icon(Icons.arrow_forward_rounded,
                 color: AppColors.gold.withValues(alpha: 0.55), size: 12),
@@ -964,7 +1132,7 @@ class _TrainingStyleCard extends StatelessWidget {
             children: [
               const Text('Training style', style: TextStyle(
                 fontFamily: 'Inter', color: AppColors.textMuted,
-                fontSize: 11, fontWeight: FontWeight.w400)),
+                fontSize: 13, fontWeight: FontWeight.w400)),
               const SizedBox(height: 2),
               Text(
                 splitStyle == SplitStyle.aiAdaptive
@@ -972,7 +1140,7 @@ class _TrainingStyleCard extends StatelessWidget {
                     : splitStyle.label,
                 style: const TextStyle(
                   fontFamily: 'Inter', color: AppColors.textPrimary,
-                  fontSize: 13, fontWeight: FontWeight.w600)),
+                  fontSize: 14, fontWeight: FontWeight.w600)),
             ],
           )),
           Icon(Icons.chevron_right_rounded,
@@ -986,14 +1154,18 @@ class _TrainingStyleCard extends StatelessWidget {
 // P5 — HEALTH CONNECT (upgraded)
 // ════════════════════════════════════════════════
 class _HealthConnectCard extends StatefulWidget {
-  final bool connected;
-  final double sleepHours;
-  final int todaySteps;
+  final bool    connected;
+  final double  sleepHours;
+  final int     todaySteps;
+  final double? restingHeartRate; // bpm — null if no reading available
+  final double  activeEnergyKcal; // kcal burned today — 0 if unavailable
 
   const _HealthConnectCard({
     required this.connected,
     required this.sleepHours,
     required this.todaySteps,
+    this.restingHeartRate,
+    this.activeEnergyKcal = 0.0,
   });
 
   @override
@@ -1006,6 +1178,10 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
   String _formatSteps(int s) =>
       s >= 1000 ? '${(s / 1000).toStringAsFixed(1)}k' : '$s';
 
+  Widget _vDivider() => Container(
+    width: 0.5, margin: const EdgeInsets.symmetric(horizontal: 4),
+    color: AppColors.divider.withValues(alpha: 0.35));
+
   @override
   Widget build(BuildContext context) {
     if (!widget.connected) return _buildConnect(context);
@@ -1013,8 +1189,12 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
   }
 
   Widget _buildConnected(BuildContext context) {
-    final hasSleep = widget.sleepHours > 0;
-    final hasSteps = widget.todaySteps > 0;
+    final hasSleep  = widget.sleepHours > 0;
+    final hasSteps  = widget.todaySteps > 0;
+    final hasRHR    = widget.restingHeartRate != null;
+    final hasEnergy = widget.activeEnergyKcal > 0;
+    final hasAnyData = hasSleep || hasSteps || hasRHR || hasEnergy;
+    final hasRow2    = hasRHR || hasEnergy;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -1031,7 +1211,7 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
           const SizedBox(width: 7),
           const Text('Health connect', style: TextStyle(
             fontFamily: 'Inter', color: AppColors.textPrimary,
-            fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0)),
+            fontSize: 13, fontWeight: FontWeight.w500, letterSpacing: 0)),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1043,26 +1223,81 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
             child: Text('Connected', style: TextStyle(
               fontFamily: 'Inter',
               color: AppColors.gold.withValues(alpha: 0.85),
-              fontSize: 9, fontWeight: FontWeight.w700)),
+              fontSize: 11, fontWeight: FontWeight.w700)),
           ),
         ]),
         const SizedBox(height: AppSpacing.md),
-        if (!hasSleep && !hasSteps)
+        if (!hasAnyData)
           Text('Syncing health data…',
               style: TextStyle(fontFamily: 'Inter',
-                  color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 12))
+                  color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 13))
+        else if (hasSleep)
+          // Sleep present → 2-row layout: [Sleep | Steps] then [RHR | Energy]
+          Column(children: [
+            IntrinsicHeight(child: Row(children: [
+              Expanded(child: _HealthCell(
+                label: 'Sleep',
+                value: '${widget.sleepHours.toStringAsFixed(1)}h',
+                icon: Icons.bedtime_outlined)),
+              if (hasSteps) ...[
+                _vDivider(),
+                Expanded(child: _HealthCell(
+                  label: 'Steps',
+                  value: _formatSteps(widget.todaySteps),
+                  icon: Icons.directions_walk_rounded)),
+              ],
+            ])),
+            if (hasRow2) ...[
+              const SizedBox(height: 10),
+              Container(height: 0.5, color: AppColors.divider.withValues(alpha: 0.25)),
+              const SizedBox(height: 10),
+              IntrinsicHeight(child: Row(children: [
+                if (hasRHR) Expanded(child: _HealthCell(
+                  label: 'Resting HR',
+                  value: '${widget.restingHeartRate!.round()} bpm',
+                  icon: Icons.favorite_border_rounded)),
+                if (hasRHR && hasEnergy) _vDivider(),
+                if (hasEnergy) Expanded(child: _HealthCell(
+                  label: 'Active kcal',
+                  value: '${widget.activeEnergyKcal.round()}',
+                  icon: Icons.whatshot_rounded)),
+              ])),
+            ],
+          ])
         else
-          IntrinsicHeight(child: Row(children: [
-            if (hasSleep) Expanded(child: _HealthCell(
-              label: 'Sleep', value: '${widget.sleepHours.toStringAsFixed(1)}h',
-              icon: Icons.bedtime_outlined)),
-            if (hasSleep && hasSteps) Container(
-              width: 0.5, margin: const EdgeInsets.symmetric(horizontal: 4),
-              color: AppColors.divider.withValues(alpha: 0.35)),
-            if (hasSteps) Expanded(child: _HealthCell(
-              label: 'Steps', value: _formatSteps(widget.todaySteps),
-              icon: Icons.directions_walk_rounded)),
-          ])),
+          // No sleep → single row: Steps | RHR | Energy (up to 3 columns)
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            IntrinsicHeight(child: Row(children: [
+              if (hasSteps) Expanded(child: _HealthCell(
+                label: 'Steps',
+                value: _formatSteps(widget.todaySteps),
+                icon: Icons.directions_walk_rounded)),
+              if (hasSteps && hasRHR) _vDivider(),
+              if (hasRHR) Expanded(child: _HealthCell(
+                label: 'Resting HR',
+                value: '${widget.restingHeartRate!.round()} bpm',
+                icon: Icons.favorite_border_rounded)),
+              if ((hasSteps || hasRHR) && hasEnergy) _vDivider(),
+              if (hasEnergy) Expanded(child: _HealthCell(
+                label: 'Active kcal',
+                value: '${widget.activeEnergyKcal.round()}',
+                icon: Icons.whatshot_rounded)),
+            ])),
+            const SizedBox(height: 10),
+            Row(children: [
+              Icon(Icons.bedtime_outlined,
+                size: 11,
+                color: AppColors.textMuted.withValues(alpha: 0.40)),
+              const SizedBox(width: 5),
+              Text(Platform.isIOS
+                ? 'No sleep data — wear Apple Watch to bed to enable'
+                : 'No sleep data — connect a sleep app in Health Connect',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: AppColors.textMuted.withValues(alpha: 0.40),
+                  fontSize: 11, fontWeight: FontWeight.w400)),
+            ]),
+          ]),
       ]),
     );
   }
@@ -1077,7 +1312,7 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
         setState(() => _loading = false);
         if (!ok) {
           // Permission not granted — open HC app or Play Store
-          await HealthConnectService.instance.openOrInstall();
+          await HealthPlatformService.instance.openOrInstall();
         }
       },
       child: Container(
@@ -1102,12 +1337,12 @@ class _HealthConnectCardState extends State<_HealthConnectCard> {
               crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Health Connect', style: TextStyle(
               fontFamily: 'Inter', color: AppColors.textSecondary,
-              fontSize: 13, fontWeight: FontWeight.w600)),
+              fontSize: 15, fontWeight: FontWeight.w600)),
             SizedBox(height: 2),
             Text('Connect to track sleep and recovery',
               style: TextStyle(
                 fontFamily: 'Inter', color: AppColors.textMuted,
-                fontSize: 11, fontWeight: FontWeight.w400)),
+                fontSize: 13, fontWeight: FontWeight.w400)),
           ])),
           const SizedBox(width: 8),
           if (_loading)
@@ -1140,7 +1375,7 @@ class _HealthCell extends StatelessWidget {
           fontWeight: FontWeight.w900, height: 1.0)),
       const SizedBox(height: 2),
       Text(label, style: TextStyle(fontFamily: 'Inter',
-          color: AppColors.textMuted.withValues(alpha: 0.50), fontSize: 9,
+          color: AppColors.textMuted.withValues(alpha: 0.50), fontSize: 11,
           fontWeight: FontWeight.w400, letterSpacing: 0.1)),
     ],
   );
@@ -1191,7 +1426,7 @@ class _InfoCard extends StatelessWidget {
       Row(children: [
         Expanded(child: _InfoField(label: 'Age',    value: '${p.age} yrs')),
         const SizedBox(width: AppSpacing.md),
-        Expanded(child: _InfoField(label: 'Weight', value: '${p.weightKg} kg')),
+        Expanded(child: _InfoField(label: 'Weight', value: WeightConverter.display(p.weightKg, p.weightUnit))),
       ]),
       const SizedBox(height: AppSpacing.sm),
       Row(children: [
@@ -1219,12 +1454,12 @@ class _InfoField extends StatelessWidget {
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: TextStyle(fontFamily: 'Inter',
-          color: AppColors.textMuted.withValues(alpha: 0.45), fontSize: 9,
+          color: AppColors.textMuted.withValues(alpha: 0.45), fontSize: 11,
           fontWeight: FontWeight.w400, letterSpacing: 0)),
       const SizedBox(height: 4),
       Text(value,
           style: const TextStyle(fontFamily: 'Inter',
-              color: AppColors.textPrimary, fontSize: 13,
+              color: AppColors.textPrimary, fontSize: 14,
               fontWeight: FontWeight.w500),
           overflow: TextOverflow.ellipsis),
     ]),
@@ -1323,7 +1558,7 @@ Widget _fSec(String title) => Row(children: [
   ),
   const SizedBox(width: 6),
   Text(title, style: TextStyle(fontFamily: 'Inter',
-      color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 10,
+      color: AppColors.textMuted.withValues(alpha: 0.55), fontSize: 12,
       fontWeight: FontWeight.w400, letterSpacing: 0)),
 ]);
 
@@ -1344,7 +1579,7 @@ class _ExpandableLabel extends StatelessWidget {
           borderRadius: BorderRadius.circular(2))),
       const SizedBox(width: AppSpacing.sm),
       Text(text, style: TextStyle(fontFamily: 'Inter',
-          color: AppColors.textMuted.withValues(alpha: 0.65), fontSize: 11,
+          color: AppColors.textMuted.withValues(alpha: 0.65), fontSize: 13,
           fontWeight: FontWeight.w500, letterSpacing: 0)),
       const Spacer(),
       Icon(
@@ -1374,11 +1609,11 @@ class _TF extends StatelessWidget {
     keyboardType: isDecimal
         ? const TextInputType.numberWithOptions(decimal: true)
         : isNumber ? TextInputType.number : TextInputType.text,
-    style: const TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 14),
+    style: const TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 16),
     decoration: InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
-        fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.34), fontSize: 12),
+        fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.34), fontSize: 13),
       filled: true, fillColor: const Color(0xFF141414),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
@@ -1410,12 +1645,12 @@ class _DD extends StatelessWidget {
   Widget build(BuildContext context) => DropdownButtonFormField<String>(
     initialValue: value, onChanged: onChanged,
     dropdownColor: AppColors.bgModal,
-    style: const TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 14),
+    style: const TextStyle(fontFamily: 'Inter', color: AppColors.textPrimary, fontSize: 16),
     iconEnabledColor: Colors.white.withValues(alpha: 0.72),
     decoration: InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
-        fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.34), fontSize: 12),
+        fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.34), fontSize: 13),
       filled: true, fillColor: const Color(0xFF141414),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),

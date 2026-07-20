@@ -20,9 +20,16 @@ class RepRange {
 class WeightRounder {
   WeightRounder._();
 
-  /// Round [raw] to the nearest valid plate/dumbbell increment.
-  ///   Dumbbell / cable → 2.5 kg
-  ///   Barbell / machine → 5 kg
+  /// Round [raw] to the nearest valid gym increment for [equipment].
+  ///
+  ///   barbell / machine → 5 kg
+  ///   dumbbell / cable  → 2.5 kg
+  ///   bodyweight / ''   → 2.5 kg (smallest safe step)
+  ///
+  /// Passing an empty string is valid and intentional: persisted exercises
+  /// that predate the equipment field default to the dumbbell step — the
+  /// smallest available increment, which is always the safest fallback.
+  /// Call sites must NOT inline-guard this — let WeightRounder own the default.
   static double round(double raw, String equipment) {
     if (raw <= 0) return 0;
     final step    = _step(equipment.toLowerCase().trim());
@@ -31,13 +38,14 @@ class WeightRounder {
   }
 
   /// How much weight to add per successful progressive overload attempt.
+  /// Empty [equipment] falls back to the dumbbell step (2.5 kg).
   static double progressionStep(String equipment, String movement) {
     switch (equipment.toLowerCase().trim()) {
       case 'barbell': return movement == 'compound' ? 5.0 : 2.5;
       case 'dumbbell': return 2.5;
       case 'cable':   return 2.5;
       case 'machine': return 5.0;
-      default:        return 2.5;
+      default:        return 2.5; // '', 'bodyweight', unknown
     }
   }
 
@@ -45,7 +53,7 @@ class WeightRounder {
     switch (eq) {
       case 'barbell': return 5.0;
       case 'machine': return 5.0;
-      default:        return 2.5; // dumbbell, cable, bodyweight
+      default:        return 2.5; // dumbbell, cable, bodyweight, '' (unknown)
     }
   }
 }

@@ -8,9 +8,11 @@
 
 import 'package:flutter/foundation.dart';
 
+import '../../ai/maturity/allowed_claims.dart';
 import '../../memory/snapshots/athlete_memory_snapshot.dart';
 import '../../services/adaptive_programming_service.dart';
 import '../../services/adherence_intelligence_service.dart';
+import '../models/biometric_context.dart';
 import '../models/decision_context.dart';
 import '../models/decision_state.dart';
 
@@ -46,18 +48,50 @@ class AthleteBrainService {
 
   AdaptiveWorkoutDecision computeDecision(
     DecisionContext context,
+    AllowedClaims allowedClaims,
   ) {
     final validated = _validateContext(context);
     final normalized = _normalizeContext(validated);
-    final input = _preparePolicyInput(normalized);
+    final input = _preparePolicyInput(normalized, allowedClaims);
 
+    AdaptiveWorkoutDecision result;
     try {
-      return AdaptiveProgrammingService.compute(input);
+      result = AdaptiveProgrammingService.compute(input);
     } catch (error, stackTrace) {
       debugPrint(
         'AthleteBrainService.computeDecision failed: $error\n$stackTrace',
       );
       return AdaptiveWorkoutDecision.baseline;
+    }
+
+    // Prepend biometric attribution when a primary suppression signal exists.
+    final biometrics = context.biometricContext;
+    if (biometrics != null && result.athleteFacingMessage.isNotEmpty) {
+      final prefix = _biometricPrefix(biometrics);
+      if (prefix.isNotEmpty) {
+        debugPrint('[AthleteBrain] biometric attribution: $prefix');
+        return result.copyWith(
+          athleteFacingMessage: '$prefix ${result.athleteFacingMessage}',
+        );
+      }
+    }
+    return result;
+  }
+
+  String _biometricPrefix(BiometricContext b) {
+    switch (b.primarySignal) {
+      case BiometricSignal.hrv:
+        final pct = ((b.hrv! - b.hrvBaseline!) / b.hrvBaseline!);
+        return pct < -0.25
+            ? 'Your recovery data dropped a lot overnight —'
+            : 'Your recovery data is a little lower than usual —';
+      case BiometricSignal.rhr:
+        return 'Your heart rate is higher than usual today (${b.rhr!.round()} bpm) —';
+      case BiometricSignal.sleep:
+        final hrs = b.sleepHours.toStringAsFixed(1);
+        return 'You only slept ${hrs}h last night —';
+      case BiometricSignal.none:
+        return '';
     }
   }
 
@@ -121,6 +155,7 @@ class AthleteBrainService {
       workoutContext:        context.workoutContext,
       environmentContext:    context.environmentContext,
       athleteMemorySnapshot: context.athleteMemorySnapshot,
+      biometricContext:      context.biometricContext,
     );
   }
 
@@ -154,11 +189,11 @@ class AthleteBrainService {
     );
   }
 
-  AdaptiveInput _preparePolicyInput(DecisionState state) {
-    return _toAdaptiveInput(state);
+  AdaptiveInput _preparePolicyInput(DecisionState state, AllowedClaims allowedClaims) {
+    return _toAdaptiveInput(state, allowedClaims);
   }
 
-  AdaptiveInput _toAdaptiveInput(DecisionState state) {
+  AdaptiveInput _toAdaptiveInput(DecisionState state, AllowedClaims allowedClaims) {
     // Compute soft memory advisory — zero when no snapshot is available.
     final advisory = state.athleteMemorySnapshot != null
         ? _computeMemoryAdvisory(state.athleteMemorySnapshot!)
@@ -213,11 +248,13 @@ class AthleteBrainService {
       isOnPlateau:               state.analyticsSnapshot.isOnPlateau,
       // ── Context (unchanged) ──────────────────────────────────────────────
       daysSinceLastWorkout:      state.workoutContext.daysSinceLastWorkout,
-      totalWorkouts:             state.workoutContext.totalWorkouts,
       goal:                      state.workoutContext.goal,
       todayExerciseNames:        state.workoutContext.todayExerciseNames,
       todayExerciseCategories:   state.workoutContext.todayExerciseCategories,
       now:                       state.environmentContext.now,
+      // ── AI maturity trust gates ─────────────────────────────────────────
+      canShowAdaptiveIncrease:   allowedClaims.ui.canShowAdaptiveIncrease,
+      canMakePrediction:         allowedClaims.content.canMakePrediction,
     );
   }
 

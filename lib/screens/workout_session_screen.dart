@@ -68,7 +68,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             style: const TextStyle(
                 fontFamily: 'Rajdhani',
                 fontWeight: FontWeight.w700,
-                fontSize: 20,
+                fontSize: 22,
                 color: AppColors.textPrimary)),
         actions: [
           Padding(
@@ -77,7 +77,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
               child: Text('$_completedCount / ${_sets.length}',
                   style: const TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 13,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textMuted)),
             ),
@@ -227,7 +227,7 @@ class _SetRow extends StatelessWidget {
                 Text(name,
                     style: TextStyle(
                         fontFamily: 'Inter',
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: done
                             ? AppColors.textMuted
@@ -236,7 +236,7 @@ class _SetRow extends StatelessWidget {
                 Text('Set ${index + 1}',
                     style: const TextStyle(
                         fontFamily: 'Inter',
-                        fontSize: 11,
+                        fontSize: 13,
                         color: AppColors.textMuted)),
               ],
             ),
@@ -249,13 +249,13 @@ class _SetRow extends StatelessWidget {
               onTap: onDecrement,
             ),
             SizedBox(
-              width: 40,
+              width: 44,
               child: Text(
                 '$reps',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     fontFamily: 'Rajdhani',
-                    fontSize: 22,
+                    fontSize: 26,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary),
               ),
@@ -268,13 +268,13 @@ class _SetRow extends StatelessWidget {
             Text('reps',
                 style: const TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 11,
+                    fontSize: 13,
                     color: AppColors.textMuted)),
           ] else ...[
             Text('$reps reps',
                 style: const TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textMuted)),
           ],

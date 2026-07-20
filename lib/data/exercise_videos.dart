@@ -87,13 +87,7 @@ class ExerciseVideos {
   };
 
   static String? getVideoId(String exerciseName) {
-    final key = exerciseName.toLowerCase().trim();
-    if (_videos.containsKey(key)) return _videos[key];
-    for (final entry in _videos.entries) {
-      if (key.contains(entry.key) || entry.key.contains(key)) {
-        return entry.value;
-      }
-    }
-    return null;
+    // Exact match only — fuzzy matching caused wrong demos for unrelated exercises
+    return _videos[exerciseName.toLowerCase().trim()];
   }
 }

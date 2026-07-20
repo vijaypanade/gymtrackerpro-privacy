@@ -142,23 +142,15 @@ class ExerciseGifService {
     // 1. Exact
     if (map.containsKey(n)) return map[n];
 
-    // 2. Substring (app name contains DB name or vice-versa)
-    for (final entry in map.entries) {
-      if (entry.key.length >= 4 &&
-          (n.contains(entry.key) || entry.key.contains(n))) {
-        return entry.value;
-      }
+    // 2. Equipment-word variants (barbell→bench, drop equipment prefix, word order)
+    //    These are safe structural substitutions for the same exercise.
+    for (final v in _variants(n)) {
+      if (map.containsKey(v)) return map[v];
     }
 
-    // 3. Token overlap ≥ 50%, minimum 2 shared tokens
+    // 3. Token overlap ≥ 70%, minimum 2 shared tokens (raised from 50% to avoid false matches)
     final result = _tokenMatch(n, map);
     if (result != null) return result;
-
-    // 4. Equipment-word variants
-    for (final v in _variants(n)) {
-      final r = map[v] ?? _tokenMatch(v, map);
-      if (r != null) return r;
-    }
 
     return null;
   }
@@ -172,7 +164,7 @@ class ExerciseGifService {
       final shared = qt.intersection(kt).length;
       if (shared < 2) continue;
       final score = shared * 100 ~/ qt.union(kt).length;
-      if (score > bestScore && score >= 50) {
+      if (score > bestScore && score >= 70) {
         bestScore = score;
         bestKey   = entry.key;
       }

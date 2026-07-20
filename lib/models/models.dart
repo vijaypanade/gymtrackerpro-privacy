@@ -38,6 +38,10 @@ class PlannedExercise {
   final List<ExSet> sets;
   final bool isFavorite;
   final bool bodyweight;
+  /// Equipment type: 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight' | ''
+  /// Empty string on pre-RFC-GYM-PROGRESSION-001 persisted plans; WeightRounder
+  /// treats '' as its dumbbell default (2.5 kg step) — the safest fallback.
+  final String equipment;
   bool isComplete;
   // Ghost Copy fields — set by GhostCopyService each new week
   int    ghostWeekGap;     // 0=no ghost, 1=progressed, 2=skipped, 3+=comeback
@@ -51,7 +55,7 @@ class PlannedExercise {
     required this.id, required this.baseId, required this.name,
     required this.category, required this.emoji, required this.sets,
     this.type = '', this.unit = 'kg', this.isFavorite = false,
-    this.bodyweight = false, this.isComplete = false,
+    this.bodyweight = false, this.equipment = '', this.isComplete = false,
     this.ghostWeekGap = 0, this.previousWeight = 0,
   });
 
@@ -72,12 +76,18 @@ class PlannedExercise {
     category: json['category'] ?? "General",
     emoji: json['emoji'] ?? "🏋️",
 
-    sets: rawSets.map((s) => ExSet.fromJson(s)).toList(),
+    sets: rawSets.map((s) {
+      // Hive returns Map<dynamic, dynamic>; JSON returns Map<String, dynamic>.
+      // Normalise so ExSet.fromJson always receives the correct type.
+      final m = s is Map<String, dynamic> ? s : Map<String, dynamic>.from(s as Map);
+      return ExSet.fromJson(m);
+    }).toList(),
 
-    type: json['type'] ?? '',
-    unit: json['unit'] ?? 'kg',
+    type:       json['type']      ?? '',
+    unit:       json['unit']      ?? 'kg',
     isFavorite: json['isFavorite'] ?? false,
     bodyweight: json['bodyweight'] ?? false,
+    equipment:  json['equipment']  as String? ?? '',
     isComplete: json['isComplete'] ?? false,
     ghostWeekGap:    (json['ghostWeekGap'] as int?)    ?? 0,
     previousWeight:  (json['previousWeight'] as num?)?.toDouble() ?? 0,
@@ -87,7 +97,7 @@ class PlannedExercise {
   Map<String, dynamic> toJson() => {
     'id': id, 'baseId': baseId, 'name': name, 'type': type, 'unit': unit,
     'category': category, 'emoji': emoji, 'sets': sets.map((e) => e.toJson()).toList(),
-    'isFavorite': isFavorite, 'bodyweight': bodyweight, 'isComplete': isComplete,
+    'isFavorite': isFavorite, 'bodyweight': bodyweight, 'equipment': equipment, 'isComplete': isComplete,
     'ghostWeekGap': ghostWeekGap, 'previousWeight': previousWeight,
   };
 
@@ -162,13 +172,15 @@ class UserProfile {
   String gender;
   String activityLevel;
   String dietPreference; // 'veg', 'nonveg', 'eggetarian'
-  String location; // e.g. 'Maharashtra', 'Delhi'
+  String location; // e.g. 'Maharashtra', 'Delhi' (kept for backward compat)
   bool usesWheyProtein; // true if user takes whey supplement
   bool usesCreatine; // true if user takes creatine
   String workoutTime; // 'morning' | 'evening'
   String bodyType; // 'ectomorph', 'mesomorph', 'endomorph'
-  String cuisinePreference; // 'maharashtrian', 'north_indian', 'south_indian', 'mixed'
-  String state; // Indian state for local food preferences
+  String cuisinePreference; // see kCuisineOptions in locale_helper.dart
+  String state; // kept for backward compat — prefer country
+  String country; // full country name, e.g. 'India', 'United States'
+  String weightUnit; // 'kg' or 'lbs' — stored preference, display-only
 
   UserProfile({
     this.name = 'Athlete', this.age = 25, this.weightKg = 70.0, this.heightCm = 170.0,
@@ -180,8 +192,10 @@ class UserProfile {
     this.usesCreatine = false,
     this.workoutTime = 'evening',
     this.bodyType = 'mesomorph',
-    this.cuisinePreference = 'mixed',
+    this.cuisinePreference = 'no_preference',
     this.state = 'Maharashtra',
+    this.country = '',
+    this.weightUnit = 'kg',
   });
 
   double get bmi => weightKg / ((heightCm / 100.0) * (heightCm / 100.0));
@@ -205,7 +219,7 @@ class UserProfile {
     String? dietPreference, String? location,
     bool? usesWheyProtein, bool? usesCreatine,
     String? workoutTime, String? bodyType, String? cuisinePreference,
-    String? state,
+    String? state, String? country, String? weightUnit,
   }) => UserProfile(
     name: name ?? this.name, age: age ?? this.age,
     weightKg: weightKg ?? this.weightKg, heightCm: heightCm ?? this.heightCm,
@@ -218,6 +232,8 @@ class UserProfile {
     bodyType: bodyType ?? this.bodyType,
     cuisinePreference: cuisinePreference ?? this.cuisinePreference,
     state: state ?? this.state,
+    country: country ?? this.country,
+    weightUnit: weightUnit ?? this.weightUnit,
     trainerType: trainerType ?? this.trainerType,
     activityLevel: activityLevel ?? this.activityLevel,
   );
@@ -232,6 +248,8 @@ class UserProfile {
     'bodyType': bodyType,
     'cuisinePreference': cuisinePreference,
     'state': state,
+    'country': country,
+    'weightUnit': weightUnit,
   };
 
   factory UserProfile.fromJson(Map<String, dynamic> j) {
@@ -251,15 +269,29 @@ class UserProfile {
       location: j['location'] as String? ?? 'India',
       usesWheyProtein: j['usesWheyProtein'] as bool? ?? false,
       usesCreatine: j['usesCreatine'] as bool? ?? false,
-      workoutTime: _migrateWorkoutTime(j['workoutTime'] as String? ?? 'evening'),      bodyType: j['bodyType'] as String? ?? 'mesomorph',
-      cuisinePreference: j['cuisinePreference'] as String? ?? 'mixed',
+      workoutTime: _migrateWorkoutTime(j['workoutTime'] as String? ?? 'evening'),
+      bodyType: j['bodyType'] as String? ?? 'mesomorph',
+      cuisinePreference: _migrateCuisine(j['cuisinePreference'] as String? ?? 'mixed'),
       state: j['state'] as String? ?? 'Maharashtra',
+      // Migrate existing users: if country not yet stored, fall back to location
+      country: j['country'] as String? ??
+          (j['location'] as String? ?? ''),
+      weightUnit: j['weightUnit'] as String? ?? 'kg',
     );
   }
 
   // Migrate old 4-option values → 2-option: afternoon/night → evening
   static String _migrateWorkoutTime(String v) =>
       (v == 'morning') ? 'morning' : 'evening';
+
+  // Migrate India-only cuisine values to global schema
+  static String _migrateCuisine(String v) => switch (v) {
+        'maharashtrian' => 'indian',
+        'north_indian'  => 'indian',
+        'south_indian'  => 'indian',
+        'mixed'         => 'no_preference',
+        _               => v,
+      };
 }
 
 // ══════════════════════════════════════════════
@@ -613,26 +645,38 @@ class BadgeSystem {
 // HISTORY ENTRY
 // ══════════════════════════════════════════════
 class HistoryEntry {
-  final String id;
-  final String date;
-  final String workoutName;
-  final int durationMinutes;
-  final double totalVolume;
-  final int exerciseCount;
-  final int setCount;
-  final int xpEarned;
+  final String  id;
+  final String  date;
+  final String  workoutName;
+  final int     durationMinutes;
+  final double  totalVolume;
+  final int     exerciseCount;
+  final int     setCount;
+  final int     xpEarned;
+  // RFC-002.6B: import provenance fields.
+  // Null for native LiftOn workouts; set by HealthEntryBuilder for imports.
+  // externalSource: platform identifier, e.g. 'apple_health'.
+  // externalId:     platform-side record UUID — dedup anchor, never used as id.
+  final String? externalSource;
+  final String? externalId;
 
   HistoryEntry({
     required this.id, required this.date, required this.workoutName,
     required this.durationMinutes, required this.totalVolume,
     required this.exerciseCount, required this.setCount, this.xpEarned = 0,
+    this.externalSource, this.externalId,
   });
 
-  Map<String, dynamic> toJson() => {
-    'id': id, 'date': date, 'workoutName': workoutName,
-    'durationMinutes': durationMinutes, 'totalVolume': totalVolume,
-    'exerciseCount': exerciseCount, 'setCount': setCount, 'xpEarned': xpEarned,
-  };
+  Map<String, dynamic> toJson() {
+    final m = <String, dynamic>{
+      'id': id, 'date': date, 'workoutName': workoutName,
+      'durationMinutes': durationMinutes, 'totalVolume': totalVolume,
+      'exerciseCount': exerciseCount, 'setCount': setCount, 'xpEarned': xpEarned,
+    };
+    if (externalSource != null) m['externalSource'] = externalSource;
+    if (externalId     != null) m['externalId']     = externalId;
+    return m;
+  }
 
   factory HistoryEntry.fromJson(Map<String, dynamic> j) => HistoryEntry(
     id: j['id'] as String? ?? '', date: j['date'] as String? ?? '',
@@ -642,6 +686,8 @@ class HistoryEntry {
     exerciseCount: j['exerciseCount'] as int? ?? 0,
     setCount: j['setCount'] as int? ?? 0,
     xpEarned: j['xpEarned'] as int? ?? 0,
+    externalSource: j['externalSource'] as String?,
+    externalId:     j['externalId']     as String?,
   );
 }
 

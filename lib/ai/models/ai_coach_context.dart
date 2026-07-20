@@ -18,6 +18,7 @@ import '../../coach/models/coach_context.dart';
 import '../../coach/models/coach_message.dart';
 import '../../memory/snapshots/athlete_memory_snapshot.dart';
 import '../../services/adaptive_programming_service.dart';
+import '../maturity/ai_maturity_state.dart';
 
 @immutable
 class AICoachContext {
@@ -39,6 +40,10 @@ class AICoachContext {
   /// Per-dimension confidence breakdown from DecisionConfidenceEngine.
   final DecisionConfidence decisionConfidence;
 
+  /// Current AI maturity snapshot. Governs language register and claim
+  /// authority for any AI surface that uses this context.
+  final AIMaturityState aiMaturity;
+
   const AICoachContext({
     required this.coachMessage,
     required this.coachBrainContext,
@@ -46,5 +51,6 @@ class AICoachContext {
     required this.adaptiveDecision,
     required this.brainCardData,
     required this.decisionConfidence,
+    required this.aiMaturity,
   });
 }

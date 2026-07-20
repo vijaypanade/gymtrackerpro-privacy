@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../ai/maturity/athlete_brain_presentation.dart';
 import '../../brain/models/brain_card_data.dart';
 import '../../providers/app_provider.dart';
 import '../../utils/app_constants.dart';
@@ -20,10 +21,51 @@ class AthleteBrainCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<AppProvider, ({BrainCardData data, int totalWorkouts})>(
-      selector: (_, ap) => (data: ap.brainCardData, totalWorkouts: ap.totalWorkouts),
-      builder:  (_, snap, __) => RepaintBoundary(
-        child: _BrainCardContent(data: snap.data, totalWorkouts: snap.totalWorkouts),
+    return Selector<AppProvider, ({BrainCardData data, String headerLabel, bool canShowWhyToggle, double progressPct, String footerCopy})>(
+      selector: (_, ap) => (
+        data:             ap.brainCardData,
+        headerLabel:      ap.aiMaturity.phase.athleteBrainHeaderLabel,
+        canShowWhyToggle: ap.aiMaturity.allowedClaims.ui.canShowWhyToggle,
+        progressPct:      ap.aiMaturity.progressPct,
+        footerCopy:       ap.aiMaturity.phase.calibratingFooterCopy,
+      ),
+      builder: (_, snap, __) => RepaintBoundary(
+        child: _BrainCardContent(
+          data:             snap.data,
+          headerLabel:      snap.headerLabel,
+          canShowWhyToggle: snap.canShowWhyToggle,
+          progressPct:      snap.progressPct,
+          footerCopy:       snap.footerCopy,
+        ),
+      ),
+    );
+  }
+}
+
+/// Content-only variant — no outer card shell.
+/// Used inside [_PerformanceSection] which provides the shared container.
+class AthleteBrainBody extends StatelessWidget {
+  const AthleteBrainBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<AppProvider, ({BrainCardData data, String headerLabel, bool canShowWhyToggle, double progressPct, String footerCopy})>(
+      selector: (_, ap) => (
+        data:             ap.brainCardData,
+        headerLabel:      ap.aiMaturity.phase.athleteBrainHeaderLabel,
+        canShowWhyToggle: ap.aiMaturity.allowedClaims.ui.canShowWhyToggle,
+        progressPct:      ap.aiMaturity.progressPct,
+        footerCopy:       ap.aiMaturity.phase.calibratingFooterCopy,
+      ),
+      builder: (_, snap, __) => RepaintBoundary(
+        child: _BrainCardContent(
+          data:             snap.data,
+          headerLabel:      snap.headerLabel,
+          canShowWhyToggle: snap.canShowWhyToggle,
+          progressPct:      snap.progressPct,
+          footerCopy:       snap.footerCopy,
+          showContainer:    false,
+        ),
       ),
     );
   }
@@ -33,8 +75,19 @@ class AthleteBrainCard extends StatelessWidget {
 
 class _BrainCardContent extends StatefulWidget {
   final BrainCardData data;
-  final int totalWorkouts;
-  const _BrainCardContent({required this.data, required this.totalWorkouts});
+  final String        headerLabel;
+  final bool          canShowWhyToggle;
+  final double        progressPct;
+  final String        footerCopy;
+  final bool          showContainer;
+  const _BrainCardContent({
+    required this.data,
+    required this.headerLabel,
+    required this.canShowWhyToggle,
+    required this.progressPct,
+    required this.footerCopy,
+    this.showContainer = true,
+  });
 
   @override
   State<_BrainCardContent> createState() => _BrainCardContentState();
@@ -50,17 +103,48 @@ class _BrainCardContentState extends State<_BrainCardContent> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.totalWorkouts == 0) {
-      return const _OnboardingBrainContent(totalWorkouts: 0);
-    }
     if (widget.data.isOnboarding) {
-      return _OnboardingBrainContent(totalWorkouts: widget.totalWorkouts);
+      return const _OnboardingBrainContent(totalWorkouts: 0);
     }
 
     final data = widget.data;
 
-    return Container(
+    final column = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Always visible: icon + title + one human sentence ───────────
+          _Header(headerLabel: widget.headerLabel),
+          const SizedBox(height: 6),
+          _MissionRow(data: data),
+          const SizedBox(height: 4),
+          _MissionVoice(data: data),
+          const SizedBox(height: 4),
 
+          // ── Expandable detail panel ─────────────────────────────────────
+          AnimatedSize(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: _expanded
+                ? _ExpandedPanel(data: data)
+                : const SizedBox.shrink(),
+          ),
+
+          // ── Footer — Why toggle when unlocked, calibration bar while learning ──
+          Container(height: 0.5, color: AppColors.borderSoft),
+          if (widget.canShowWhyToggle)
+            _WhyToggleRow(expanded: _expanded, onTap: _toggle)
+          else
+            _CalibratingFooter(progressPct: widget.progressPct, footerCopy: widget.footerCopy),
+        ],
+      ),
+    );
+
+    if (!widget.showContainer) return column;
+
+    return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -82,38 +166,7 @@ class _BrainCardContentState extends State<_BrainCardContent> {
           ),
         ],
       ),
-      child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Always visible: icon + title + one human sentence ───────────
-            _Header(data: data, totalWorkouts: widget.totalWorkouts),
-            const SizedBox(height: 6),
-            _MissionRow(data: data),
-            const SizedBox(height: 4),
-            _MissionVoice(data: data),
-            const SizedBox(height: 4),
-
-            // ── Expandable detail panel ─────────────────────────────────────
-            AnimatedSize(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeInOut,
-              alignment: Alignment.topCenter,
-              child: _expanded
-                  ? _ExpandedPanel(data: data)
-                  : const SizedBox.shrink(),
-            ),
-
-            // ── Footer — toggle for 5+, calibrating progress bar for 1-4 ──
-            Container(height: 0.5, color: AppColors.borderSoft),
-            if (widget.totalWorkouts >= 5)
-              _WhyToggleRow(expanded: _expanded, onTap: _toggle)
-            else
-              _CalibratingFooter(totalWorkouts: widget.totalWorkouts),
-          ],
-        ),
-      ),
+      child: column,
     );
   }
 }
@@ -121,15 +174,8 @@ class _BrainCardContentState extends State<_BrainCardContent> {
 // ── Header ───────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
-  final BrainCardData data;
-  final int totalWorkouts;
-  const _Header({required this.data, required this.totalWorkouts});
-
-  String get _label {
-    if (totalWorkouts == 1) return 'First Insight';
-    if (totalWorkouts < 5)  return 'Pattern Found';
-    return "Today's Signal";
-  }
+  final String headerLabel;
+  const _Header({required this.headerLabel});
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +184,7 @@ class _Header extends StatelessWidget {
         const Icon(Icons.psychology_outlined, size: 16, color: AppColors.goldSoft),
         const SizedBox(width: 8),
         Text(
-          _label,
+          headerLabel,
           style: const TextStyle(
             fontFamily: 'Inter',
             fontSize: 11,
@@ -452,8 +498,9 @@ class _ExpandedPanel extends StatelessWidget {
 // ── Calibrating footer — shown in place of toggle for workouts 1-4 ───────────
 
 class _CalibratingFooter extends StatelessWidget {
-  final int totalWorkouts;
-  const _CalibratingFooter({required this.totalWorkouts});
+  final double progressPct;
+  final String footerCopy;
+  const _CalibratingFooter({required this.progressPct, required this.footerCopy});
 
   @override
   Widget build(BuildContext context) {
@@ -468,7 +515,7 @@ class _CalibratingFooter extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: totalWorkouts / 5.0,
+                    value: progressPct,
                     backgroundColor: AppColors.gold.withValues(alpha: 0.08),
                     valueColor: const AlwaysStoppedAnimation<Color>(AppColors.gold),
                     minHeight: 2,
@@ -487,9 +534,7 @@ class _CalibratingFooter extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            totalWorkouts == 1
-                ? 'First recovery tracked'
-                : 'Pattern updating',
+            footerCopy,
             style: AppTextStyles.caption.copyWith(
               color: AppColors.textMuted,
             ),
