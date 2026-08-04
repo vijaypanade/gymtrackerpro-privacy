@@ -272,15 +272,15 @@ class _OnboardingBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Your training starts here', style: AppTextStyles.h3),
-        const SizedBox(height: 6),
+        const SizedBox(height: 12),
+        if (data.exerciseCount > 0)
+          const _CtaButton(label: "Start Today's Workout"),
+        if (data.exerciseCount > 0)
+          const SizedBox(height: 16),
         Text(
-          'Complete your first session to activate AI coaching',
+          'Complete your first session to activate AI coaching.',
           style: AppTextStyles.bodySmall,
         ),
-        if (data.exerciseCount > 0) ...[
-          const SizedBox(height: 16),
-          const _CtaButton(label: "Start Today's Workout"),
-        ],
       ],
     );
   }

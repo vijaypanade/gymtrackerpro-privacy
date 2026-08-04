@@ -77,3 +77,18 @@ dart_defines.json
 *.zip
 analyze.txt
 .claude/
+
+# Node — functions deps, plus strays from installing at the repo root.
+# The real @apple/app-store-server-library dependency lives in
+# functions/package.json; these root copies came from an npm i run one
+# directory too high and are not part of the build.
+node_modules/
+package-lock.json
+/package.json
+
+# Firebase Functions env files. The bare ".env" pattern above does not match
+# the per-project form (.env.<projectId>), which is the one actually used.
+.env.*
+
+# Editor/tool backups (e.g. index.js.bak from a migration script)
+*.bak

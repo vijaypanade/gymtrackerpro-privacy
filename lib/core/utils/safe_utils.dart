@@ -84,9 +84,35 @@ class WeekPlanGuard {
 /// when multiple calls race on Android.
 class SafeAudio {
   static final AudioPlayer _player = AudioPlayer();
+  static bool _contextReady = false;
+
+  /// An app has exactly one AVAudioSession, and audioplayers is its second
+  /// owner alongside flutter_tts. Its iOS default is `playback` with no options
+  /// — a non-mixing category, so playing a one-second SFX interrupts whatever
+  /// the user is listening to and does not resume it. Matching the voice
+  /// coach's category and options means neither owner interrupts, and it no
+  /// longer matters which of the two configured the session last.
+  static Future<void> _ensureContext() async {
+    if (_contextReady) return;
+    _contextReady = true; // set first: a failure must not retry on every SFX
+    try {
+      await AudioPlayer.global.setAudioContext(
+        const AudioContext(
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: [
+              AVAudioSessionOptions.mixWithOthers,
+              AVAudioSessionOptions.duckOthers,
+            ],
+          ),
+        ),
+      );
+    } catch (_) {}
+  }
 
   static Future<void> playSuccess() async {
     try {
+      await _ensureContext();
       await _player.stop();
       await _player.play(AssetSource('sounds/success.mp3'));
     } catch (_) {}

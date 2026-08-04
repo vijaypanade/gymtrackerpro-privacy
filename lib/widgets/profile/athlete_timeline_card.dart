@@ -19,9 +19,8 @@ import 'timeline_event_tile.dart';
 class _TimelineCardData {
   final List<TimelineEvent> events;
   final List<Milestone>     milestones;
-  final int    totalWorkouts;
-  final int    longestStreak;
   final int    totalPRs;
+  final int    activeWeeks;
   final String identityLabel;
   final String evolutionSummary;
   final String headline;
@@ -30,9 +29,8 @@ class _TimelineCardData {
   const _TimelineCardData({
     required this.events,
     required this.milestones,
-    required this.totalWorkouts,
-    required this.longestStreak,
     required this.totalPRs,
+    required this.activeWeeks,
     required this.identityLabel,
     required this.evolutionSummary,
     required this.headline,
@@ -42,15 +40,14 @@ class _TimelineCardData {
   factory _TimelineCardData.from(AppProvider ap) {
     final t = ap.timelineSnapshot;
     return _TimelineCardData(
-      events:          t.events,
-      milestones:      t.milestones,
-      totalWorkouts:   t.totalWorkouts,
-      longestStreak:   t.longestStreak,
-      totalPRs:        t.totalPRs,
-      identityLabel:   t.currentIdentityLabel,
+      events:           t.events,
+      milestones:       t.milestones,
+      totalPRs:         t.totalPRs,
+      activeWeeks:      ap.activeWeeks,
+      identityLabel:    t.currentIdentityLabel,
       evolutionSummary: t.evolutionSummary,
-      headline:        t.headline,
-      hasData:         t.hasData,
+      headline:         t.headline,
+      hasData:          t.hasData,
     );
   }
 
@@ -58,16 +55,15 @@ class _TimelineCardData {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! _TimelineCardData) return false;
-    return other.totalWorkouts == totalWorkouts &&
-           other.longestStreak == longestStreak &&
-           other.totalPRs      == totalPRs      &&
+    return other.activeWeeks   == activeWeeks  &&
+           other.totalPRs      == totalPRs     &&
            other.identityLabel == identityLabel &&
            other.hasData       == hasData;
   }
 
   @override
   int get hashCode => Object.hash(
-    totalWorkouts, longestStreak, totalPRs, identityLabel, hasData,
+    activeWeeks, totalPRs, identityLabel, hasData,
   );
 }
 
@@ -183,10 +179,10 @@ class _StatRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          _StatCell(value: '${data.totalWorkouts}',     label: 'Sessions',     delayMs: 0),
-          _StatCell(value: '${data.longestStreak}d',   label: 'Peak Streak',  delayMs: 100),
+          _StatCell(value: '${data.events.length}',      label: 'Key Events',   delayMs: 0),
+          _StatCell(value: '${data.activeWeeks}w',     label: 'Active Weeks', delayMs: 100),
           _StatCell(value: '${data.totalPRs}',         label: 'Lifetime PRs', delayMs: 200),
-          _StatCell(value: '${data.milestones.length}', label: data.milestones.length == 1 ? 'Milestone' : 'Milestones',  delayMs: 300),
+          _StatCell(value: '${data.milestones.length}', label: data.milestones.length == 1 ? 'Milestone' : 'Milestones', delayMs: 300),
         ],
       ),
     );

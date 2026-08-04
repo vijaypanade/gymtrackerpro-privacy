@@ -441,7 +441,8 @@ class _PRScreen extends StatefulWidget {
 class _PRScreenState extends State<_PRScreen>
     with TickerProviderStateMixin {
 
-  final GlobalKey _repaintKey = GlobalKey();
+  final GlobalKey _repaintKey     = GlobalKey();
+  final GlobalKey _shareButtonKey = GlobalKey();
 
   late AnimationController _trophyC, _cardC, _weightC, _shimmerC;
   late Animation<double> _trophy, _card, _weightScale, _shimmer;
@@ -641,15 +642,40 @@ class _PRScreenState extends State<_PRScreen>
         }
         return;
       }
+      // Verify file exists on disk before handing to share sheet
+      if (!await file.exists()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Share file not found — try again.')),
+          );
+        }
+        return;
+      }
+      // Compute share button rect so iPad can anchor the popover correctly.
+      // share_plus 10.x requires sharePositionOrigin on iPad; without it the
+      // native plugin returns FlutterError and the sheet is never presented.
+      Rect? shareRect;
+      final box =
+          _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box != null && box.hasSize) {
+        shareRect = box.localToGlobal(Offset.zero) & box.size;
+      }
       // Share while dialog is still visible — Flutter overlays are not UIKit
       // modals, so UIActivityViewController presents without conflict.
-      await Share.shareXFiles(
+      final result = await Share.shareXFiles(
         [XFile(file.path)],
         text: '🔥 New PR: ${_formatName(widget.exerciseName)} — $_prValue\n'
             'Powered by LiftOn 💪',
+        sharePositionOrigin: shareRect,
       );
+      debugPrint('Share PR result: ${result.status}');
     } catch (e) {
       debugPrint('Share PR error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed — please try again.')),
+        );
+      }
     } finally {
       _shareBusy = false;
     }
@@ -1013,6 +1039,7 @@ class _PRScreenState extends State<_PRScreen>
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
+                    key: _shareButtonKey,
                     onPressed: _sharePR,
                     icon: const Icon(Icons.share_rounded, size: 18),
                     label: Text('Share',

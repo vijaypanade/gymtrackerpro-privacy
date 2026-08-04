@@ -11,7 +11,7 @@ import 'package:flutter/services.dart';
 import '../services/notification_service.dart';
 
 import 'package:provider/provider.dart';
-import 'premium_screen.dart';
+import 'premium_paywall_screen.dart';
 import '../models/models.dart' hide MissionType;
 import '../providers/app_provider.dart';
 import '../providers/gamification_provider.dart';
@@ -126,7 +126,7 @@ class _FullDashboard extends StatelessWidget {
         // ── 1. RECOVERY INTELLIGENCE — "Can I train today?" ───────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, rs(context, 6), pad, 0),
+            padding: EdgeInsets.fromLTRB(pad, rs(context, 16), pad, 0),
             child: const _RecoveryIntelligenceCard(),
           ),
         ),
@@ -134,7 +134,7 @@ class _FullDashboard extends StatelessWidget {
         // ── 2. TODAY'S WORKOUT STRIP — "What am I training?" ──────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, rs(context, 4), pad, 0),
+            padding: EdgeInsets.fromLTRB(pad, rs(context, 8), pad, 0),
             child: const FadeSlide(delay: 40, child: WorkoutStripCard()),
           ),
         ),
@@ -142,7 +142,7 @@ class _FullDashboard extends StatelessWidget {
         // ── 3. DECISION HERO — today's verdict + primary CTA ──────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, rs(context, 4), pad, 0),
+            padding: EdgeInsets.fromLTRB(pad, rs(context, 8), pad, 0),
             child: const FadeSlide(delay: 60, child: DecisionHeroCard()),
           ),
         ),
@@ -158,7 +158,7 @@ class _FullDashboard extends StatelessWidget {
         // ── 5. PERFORMANCE — Weekly Progress + Athlete Brain ─────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, rs(context, 6), pad, 0),
+            padding: EdgeInsets.fromLTRB(pad, rs(context, 12), pad, 0),
             child: const FadeSlide(delay: 100, child: _PerformanceSection()),
           ),
         ),
@@ -166,7 +166,7 @@ class _FullDashboard extends StatelessWidget {
         // ── 6. PROTEIN / MISSIONS ─────────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, rs(context, 6), pad, 0),
+            padding: EdgeInsets.fromLTRB(pad, rs(context, 12), pad, 0),
             child: const FadeSlide(delay: 120, child: DailyProteinCard()),
           ),
         ),
@@ -288,12 +288,12 @@ class _HomeAppBarTitle extends StatelessWidget {
                 fontFamily: 'Inter',
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
-                color: AppColors.textMuted.withValues(alpha: 0.42),
-                letterSpacing: 0.1,
-                height: 1.1,
+                color: AppColors.textMuted.withValues(alpha: 0.62),
+                letterSpacing: 0.2,
+                height: 1.2,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               first ?? 'Athlete',
               style: const TextStyle(
@@ -323,7 +323,7 @@ class _EliteHookAction extends StatelessWidget {
       builder: (_, isPremium, __) {
         if (isPremium) return const SizedBox.shrink();
         return GestureDetector(
-          onTap: () => Navigator.push(context, slideRoute(const PremiumScreen())),
+          onTap: () => PremiumPaywallScreen.show(context, source: 'home_badge'),
           child: Padding(
             padding: const EdgeInsets.only(right: 8, top: 10, bottom: 10),
             child: Container(

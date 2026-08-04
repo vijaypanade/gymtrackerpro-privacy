@@ -2,6 +2,8 @@
 // Premium screen with proper UX, feature comparison, pricing
 // Tapping "Upgrade" routes through MonetizationService
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -301,7 +303,11 @@ class _PremiumScreenState extends State<PremiumScreen>
               const SizedBox(height: 20),
 
               Center(child: Text(
-                'Billed monthly. Cancel anytime in Google Play.',
+                // Naming the other platform's store is a 3.1.1 rejection, and it
+                // is simply wrong for whichever platform is not being run.
+                Platform.isIOS
+                    ? 'Billed monthly. Cancel anytime in Settings.'
+                    : 'Billed monthly. Cancel anytime in Google Play.',
                 style: GoogleFonts.inter(
                     color: AppColors.textMuted.withValues(alpha: 0.6),
                     fontSize: 11),
@@ -332,8 +338,11 @@ class _PremiumScreenState extends State<PremiumScreen>
                         color: AppColors.textMuted, fontSize: 13)),
                 GestureDetector(
                   onTap: () async {
-                    final uri = Uri.parse(
-                        'https://play.google.com/store/account/subscriptions');
+                    // Matches the platform-aware link already used in
+                    // profile_screen.dart — this one was left Play-only.
+                    final uri = Uri.parse(Platform.isIOS
+                        ? 'https://apps.apple.com/account/subscriptions'
+                        : 'https://play.google.com/store/account/subscriptions');
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   },
                   child: Text(

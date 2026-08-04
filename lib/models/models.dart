@@ -371,8 +371,39 @@ class XPSystem {
     }
   }
 
+  static const int xpPerPrestigeTier = 1000;
+
+  // Weekly XP goal scales with rank so it always feels achievable.
+  int get weeklyXpGoal {
+    switch (rank) {
+      case UserRank.recruit:
+      case UserRank.warrior:
+        return 300;
+      case UserRank.gladiator:
+      case UserRank.champion:
+        return 500;
+      case UserRank.legend:
+      case UserRank.beast:
+        return 700;
+    }
+  }
+
+  static String _toRoman(int n) {
+    const values  = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
+    const symbols = ['M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
+    final buf = StringBuffer();
+    var rem = n;
+    for (var i = 0; i < values.length; i++) {
+      while (rem >= values[i]) { buf.write(symbols[i]); rem -= values[i]; }
+    }
+    return buf.toString();
+  }
+
   double get rankProgress {
-    if (rank == UserRank.beast) return 1.0;
+    if (rank == UserRank.beast) {
+      final prestigeXP = totalXP - 10000;
+      return ((prestigeXP % xpPerPrestigeTier) / xpPerPrestigeTier).clamp(0.0, 1.0);
+    }
     final current = totalXP - xpForCurrentRank;
     final needed  = xpForNextRank - xpForCurrentRank;
     return (current / needed).clamp(0.0, 1.0);
@@ -385,15 +416,26 @@ class XPSystem {
       case UserRank.gladiator: return 'Champion';
       case UserRank.champion:  return 'Legend';
       case UserRank.legend:    return 'Beast';
-      case UserRank.beast:     return 'MAX';
+      case UserRank.beast:
+        final level = (totalXP - 10000) ~/ xpPerPrestigeTier + 1;
+        return 'Beast ${_toRoman(level + 1)}';
     }
   }
 
-
-  // XP needed to reach next rank
+  // XP needed to reach next rank (or next prestige tier for Beast)
   int get xpToNextRank {
-    if (rank == UserRank.beast) return 0;
+    if (rank == UserRank.beast) {
+      final prestigeXP = totalXP - 10000;
+      return xpPerPrestigeTier - (prestigeXP % xpPerPrestigeTier);
+    }
     return (xpForNextRank - totalXP).clamp(0, 999999);
+  }
+
+  // Current Beast tier label ("Beast I", "Beast II", …). Empty for all other ranks.
+  String get prestigeLabel {
+    if (rank != UserRank.beast) return '';
+    final level = (totalXP - 10000) ~/ xpPerPrestigeTier + 1;
+    return 'Beast ${_toRoman(level)}';
   }
 
   // Next rank emoji

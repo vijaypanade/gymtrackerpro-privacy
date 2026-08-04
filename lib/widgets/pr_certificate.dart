@@ -164,7 +164,8 @@ class _CertificateScreen extends StatefulWidget {
 
 class _CertificateScreenState extends State<_CertificateScreen>
     with SingleTickerProviderStateMixin {
-  final GlobalKey _repaintKey = GlobalKey();
+  final GlobalKey _repaintKey   = GlobalKey();
+  final GlobalKey _shareButtonKey = GlobalKey();
 
   late final AnimationController _entryC;
   late final Animation<double> _fade;
@@ -294,13 +295,39 @@ class _CertificateScreenState extends State<_CertificateScreen>
         }
         return;
       }
-      await Share.shareXFiles(
+      // Verify file actually exists on disk before handing to share sheet
+      if (!await f.exists()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Certificate file not found — try again.')),
+          );
+        }
+        return;
+      }
+      // Compute share button rect so iPad can anchor the popover correctly.
+      // share_plus 10.x requires sharePositionOrigin on iPad; without it the
+      // native plugin returns FlutterError and the sheet is never presented.
+      Rect? shareRect;
+      final box =
+          _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box != null && box.hasSize) {
+        shareRect = box.localToGlobal(Offset.zero) & box.size;
+      }
+      final result = await Share.shareXFiles(
         [XFile(f.path)],
         text: '🏆 ${_formatName(widget.exerciseName)} — $_prValue\n'
             'Certified by LiftOn 💪',
+        sharePositionOrigin: shareRect,
       );
+      debugPrint('Certificate share result: ${result.status}');
     } catch (e) {
       debugPrint('Certificate share error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed — please try again.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -340,6 +367,7 @@ class _CertificateScreenState extends State<_CertificateScreen>
                 child: Row(mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                   _actionButton(
+                    key: _shareButtonKey,
                     icon: Icons.share_rounded,
                     label: 'SHARE',
                     filled: true,
@@ -362,12 +390,14 @@ class _CertificateScreenState extends State<_CertificateScreen>
   }
 
   Widget _actionButton({
+    Key? key,
     required IconData icon,
     required String label,
     required bool filled,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
+      key: key,
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12),

@@ -343,13 +343,17 @@ class _AIChatScreenState extends State<AIChatScreen>
 
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 150), () {
-      if (_scroll.hasClients) {
+      if (!mounted) return;
+      if (!_scroll.hasClients) return;
+      final pos = _scroll.position;
+      if (!pos.hasContentDimensions) return;
+      try {
         _scroll.animateTo(
-          _scroll.position.maxScrollExtent,
+          pos.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
-      }
+      } catch (_) {}
     });
   }
 

@@ -23,6 +23,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:in_app_purchase/in_app_purchase.dart' show ProductDetails;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/billing_service.dart';
@@ -58,7 +59,7 @@ class _Plan {
 
 // Note: in production these prices come from ProductDetails.price (Play Store).
 // These are display fallbacks while products are loading.
-const _kPlans = [
+final _kPlans = [
   _Plan(
     id:        _PlanId.yearly,
     productId: BillingProducts.yearly,
@@ -79,6 +80,29 @@ const _kPlans = [
     badge:     'MOST POPULAR',
   ),
 ];
+
+// The store returns the price already formatted for the user's storefront and
+// currency, and that is the only figure they are actually charged. The hardcoded
+// ₹ strings above are a placeholder for the brief moment before products finish
+// loading — showing them to a non-INR storefront advertises a price that will
+// not be charged (App Store Guideline 3.1.2 / Play equivalent).
+ProductDetails? _storeProduct(String productId) {
+  for (final p in BillingService.instance.products) {
+    if (p.id == productId) return p;
+  }
+  return null;
+}
+
+String _livePrice(_Plan plan) => _storeProduct(plan.productId)?.price ?? plan.price;
+
+// Derived per-month figure for the yearly plan. Recomputed from the live price
+// so the currency matches; falls back to the placeholder only while loading.
+String? _livePerMonth(_Plan plan) {
+  if (plan.perMonth == null) return null;
+  final p = _storeProduct(plan.productId);
+  if (p == null) return plan.perMonth;
+  return 'Only ${p.currencySymbol}${(p.rawPrice / 12).toStringAsFixed(0)}/month';
+}
 
 const _kFeatures = [
   (Icons.all_inclusive_rounded,     'Unlimited Coaching',          'Daily limit removed'),
@@ -545,8 +569,8 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen>
     final isYearly = _selected == _PlanId.yearly;
 
     final trialLine = isYearly
-        ? '${plan.price}/year billed after trial ends'
-        : '${plan.price}/month billed after 14-day trial';
+        ? '${_livePrice(plan)}/year billed after trial ends'
+        : '${_livePrice(plan)}/month billed after 14-day trial';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -776,7 +800,7 @@ class _HeroPlanCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  plan.price,
+                  _livePrice(plan),
                   style: GoogleFonts.rajdhani(
                     color: AppColors.textPrimary,
                     fontSize: 36,
@@ -798,10 +822,10 @@ class _HeroPlanCard extends StatelessWidget {
               ],
             ),
 
-            if (plan.perMonth != null) ...[
+            if (_livePerMonth(plan) != null) ...[
               const SizedBox(height: 4),
               Text(
-                plan.perMonth!,
+                _livePerMonth(plan)!,
                 style: GoogleFonts.inter(
                   color: AppColors.goldSoft,
                   fontSize: 14,
@@ -906,7 +930,7 @@ class _SidePlanCard extends StatelessWidget {
               const SizedBox(height: 20),
 
             Text(
-              plan.price,
+              _livePrice(plan),
               style: GoogleFonts.rajdhani(
                 color: AppColors.textPrimary,
                 fontSize: 24,
@@ -922,10 +946,10 @@ class _SidePlanCard extends StatelessWidget {
               ),
             ),
 
-            if (plan.perMonth != null) ...[
+            if (_livePerMonth(plan) != null) ...[
               const SizedBox(height: 4),
               Text(
-                plan.perMonth!,
+                _livePerMonth(plan)!,
                 style: GoogleFonts.inter(
                   color: AppColors.textSecondary,
                   fontSize: 12,

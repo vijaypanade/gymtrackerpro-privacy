@@ -163,6 +163,15 @@ service cloud.firestore {
       allow create, update, delete:  if false;
     }
 
+    // RFC-003: purchase_tokens is the authoritative ownership database binding
+    // one purchase token (SHA-256 keyed) to one Firebase UID. It is written
+    // exclusively by the verifyPurchase Cloud Function (Admin SDK). Clients
+    // have no read or write access — they must not know whether a given token
+    // is already bound, to avoid fingerprinting another user's subscription.
+    match /purchase_tokens/{tokenHash} {
+      allow read, write: if false;
+    }
+
     // ── Server-owned collections — GET own UID only, no client writes (m1) ─
 
     match /entitlements/{uid} {

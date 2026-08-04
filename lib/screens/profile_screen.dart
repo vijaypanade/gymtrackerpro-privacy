@@ -20,7 +20,7 @@ import '../widgets/profile_rank_badge.dart';
 import 'main_shell.dart';
 import 'onboarding_screen.dart';
 import '../utils/weight_converter.dart';
-import 'premium_screen.dart';
+import 'premium_paywall_screen.dart';
 import '../utils/app_routes.dart';
 import '../widgets/profile/athlete_timeline_card.dart';
 
@@ -307,6 +307,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Selector2<AppProvider, GamificationProvider, ({
       UserProfile profile,
       int totalWorkouts, int currentStreak, int longestStreak,
+      int activeWeeks,
       XPSystem xp,
       double tdee,
       bool isPremium,
@@ -326,6 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           totalWorkouts:     ap.streak.totalWorkouts,
           currentStreak:     ap.streak.currentStreak,
           longestStreak:     ap.streak.longestStreak,
+          activeWeeks:       ap.activeWeeks,
           xp:                gp.xp,
           tdee:              ap.tdee,
           isPremium:         ap.isPremium,
@@ -356,7 +358,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               )),
             ),
             CustomScrollView(
-              physics: const BouncingScrollPhysics(),
+              physics: Platform.isIOS
+                  ? const BouncingScrollPhysics()
+                  : const ClampingScrollPhysics(),
               slivers: [
                 SliverAppBar(
                   backgroundColor: Colors.transparent,
@@ -403,6 +407,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           totalWorkouts: d.totalWorkouts,
                           currentStreak: d.currentStreak,
                           longestStreak: d.longestStreak,
+                          activeWeeks:  d.activeWeeks,
                           recoveryScore: d.recoveryScore,
                           lifetimeKg:   d.lifetimeKg,
                           splitStyle:   d.splitStyle)),
@@ -620,14 +625,15 @@ class _EditButtonState extends State<_EditButton>
 class _HeroCard extends StatelessWidget {
   final UserProfile p;
   final XPSystem xp;
-  final int totalWorkouts, currentStreak, longestStreak, recoveryScore;
+  final int totalWorkouts, currentStreak, longestStreak, recoveryScore, activeWeeks;
   final double lifetimeKg;
   final SplitStyle splitStyle;
 
   const _HeroCard({
     required this.p, required this.xp,
     required this.totalWorkouts, required this.currentStreak,
-    required this.longestStreak, required this.recoveryScore,
+    required this.longestStreak, required this.activeWeeks,
+    required this.recoveryScore,
     required this.lifetimeKg,
     required this.splitStyle,
   });
@@ -645,20 +651,18 @@ class _HeroCard extends StatelessWidget {
     return 'Session one starts the record.';
   }
 
-  // Top X% badge — only shown for gladiator and above.
-  static String _topPct(UserRank rank) {
-    switch (rank) {
-      case UserRank.beast:     return 'TOP 1%';
-      case UserRank.legend:    return 'TOP 3%';
-      case UserRank.champion:  return 'TOP 10%';
-      case UserRank.gladiator: return 'TOP 20%';
-      default:                 return '';
-    }
+  // Earned badge based on verified rank/effort — no fake percentiles.
+  static String _earnedBadge(UserRank rank, int workouts) {
+    if (rank == UserRank.beast)    return 'ELITE ATHLETE';
+    if (rank == UserRank.legend)   return 'HIGHLY CONSISTENT';
+    if (rank == UserRank.champion) return 'DEDICATED LIFTER';
+    if (workouts >= 50)            return 'PEAK PERFORMER';
+    return '';
   }
 
   @override
   Widget build(BuildContext context) {
-    final topPct = _topPct(xp.rank);
+    final badge = _earnedBadge(xp.rank, totalWorkouts);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
@@ -676,17 +680,16 @@ class _HeroCard extends StatelessWidget {
           const SizedBox(width: AppSpacing.md),
           Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Rank name — primary identity (dynamic, never hardcoded)
-            Text(xp.rank.displayName,
-                style: const TextStyle(fontFamily: 'Rajdhani',
-                    color: AppColors.textPrimary, fontSize: 26,
-                    fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-            // User's name — secondary, muted
-            Text(p.name, style: TextStyle(fontFamily: 'Inter',
-                color: AppColors.textMuted.withValues(alpha: 0.55),
-                fontSize: 14, fontWeight: FontWeight.w400)),
+            // Name — primary identity
+            Text(p.name, style: const TextStyle(fontFamily: 'Inter',
+                color: AppColors.textPrimary, fontSize: 18,
+                fontWeight: FontWeight.w700)),
+            // Rank — secondary, gold
+            Text(xp.rank.displayName, style: const TextStyle(fontFamily: 'Rajdhani',
+                color: AppColors.gold,
+                fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
             const SizedBox(height: AppSpacing.xs),
-            if (topPct.isNotEmpty) ...[
+            if (badge.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
@@ -694,7 +697,7 @@ class _HeroCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                       color: AppColors.gold.withValues(alpha: 0.25), width: 0.5)),
-                child: Text(topPct, style: TextStyle(
+                child: Text(badge, style: TextStyle(
                     fontFamily: 'Inter',
                     color: AppColors.gold.withValues(alpha: 0.85),
                     fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
@@ -715,7 +718,7 @@ class _HeroCard extends StatelessWidget {
         const Divider(color: AppColors.divider, height: 1),
         const SizedBox(height: AppSpacing.md),
 
-        // Stat row: Tonnes | Sessions | Streak | BMI
+        // Stat row: Tonnes | Sessions | Streak | Active Weeks
         IntrinsicHeight(child: Row(children: [
           _heroStat(_formatTonnes(lifetimeKg), 'All-Time Volume'),
           _heroDiv(),
@@ -723,7 +726,7 @@ class _HeroCard extends StatelessWidget {
           _heroDiv(),
           _heroStat('${longestStreak}d', 'Best Streak'),
           _heroDiv(),
-          _heroStat(p.bmi.toStringAsFixed(1), 'BMI'),
+          _heroStat('${activeWeeks}w', 'Active Weeks'),
         ])),
         const SizedBox(height: AppSpacing.md),
         const Divider(color: AppColors.divider, height: 1),
@@ -732,7 +735,45 @@ class _HeroCard extends StatelessWidget {
         // Rank Journey Strip
         _RankJourneyStrip(currentRank: xp.rank, progress: xp.rankProgress),
 
+        const SizedBox(height: AppSpacing.sm),
+        // Change 6: Numeric XP line
+        Row(children: [
+          Text(_fmtXP(xp.totalXP), style: TextStyle(
+              fontFamily: 'Inter',
+              color: AppColors.gold.withValues(alpha: 0.85),
+              fontSize: 12, fontWeight: FontWeight.w700)),
+          Text(' · ', style: TextStyle(
+              fontFamily: 'Inter',
+              color: AppColors.textMuted.withValues(alpha: 0.35),
+              fontSize: 12)),
+          Text('${_fmtXP(xp.xpToNextRank)} to ${xp.nextRankName}',
+              style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: AppColors.textMuted.withValues(alpha: 0.55),
+                  fontSize: 12, fontWeight: FontWeight.w400)),
+        ]),
+        const SizedBox(height: AppSpacing.xs),
+        // Change 4: Weekly XP progress
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('This week', style: TextStyle(
+              fontFamily: 'Inter',
+              color: AppColors.textMuted.withValues(alpha: 0.45),
+              fontSize: 11, fontWeight: FontWeight.w400)),
+          Text('${xp.weeklyXP} / ${xp.weeklyXpGoal} XP',
+              style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: AppColors.textMuted.withValues(alpha: 0.65),
+                  fontSize: 11, fontWeight: FontWeight.w600)),
+        ]),
+
         const SizedBox(height: AppSpacing.md),
+        const Divider(color: AppColors.divider, height: 1),
+        const SizedBox(height: AppSpacing.xs),
+
+        // Change 10: ONE data-driven insight
+        _buildInsight(currentStreak, totalWorkouts, recoveryScore, xp),
+
+        const SizedBox(height: AppSpacing.xs),
         const Divider(color: AppColors.divider, height: 1),
         const SizedBox(height: AppSpacing.xs),
 
@@ -777,6 +818,15 @@ class _HeroCard extends StatelessWidget {
     return t == t.truncateToDouble() ? '${t.toInt()}t' : '${t.toStringAsFixed(1)}t';
   }
 
+  /// Formats XP as compact integer with K suffix for ≥1000.
+  static String _fmtXP(int xp) {
+    if (xp >= 1000) {
+      final k = xp / 1000;
+      return k == k.truncateToDouble() ? '${k.toInt()}k' : '${k.toStringAsFixed(1)}k';
+    }
+    return '$xp';
+  }
+
   static Widget _heroStat(String value, String label) => Expanded(
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       Text(value, style: const TextStyle(fontFamily: 'Rajdhani',
@@ -794,6 +844,33 @@ class _HeroCard extends StatelessWidget {
   static Widget _heroDiv() => Container(
       width: 0.5, margin: const EdgeInsets.symmetric(horizontal: 4),
       color: AppColors.divider.withValues(alpha: 0.45));
+
+  static Widget _buildInsight(int streak, int workouts, int recovery, XPSystem xp) {
+    final String text;
+    if (streak >= 14) {
+      text = '🔥 $streak-day streak — elite consistency.';
+    } else if (streak >= 7) {
+      text = '🔥 $streak days in a row — keep the chain alive.';
+    } else if (recovery >= 85) {
+      text = '💚 Recovery is high — ideal day for max effort.';
+    } else if (xp.xpToNextRank <= 200 && xp.rank != UserRank.beast) {
+      text = '⚡ ${xp.xpToNextRank} XP from ${xp.nextRankName} — push now.';
+    } else if (workouts % 50 == 0 && workouts > 0) {
+      text = '🏆 $workouts sessions — a milestone worth owning.';
+    } else if (workouts % 10 == 0 && workouts > 0) {
+      text = '📊 $workouts sessions logged. The record is building.';
+    } else {
+      text = '📈 Every session moves the line. Show up again.';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Text(text, style: TextStyle(
+          fontFamily: 'Inter',
+          color: AppColors.textMuted.withValues(alpha: 0.55),
+          fontSize: 12, fontWeight: FontWeight.w400, letterSpacing: 0.1)),
+    );
+  }
 }
 
 
@@ -1027,8 +1104,9 @@ class _SubscriptionCard extends StatelessWidget {
         const Spacer(),
         GestureDetector(
           onTap: () async {
-            final uri = Uri.parse(
-                'https://play.google.com/store/account/subscriptions');
+            final uri = Uri.parse(Platform.isIOS
+                ? 'https://apps.apple.com/account/subscriptions'
+                : 'https://play.google.com/store/account/subscriptions');
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           },
           child: Icon(Icons.chevron_right_rounded,
@@ -1038,9 +1116,22 @@ class _SubscriptionCard extends StatelessWidget {
     );
   }
 
+  static String _personalizedHook(int workouts, String goal) {
+    if (workouts >= 100) return '$workouts sessions logged. Your coach should know every one.';
+    if (workouts >= 50 && goal == 'strength')   return '$workouts strength sessions — unlock full progressive overload.';
+    if (workouts >= 50 && goal == 'fat_loss')   return '$workouts sessions logged. Let coaching do the heavy lifting.';
+    if (workouts >= 50)                          return '$workouts sessions strong. Get the coaching system to match.';
+    if (workouts >= 10)                          return 'Your training is taking shape. A coach will accelerate it.';
+    return 'Unlock the full LiftOn coaching system.';
+  }
+
   Widget _buildUpgradeCTA(BuildContext context) {
+    final ap      = context.read<AppProvider>();
+    final hookLine = _personalizedHook(
+        ap.streak.totalWorkouts, ap.profile.goal);
+
     return GestureDetector(
-      onTap: () => Navigator.push(context, slideRoute(const PremiumScreen())),
+      onTap: () => PremiumPaywallScreen.show(context, source: 'profile_cta'),
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
         decoration: BoxDecoration(
@@ -1070,6 +1161,11 @@ class _SubscriptionCard extends StatelessWidget {
                 fontSize: 13, fontWeight: FontWeight.w700)),
             ),
           ]),
+          const SizedBox(height: AppSpacing.sm),
+          Text(hookLine, style: TextStyle(
+              fontFamily: 'Inter',
+              color: AppColors.textMuted.withValues(alpha: 0.65),
+              fontSize: 13, fontWeight: FontWeight.w400, height: 1.4)),
           const SizedBox(height: AppSpacing.md),
           ..._features.map((f) => Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -1085,12 +1181,6 @@ class _SubscriptionCard extends StatelessWidget {
           )),
           const SizedBox(height: AppSpacing.sm),
           Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            Text('Unlock the full coaching system',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                color: AppColors.gold.withValues(alpha: 0.55),
-                fontSize: 13, fontWeight: FontWeight.w500)),
-            const SizedBox(width: 4),
             Icon(Icons.arrow_forward_rounded,
                 color: AppColors.gold.withValues(alpha: 0.55), size: 12),
           ]),

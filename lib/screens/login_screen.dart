@@ -159,9 +159,14 @@ class _LoginScreenState extends State<LoginScreen>
       );
     } else {
       setState(() => _loading = false);
+      // Show the real cause when Apple sign-in failed for a reason other than
+      // cancellation; null (a plain cancel) keeps the generic wording.
+      final appleErr = useApple ? AuthService.instance.lastAppleError : null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Sign-in cancelled or failed. Please try again.'),
+          duration: Duration(seconds: appleErr != null ? 12 : 4),
+          content: Text(appleErr
+              ?? 'Sign-in cancelled or failed. Please try again.'),
           backgroundColor: AppColors.bgElevated,
           behavior: SnackBarBehavior.floating,
           shape:

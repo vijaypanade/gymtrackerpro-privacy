@@ -106,7 +106,7 @@ class MonetizationService {
   int  _aiUsageToday   = 0;
   int  _chatUsageToday = 0;
 
-  bool get isPremium    => !const bool.fromEnvironment('dart.vm.product') || _isPremium;
+  bool get isPremium    => _isPremium;
   int  get aiUsageToday => _aiUsageToday;
   int  get freeAiLimit  => _freeAiLimit;
 
@@ -214,6 +214,11 @@ class MonetizationService {
   Future<void> revokePremium() async {
     _isPremium = false;
     final prefs = await SharedPreferences.getInstance();
+    // Use the UID-scoped key if available. If called during sign-out, currentUser
+    // may already be null — capture the key from _premiumKey BEFORE Firebase clears
+    // the session. BillingService._onAuthStateChanged calls this; at that point the
+    // auth state has already changed, so we write to the global fallback key.
+    // That is acceptable: the critical effect is _isPremium = false in memory.
     await prefs.setBool(_premiumKey, false);
   }
 
@@ -303,6 +308,19 @@ class _PaywallSheetState extends State<PaywallSheet> {
             style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
         backgroundColor: AppColors.gold,
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+    } else if (b.isPendingVerification) {
+      // Purchase received — waiting for store to confirm. Keep paywall open but
+      // clear the spinner so the user knows the app is waiting, not frozen.
+      setState(() => _loadingUpgrade = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Payment received — verifying with store…',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+        backgroundColor: Colors.orange.shade700,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ));

@@ -306,9 +306,6 @@ class AppProvider extends ChangeNotifier {
       // Storage first (everyone depends on it)
       await StorageService.instance.init();
 
-      // Monetization next
-      await MonetizationService.instance.init();
-
       // Restore active workout session (if user was mid-workout)
       await WorkoutSessionService.instance.restoreFromDisk();
 
@@ -3219,6 +3216,16 @@ class AppProvider extends ChangeNotifier {
 
   double get lifetimeVolumeKg =>
       workout.logs.fold(0.0, (s, l) => s + l.volume);
+
+  int get activeWeeks {
+    final seen = <int>{};
+    for (final h in history) {
+      final d = DateTime.tryParse(h.date);
+      if (d == null) continue;
+      seen.add(d.millisecondsSinceEpoch ~/ const Duration(days: 7).inMilliseconds);
+    }
+    return seen.length;
+  }
 
   Map<String, double> get weeklyVolumeByMuscle => workout.weeklyVolumeByMuscle;
   bool   get isBeginnerPhase     => workout.isBeginnerPhase;

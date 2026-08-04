@@ -2,10 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'main_shell.dart';
 import 'login_screen.dart';
-import '../providers/app_provider.dart';
 import '../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -98,6 +97,11 @@ class _SplashScreenState extends State<SplashScreen>
     _textCtrl.forward();
   }
 
+  // Set on the first successful launch of an install. Absent = fresh install,
+  // regardless of what the iOS Keychain still holds. Never UID-scoped: it is a
+  // property of the installation, not of any account.
+  static const _kInstalled = 'app_installed_v1';
+
   void _setupNavigation() {
     bool providerReady = false;
 
@@ -112,23 +116,30 @@ class _SplashScreenState extends State<SplashScreen>
     Future.wait<void>([
       Future<void>.delayed(const Duration(milliseconds: 2500)),
       (widget.readyFuture ?? Future<void>.value()).catchError((_) {}),
-    ]).then((_) {
+    ]).then((_) async {
       providerReady = true;
       if (!mounted) return;
       bool isLoggedIn = false;
       try {
         isLoggedIn = AuthService.instance.currentUser != null;
-        // iOS Keychain persists auth credentials across reinstalls even
-        // though local Hive data is wiped. Detect reinstall by checking
-        // whether the user has any local data — if both name and workout
-        // count are empty, send to LoginScreen to trigger cloud restore.
-        if (isLoggedIn) {
-          final ap = context.read<AppProvider>();
-          final hasLocalData = ap.user.name.isNotEmpty ||
-              ap.workout.streak.totalWorkouts > 0;
-          if (!hasLocalData) isLoggedIn = false;
+
+        // iOS keeps the Firebase session in the Keychain, and the Keychain
+        // survives deleting the app — so currentUser is non-null on a fresh
+        // install and the user reaches MainShell without ever signing in.
+        // SharedPreferences IS wiped on uninstall, so a missing flag is the
+        // reliable "this install has never run" signal.
+        //
+        // The previous check (local name / workout count) could never fire:
+        // UserProfile.name defaults to 'Athlete', so it was never empty and
+        // hasLocalData was always true.
+        final prefs = await SharedPreferences.getInstance();
+        if (isLoggedIn && !(prefs.getBool(_kInstalled) ?? false)) {
+          await AuthService.instance.signOut();
+          isLoggedIn = false;
         }
+        await prefs.setBool(_kInstalled, true);
       } catch (_) {}
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, __, ___) =>

@@ -11,7 +11,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Gymtrackerpromaster</string>
+	<string>LiftOn</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -19,7 +19,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>gymtrackerpromaster</string>
+	<string>LiftOn</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -45,8 +45,14 @@
 	<array>
 		<integer>1</integer>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>LiftOn asks for this only if you choose Save Image while sharing a workout summary or personal-record card, so the picture can be added to your photo library.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>LiftOn reads your Apple Health workouts, heart rate, resting heart rate, active energy, steps, distance, exercise minutes, and sleep data to personalize your recovery insights, track your training streaks, and provide coaching recommendations. Workout data is securely stored in your account to enable recovery across devices.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>LiftOn updates your Apple Health workout and fitness data to keep your progress synchronized.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -63,24 +63,34 @@ class VoiceCoachService {
   // keeps running when the screen is locked (UIBackgroundModes: audio must
   // also be declared in Info.plist, which it is).
   //
-  // IosTextToSpeechAudioCategory.playback + duckOthers:
+  // IosTextToSpeechAudioCategory.playback + mixWithOthers + duckOthers:
   //   • Allows TTS to play while the screen is locked.
-  //   • Ducks music/podcasts while speaking; iOS automatically unduckes them
-  //     (resumes full volume) the moment the utterance ends — the user never
-  //     has to manually restart their music.
+  //   • Ducks music/podcasts while speaking instead of interrupting them, so
+  //     iOS restores full volume when the plugin deactivates the session after
+  //     the utterance — the user never has to restart their music.
+  //
+  // ORDER MATTERS. setSharedInstance(true) maps straight to
+  // AVAudioSession.setActive(true), which activates the session under whatever
+  // category is current. Called first, that is still the default .soloAmbient —
+  // a non-mixing category, so activating it *interrupts* other audio rather
+  // than ducking it. Setting .playback + mixWithOthers first means the session
+  // is never activated in an interrupting state. An interrupted app is not
+  // resumed by .notifyOthersOnDeactivation (most players stay stopped), which
+  // is why the music never came back once the coach had spoken.
   Future<void> _configureIosAudioSession() async {
     if (!Platform.isIOS) return;
     try {
-      await _tts.setSharedInstance(true);
       await _tts.setIosAudioCategory(
         IosTextToSpeechAudioCategory.playback,
         [
+          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
           IosTextToSpeechAudioCategoryOptions.duckOthers,
           IosTextToSpeechAudioCategoryOptions.allowBluetooth,
           IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
         ],
         IosTextToSpeechAudioMode.defaultMode,
       );
+      await _tts.setSharedInstance(true);
     } catch (_) {}
   }
 

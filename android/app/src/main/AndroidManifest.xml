@@ -4,6 +4,9 @@
     <!-- ✅ IMPORTANT: Internet permission (AI साठी MUST) -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Google Play Billing — in_app_purchase साठी required -->
+    <uses-permission android:name="com.android.vending.BILLING"/>
+
     <!-- Android 13+ push notifications (required for all local notifications) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Android 12 exact alarm scheduling -->
