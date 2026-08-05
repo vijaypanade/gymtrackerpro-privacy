@@ -1,46 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="$FLUTTER_BASE_HREF">
-
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="bns_app">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>bns_app</title>
-  <link rel="manifest" href="manifest.json">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiftOn — Train Smarter. Recover Better.</title>
+  <meta name="description" content="LiftOn is an AI fitness app for smarter training, adaptive workout plans and recovery insights." />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <link rel="canonical" href="https://liftonapp.com/" />
+  <meta property="og:title" content="LiftOn — Train Smarter. Recover Better." />
+  <meta property="og:description" content="AI fitness app for smarter training, adaptive plans and recovery insights." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://liftonapp.com/" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      line-height: 1.7;
+      padding: 0 16px 60px;
+      -webkit-text-size-adjust: 100%;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    header { padding: 72px 0 40px; text-align: center; }
+    .logo { font-size: 40px; font-weight: 800; color: #BF953F; letter-spacing: -0.5px; }
+    .logo span { color: #fff; }
+    .tagline { color: #888; margin-top: 8px; font-size: 15px; }
+    .rule { border: 0; border-top: 1px solid #222; margin: 8px 0 40px; }
+    h2 { font-size: 19px; font-weight: 700; color: #BF953F; margin-bottom: 12px; }
+    p { margin-bottom: 14px; }
+    .links { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 8px; }
+    .btn {
+      flex: 1 1 220px;
+      display: block;
+      padding: 16px 18px;
+      background: #141414;
+      border: 1px solid #262626;
+      border-left: 3px solid #BF953F;
+      border-radius: 6px;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .btn small { display: block; color: #888; font-weight: 400; font-size: 13px; margin-top: 2px; }
+    .btn:hover, .btn:focus { border-color: #BF953F; }
+    .btn:focus-visible { outline: 2px solid #BF953F; outline-offset: 2px; }
+    a { color: #BF953F; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    footer {
+      margin-top: 56px; padding-top: 28px;
+      border-top: 1px solid #222; color: #777; font-size: 14px;
+    }
+    @media (max-width: 480px) {
+      header { padding: 52px 0 32px; }
+      .logo { font-size: 34px; }
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <div class="container">
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+    <header>
+      <div class="logo">LIFT<span>ON</span></div>
+      <p class="tagline">Train Smarter. Recover Better.</p>
+    </header>
+    <hr class="rule" />
+
+    <main>
+      <h2>About</h2>
+      <p>LiftOn is an AI-assisted fitness app for lifters — adaptive weekly plans, personalised coaching, recovery insights, and progress tracking that learns from every session you log.</p>
+
+      <h2>Legal</h2>
+      <div class="links">
+        <a class="btn" href="privacy_policy.html">
+          Privacy Policy
+          <small>What we collect and how it is used</small>
+        </a>
+        <a class="btn" href="terms.html">
+          Terms of Use
+          <small>EULA and subscription terms</small>
+        </a>
+      </div>
+
+      <h2>Support</h2>
+      <p>Questions, bug reports or account requests: <a href="mailto:gymtrackerpro3@gmail.com">gymtrackerpro3@gmail.com</a></p>
+    </main>
+
+    <footer>
+      <p>&copy; 2026 LiftOn. All rights reserved.</p>
+    </footer>
+
+  </div>
 </body>
 </html>
