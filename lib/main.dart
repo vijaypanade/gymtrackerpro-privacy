@@ -23,6 +23,8 @@ import 'screens/splash_screen.dart';
 import 'services/billing_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/monetization_service.dart';
+import 'services/movekit_catalog_service.dart';
+import 'services/movekit_feature_flag_service.dart';
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'data/sync/outbox_service.dart';
@@ -111,6 +113,9 @@ Future<void> initCoreServices() async {
   await OutboxService.instance.open(); // RFC-002.1: wire to the already-open box
   await MonetizationService.instance.init();
   await AiQuotaService.instance.init(); // quota + kill switch — needed before app.init()
+  // RFC-005 §19.3: MoveKit loops are default-OFF and fail-closed, so this only
+  // ever turns the feature ON. No UI reads it yet.
+  await MoveKitFeatureFlagService.instance.init();
 
   await Future.wait([
     BillingService.instance.init()
@@ -205,6 +210,7 @@ class _AppBootstrapState extends State<_AppBootstrap> {
     // Defer non-critical services so they never block the first rendered frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ExerciseVideoService.init().ignore();
+      MoveKitCatalogService.init().ignore();
       VoiceCoachService().init().ignore();
     });
 

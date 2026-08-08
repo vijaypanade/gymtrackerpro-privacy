@@ -1,0 +1,2900 @@
+{
+  "_meta": {
+    "schemaVersion": 1,
+    "generator": "tool/movekit/movekit_412_source.json",
+    "source": "MoveKit Complete Pack — exercise listing",
+    "licenseId": "MK-LIC-DCAYJ-AAHE2-VYM50",
+    "provenance": "PROVISIONAL — transcribed from the owner-supplied 412-exercise listing, not exported from a vendor file. Structurally verified (412 records, ids 1-412, unique ids and names, no blank fields, no prohibited fields). Transcription accuracy has NOT been independently confirmed against vendor data.",
+    "verifyAgainstVendorWhen": "The MoveKit Complete Pack is purchased and its own metadata.json becomes available. A name typo here would silently break that clip's slug resolution.",
+    "normalisation": "NONE. name, muscle and equipment are verbatim source terminology. Multi-valued muscle/equipment retain the ' · ' separator.",
+    "slugRule": "lowercase; every run of [^a-z0-9] becomes '-'; leading and trailing '-' trimmed",
+    "deterministic": "No timestamp is emitted; two runs produce byte-identical output.",
+    "count": 412
+  },
+  "entries": [
+    {
+      "id": 1,
+      "name": "Abdominals Stretch Variation Four",
+      "muscle": "Core",
+      "equipment": "Stability Ball",
+      "slug": "abdominals-stretch-variation-four"
+    },
+    {
+      "id": 2,
+      "name": "Abdominals Stretch Variation One",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "abdominals-stretch-variation-one"
+    },
+    {
+      "id": 3,
+      "name": "Abdominals Stretch Variation Three",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "abdominals-stretch-variation-three"
+    },
+    {
+      "id": 4,
+      "name": "Abdominals Stretch Variation Two",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "abdominals-stretch-variation-two"
+    },
+    {
+      "id": 5,
+      "name": "Arc Trainer",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "arc-trainer"
+    },
+    {
+      "id": 6,
+      "name": "Arnold Press",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "arnold-press"
+    },
+    {
+      "id": 7,
+      "name": "Assault Bike",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "assault-bike"
+    },
+    {
+      "id": 8,
+      "name": "B-stance Back Extension",
+      "muscle": "Lower Back",
+      "equipment": "Bodyweight",
+      "slug": "b-stance-back-extension"
+    },
+    {
+      "id": 9,
+      "name": "B-Stance Hip Thrust",
+      "muscle": "Glutes",
+      "equipment": "Bodyweight",
+      "slug": "b-stance-hip-thrust"
+    },
+    {
+      "id": 10,
+      "name": "Back Extension",
+      "muscle": "Lower Back",
+      "equipment": "Bodyweight",
+      "slug": "back-extension"
+    },
+    {
+      "id": 11,
+      "name": "Backstroke Swim",
+      "muscle": "Back",
+      "equipment": "Bodyweight",
+      "slug": "backstroke-swim"
+    },
+    {
+      "id": 12,
+      "name": "Band Assisted Pull-Up",
+      "muscle": "Back",
+      "equipment": "Band",
+      "slug": "band-assisted-pull-up"
+    },
+    {
+      "id": 13,
+      "name": "Band Curl",
+      "muscle": "Biceps",
+      "equipment": "Band",
+      "slug": "band-curl"
+    },
+    {
+      "id": 14,
+      "name": "Band External Rotation",
+      "muscle": "Shoulders",
+      "equipment": "Band",
+      "slug": "band-external-rotation"
+    },
+    {
+      "id": 15,
+      "name": "Band Glute Bridge",
+      "muscle": "Glutes",
+      "equipment": "Band",
+      "slug": "band-glute-bridge"
+    },
+    {
+      "id": 16,
+      "name": "Band High Face Pull",
+      "muscle": "Shoulders",
+      "equipment": "Band",
+      "slug": "band-high-face-pull"
+    },
+    {
+      "id": 17,
+      "name": "Band Hip Abduction",
+      "muscle": "Glutes",
+      "equipment": "Band",
+      "slug": "band-hip-abduction"
+    },
+    {
+      "id": 18,
+      "name": "Band Kneeling Pulldown",
+      "muscle": "Back",
+      "equipment": "Band",
+      "slug": "band-kneeling-pulldown"
+    },
+    {
+      "id": 19,
+      "name": "Band Lateral Raise",
+      "muscle": "Shoulders",
+      "equipment": "Band",
+      "slug": "band-lateral-raise"
+    },
+    {
+      "id": 20,
+      "name": "Band Leg Curl",
+      "muscle": "Hamstrings",
+      "equipment": "Band",
+      "slug": "band-leg-curl"
+    },
+    {
+      "id": 21,
+      "name": "Band Overhead Press",
+      "muscle": "Shoulders",
+      "equipment": "Band",
+      "slug": "band-overhead-press"
+    },
+    {
+      "id": 22,
+      "name": "Band Pullover",
+      "muscle": "Back",
+      "equipment": "Band",
+      "slug": "band-pullover"
+    },
+    {
+      "id": 23,
+      "name": "Band Romanian Deadlift",
+      "muscle": "Glutes · Hamstrings",
+      "equipment": "Band",
+      "slug": "band-romanian-deadlift"
+    },
+    {
+      "id": 24,
+      "name": "Band Row",
+      "muscle": "Back",
+      "equipment": "Band",
+      "slug": "band-row"
+    },
+    {
+      "id": 25,
+      "name": "Band Seated Pulldown",
+      "muscle": "Back",
+      "equipment": "Band",
+      "slug": "band-seated-pulldown"
+    },
+    {
+      "id": 26,
+      "name": "Band Shrug",
+      "muscle": "Trapezius",
+      "equipment": "Band",
+      "slug": "band-shrug"
+    },
+    {
+      "id": 27,
+      "name": "Band Single Arm Lateral Raise",
+      "muscle": "Shoulders",
+      "equipment": "Band",
+      "slug": "band-single-arm-lateral-raise"
+    },
+    {
+      "id": 28,
+      "name": "Band Squat",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Band",
+      "slug": "band-squat"
+    },
+    {
+      "id": 29,
+      "name": "Band Wood Chopper",
+      "muscle": "Core",
+      "equipment": "Band",
+      "slug": "band-wood-chopper"
+    },
+    {
+      "id": 30,
+      "name": "Barbell Banded Back Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Barbell",
+      "slug": "barbell-banded-back-squat"
+    },
+    {
+      "id": 31,
+      "name": "Barbell Behind The Back 30 Degree Shrug",
+      "muscle": "Trapezius",
+      "equipment": "Barbell",
+      "slug": "barbell-behind-the-back-30-degree-shrug"
+    },
+    {
+      "id": 32,
+      "name": "Barbell Bench Press",
+      "muscle": "Chest",
+      "equipment": "Barbell",
+      "slug": "barbell-bench-press"
+    },
+    {
+      "id": 33,
+      "name": "Barbell Bent Over Row",
+      "muscle": "Back",
+      "equipment": "Barbell",
+      "slug": "barbell-bent-over-row"
+    },
+    {
+      "id": 34,
+      "name": "Barbell Bent Over Row - Overhand",
+      "muscle": "Back · Trapezius",
+      "equipment": "Barbell",
+      "slug": "barbell-bent-over-row-overhand"
+    },
+    {
+      "id": 35,
+      "name": "Barbell Clean And Press",
+      "muscle": "Core · Glutes · Shoulders",
+      "equipment": "Barbell",
+      "slug": "barbell-clean-and-press"
+    },
+    {
+      "id": 36,
+      "name": "Barbell Close Grip Bench Press",
+      "muscle": "Triceps",
+      "equipment": "Barbell",
+      "slug": "barbell-close-grip-bench-press"
+    },
+    {
+      "id": 37,
+      "name": "Barbell Curl",
+      "muscle": "Biceps",
+      "equipment": "Barbell",
+      "slug": "barbell-curl"
+    },
+    {
+      "id": 38,
+      "name": "Barbell Deadlift",
+      "muscle": "Trapezius · Core",
+      "equipment": "Barbell",
+      "slug": "barbell-deadlift"
+    },
+    {
+      "id": 39,
+      "name": "Barbell Drag Curl",
+      "muscle": "Biceps",
+      "equipment": "Barbell",
+      "slug": "barbell-drag-curl"
+    },
+    {
+      "id": 40,
+      "name": "Barbell Floor Press",
+      "muscle": "Chest",
+      "equipment": "Barbell",
+      "slug": "barbell-floor-press"
+    },
+    {
+      "id": 41,
+      "name": "Barbell Front Rack Step Up Knee Drive",
+      "muscle": "Quadriceps",
+      "equipment": "Barbell",
+      "slug": "barbell-front-rack-step-up-knee-drive"
+    },
+    {
+      "id": 42,
+      "name": "Barbell High Incline Bench Press",
+      "muscle": "Chest",
+      "equipment": "Barbell",
+      "slug": "barbell-high-incline-bench-press"
+    },
+    {
+      "id": 43,
+      "name": "Barbell Hip Thrust",
+      "muscle": "Glutes",
+      "equipment": "Barbell",
+      "slug": "barbell-hip-thrust"
+    },
+    {
+      "id": 44,
+      "name": "Barbell Incline Bench Press",
+      "muscle": "Chest",
+      "equipment": "Barbell",
+      "slug": "barbell-incline-bench-press"
+    },
+    {
+      "id": 45,
+      "name": "Barbell Muscle Snatch",
+      "muscle": "Core · Glutes · Shoulders",
+      "equipment": "Barbell",
+      "slug": "barbell-muscle-snatch"
+    },
+    {
+      "id": 46,
+      "name": "Barbell Overhead Press",
+      "muscle": "Shoulders",
+      "equipment": "Barbell",
+      "slug": "barbell-overhead-press"
+    },
+    {
+      "id": 47,
+      "name": "Barbell Power Snatch",
+      "muscle": "Core · Glutes · Shoulders",
+      "equipment": "Barbell",
+      "slug": "barbell-power-snatch"
+    },
+    {
+      "id": 48,
+      "name": "Barbell Pullover",
+      "muscle": "Back",
+      "equipment": "Barbell",
+      "slug": "barbell-pullover"
+    },
+    {
+      "id": 49,
+      "name": "Barbell Rack Pull",
+      "muscle": "Trapezius · Core",
+      "equipment": "Barbell",
+      "slug": "barbell-rack-pull"
+    },
+    {
+      "id": 50,
+      "name": "Barbell Reverse Lunge",
+      "muscle": "Quadriceps",
+      "equipment": "Barbell",
+      "slug": "barbell-reverse-lunge"
+    },
+    {
+      "id": 51,
+      "name": "Barbell Romanian Deadlift",
+      "muscle": "Hamstrings · Glutes",
+      "equipment": "Barbell",
+      "slug": "barbell-romanian-deadlift"
+    },
+    {
+      "id": 52,
+      "name": "Barbell Shrug",
+      "muscle": "Trapezius",
+      "equipment": "Barbell",
+      "slug": "barbell-shrug"
+    },
+    {
+      "id": 53,
+      "name": "Barbell Snatch",
+      "muscle": "Core · Glutes · Shoulders",
+      "equipment": "Barbell",
+      "slug": "barbell-snatch"
+    },
+    {
+      "id": 54,
+      "name": "Barbell Spinal Jefferson Curl",
+      "muscle": "Core",
+      "equipment": "Barbell",
+      "slug": "barbell-spinal-jefferson-curl"
+    },
+    {
+      "id": 55,
+      "name": "Barbell Split Squat",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Barbell",
+      "slug": "barbell-split-squat"
+    },
+    {
+      "id": 56,
+      "name": "Barbell Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Barbell",
+      "slug": "barbell-squat"
+    },
+    {
+      "id": 57,
+      "name": "Barbell Step Up Knee Drive",
+      "muscle": "Quadriceps",
+      "equipment": "Barbell",
+      "slug": "barbell-step-up-knee-drive"
+    },
+    {
+      "id": 58,
+      "name": "Barbell Stiff Leg Deadlifts",
+      "muscle": "Glutes · Hamstrings",
+      "equipment": "Barbell",
+      "slug": "barbell-stiff-leg-deadlifts"
+    },
+    {
+      "id": 59,
+      "name": "Barbell Thruster",
+      "muscle": "Glutes · Shoulders · Quadriceps",
+      "equipment": "Barbell",
+      "slug": "barbell-thruster"
+    },
+    {
+      "id": 60,
+      "name": "Barbell Upright Row",
+      "muscle": "Shoulders",
+      "equipment": "Barbell",
+      "slug": "barbell-upright-row"
+    },
+    {
+      "id": 61,
+      "name": "Barbell Wrist Curl",
+      "muscle": "Forearms",
+      "equipment": "Barbell",
+      "slug": "barbell-wrist-curl"
+    },
+    {
+      "id": 62,
+      "name": "Battle Ropes",
+      "muscle": "Shoulders · Core",
+      "equipment": "Battle Ropes",
+      "slug": "battle-ropes"
+    },
+    {
+      "id": 63,
+      "name": "Bayesian Curl",
+      "muscle": "Biceps",
+      "equipment": "Cable Machine",
+      "slug": "bayesian-curl"
+    },
+    {
+      "id": 64,
+      "name": "Behind-the-Neck Press",
+      "muscle": "Shoulders",
+      "equipment": "Barbell",
+      "slug": "behind-the-neck-press"
+    },
+    {
+      "id": 65,
+      "name": "Belt Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "belt-squat"
+    },
+    {
+      "id": 66,
+      "name": "Bench Dips",
+      "muscle": "Triceps",
+      "equipment": "Bodyweight",
+      "slug": "bench-dips"
+    },
+    {
+      "id": 67,
+      "name": "Bird Dog",
+      "muscle": "Core · Lower Back",
+      "equipment": "Bodyweight",
+      "slug": "bird-dog"
+    },
+    {
+      "id": 68,
+      "name": "Bodyweight Alternating Lateral Lunge",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-alternating-lateral-lunge"
+    },
+    {
+      "id": 69,
+      "name": "Bodyweight Alternating Reverse Lunges",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-alternating-reverse-lunges"
+    },
+    {
+      "id": 70,
+      "name": "Bodyweight Box Squat",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-box-squat"
+    },
+    {
+      "id": 71,
+      "name": "Bodyweight Deadlift",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-deadlift"
+    },
+    {
+      "id": 72,
+      "name": "Bodyweight Donkey Calf Raise",
+      "muscle": "Calves",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-donkey-calf-raise"
+    },
+    {
+      "id": 73,
+      "name": "Bodyweight Elevated Push Up",
+      "muscle": "Chest",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-elevated-push-up"
+    },
+    {
+      "id": 74,
+      "name": "Bodyweight Hip Abduction",
+      "muscle": "Glutes",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-hip-abduction"
+    },
+    {
+      "id": 75,
+      "name": "Bodyweight Knee Push Ups",
+      "muscle": "Chest",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-knee-push-ups"
+    },
+    {
+      "id": 76,
+      "name": "Bodyweight Reverse Lunge",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-reverse-lunge"
+    },
+    {
+      "id": 77,
+      "name": "Bodyweight Russian Twist",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-russian-twist"
+    },
+    {
+      "id": 78,
+      "name": "Bodyweight Spinal Jefferson Curl",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-spinal-jefferson-curl"
+    },
+    {
+      "id": 79,
+      "name": "Bodyweight Squat",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "bodyweight-squat"
+    },
+    {
+      "id": 80,
+      "name": "Box Jump",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "box-jump"
+    },
+    {
+      "id": 81,
+      "name": "Breaststroke Swim",
+      "muscle": "Back · Chest",
+      "equipment": "Bodyweight",
+      "slug": "breaststroke-swim"
+    },
+    {
+      "id": 82,
+      "name": "Bulgarian Split Squat",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "bulgarian-split-squat"
+    },
+    {
+      "id": 83,
+      "name": "Burpee",
+      "muscle": "Core · Chest",
+      "equipment": "Bodyweight",
+      "slug": "burpee"
+    },
+    {
+      "id": 84,
+      "name": "Butterfly Swim",
+      "muscle": "Back · Chest",
+      "equipment": "Bodyweight",
+      "slug": "butterfly-swim"
+    },
+    {
+      "id": 85,
+      "name": "Cable 30 Degree Shrug",
+      "muscle": "Trapezius",
+      "equipment": "Cable Machine",
+      "slug": "cable-30-degree-shrug"
+    },
+    {
+      "id": 86,
+      "name": "Cable Bar Curl",
+      "muscle": "Biceps",
+      "equipment": "Cable Machine",
+      "slug": "cable-bar-curl"
+    },
+    {
+      "id": 87,
+      "name": "Cable Bar Face Pull",
+      "muscle": "Shoulders",
+      "equipment": "Cable Machine",
+      "slug": "cable-bar-face-pull"
+    },
+    {
+      "id": 88,
+      "name": "Cable Bar Pushdown",
+      "muscle": "Triceps",
+      "equipment": "Cable Machine",
+      "slug": "cable-bar-pushdown"
+    },
+    {
+      "id": 89,
+      "name": "Cable Bench Chest Fly",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "cable-bench-chest-fly"
+    },
+    {
+      "id": 90,
+      "name": "Cable Bench Press",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "cable-bench-press"
+    },
+    {
+      "id": 91,
+      "name": "Cable Bench Straight Leg Kickback",
+      "muscle": "Glutes",
+      "equipment": "Cable Machine",
+      "slug": "cable-bench-straight-leg-kickback"
+    },
+    {
+      "id": 92,
+      "name": "Cable Chest Press",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "cable-chest-press"
+    },
+    {
+      "id": 93,
+      "name": "Cable Decline Bench Press",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "cable-decline-bench-press"
+    },
+    {
+      "id": 94,
+      "name": "Cable External Rotation",
+      "muscle": "Shoulders",
+      "equipment": "Cable Machine",
+      "slug": "cable-external-rotation"
+    },
+    {
+      "id": 95,
+      "name": "Cable Front Raise",
+      "muscle": "Shoulders",
+      "equipment": "Cable Machine",
+      "slug": "cable-front-raise"
+    },
+    {
+      "id": 96,
+      "name": "Cable High-to-Low Fly",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "cable-high-to-low-fly"
+    },
+    {
+      "id": 97,
+      "name": "Cable Hip Abduction",
+      "muscle": "Glutes",
+      "equipment": "Cable Machine",
+      "slug": "cable-hip-abduction"
+    },
+    {
+      "id": 98,
+      "name": "Cable Incline Bench Press",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "cable-incline-bench-press"
+    },
+    {
+      "id": 99,
+      "name": "Cable Kickback",
+      "muscle": "Glutes",
+      "equipment": "Cable Machine",
+      "slug": "cable-kickback"
+    },
+    {
+      "id": 100,
+      "name": "Cable Low Single Arm Lateral Raise",
+      "muscle": "Shoulders",
+      "equipment": "Cable Machine",
+      "slug": "cable-low-single-arm-lateral-raise"
+    },
+    {
+      "id": 101,
+      "name": "Cable Low-to-High Fly",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "cable-low-to-high-fly"
+    },
+    {
+      "id": 102,
+      "name": "Cable Overhead Press",
+      "muscle": "Shoulders",
+      "equipment": "Cable Machine",
+      "slug": "cable-overhead-press"
+    },
+    {
+      "id": 103,
+      "name": "Cable Pec Fly",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "cable-pec-fly"
+    },
+    {
+      "id": 104,
+      "name": "Cable Pull Through",
+      "muscle": "Glutes",
+      "equipment": "Cable Machine",
+      "slug": "cable-pull-through"
+    },
+    {
+      "id": 105,
+      "name": "Cable Rope Face Pulls",
+      "muscle": "Shoulders",
+      "equipment": "Cable Machine",
+      "slug": "cable-rope-face-pulls"
+    },
+    {
+      "id": 106,
+      "name": "Cable Rope Hammer Curl",
+      "muscle": "Biceps",
+      "equipment": "Cable Machine",
+      "slug": "cable-rope-hammer-curl"
+    },
+    {
+      "id": 107,
+      "name": "Cable Rope Kneeling Face Pull",
+      "muscle": "Shoulders",
+      "equipment": "Cable Machine",
+      "slug": "cable-rope-kneeling-face-pull"
+    },
+    {
+      "id": 108,
+      "name": "Cable Rope Overhead Tricep Extension",
+      "muscle": "Triceps",
+      "equipment": "Cable Machine",
+      "slug": "cable-rope-overhead-tricep-extension"
+    },
+    {
+      "id": 109,
+      "name": "Cable Rope Pullover",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "cable-rope-pullover"
+    },
+    {
+      "id": 110,
+      "name": "Cable Rope Pushdown",
+      "muscle": "Triceps",
+      "equipment": "Cable Machine",
+      "slug": "cable-rope-pushdown"
+    },
+    {
+      "id": 111,
+      "name": "Cable Row Bar Standing Row",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "cable-row-bar-standing-row"
+    },
+    {
+      "id": 112,
+      "name": "Cable Seated Rope Face Pull",
+      "muscle": "Shoulders",
+      "equipment": "Cable Machine",
+      "slug": "cable-seated-rope-face-pull"
+    },
+    {
+      "id": 113,
+      "name": "Cable Side Bend",
+      "muscle": "Core",
+      "equipment": "Cable Machine",
+      "slug": "cable-side-bend"
+    },
+    {
+      "id": 114,
+      "name": "Cable Single Arm Neutral Grip Row",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "cable-single-arm-neutral-grip-row"
+    },
+    {
+      "id": 115,
+      "name": "Cable Single Arm Rope Pushdown",
+      "muscle": "Triceps",
+      "equipment": "Cable Machine",
+      "slug": "cable-single-arm-rope-pushdown"
+    },
+    {
+      "id": 116,
+      "name": "Cable Single Arm Underhand Grip Row",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "cable-single-arm-underhand-grip-row"
+    },
+    {
+      "id": 117,
+      "name": "Cable Single Leg Laying Leg Curl",
+      "muscle": "Hamstrings",
+      "equipment": "Cable Machine",
+      "slug": "cable-single-leg-laying-leg-curl"
+    },
+    {
+      "id": 118,
+      "name": "Cable Standing Low To High Wood Chopper",
+      "muscle": "Core",
+      "equipment": "Cable Machine",
+      "slug": "cable-standing-low-to-high-wood-chopper"
+    },
+    {
+      "id": 119,
+      "name": "Cable Standing Single Arm Chest Press",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "cable-standing-single-arm-chest-press"
+    },
+    {
+      "id": 120,
+      "name": "Cable Supinating Row",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "cable-supinating-row"
+    },
+    {
+      "id": 121,
+      "name": "Cable Wood Chopper",
+      "muscle": "Core",
+      "equipment": "Cable Machine",
+      "slug": "cable-wood-chopper"
+    },
+    {
+      "id": 122,
+      "name": "Cable Wrist Curl",
+      "muscle": "Forearms",
+      "equipment": "Cable Machine",
+      "slug": "cable-wrist-curl"
+    },
+    {
+      "id": 123,
+      "name": "Calf Press",
+      "muscle": "Calves",
+      "equipment": "Machine",
+      "slug": "calf-press"
+    },
+    {
+      "id": 124,
+      "name": "Captain’s Chair Knee Raise",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "captain-s-chair-knee-raise"
+    },
+    {
+      "id": 125,
+      "name": "Chest-Supported Dumbbell Row",
+      "muscle": "Back · Trapezius",
+      "equipment": "Dumbbell",
+      "slug": "chest-supported-dumbbell-row"
+    },
+    {
+      "id": 126,
+      "name": "Chest-Supported T-Bar Row",
+      "muscle": "Back · Trapezius",
+      "equipment": "Machine",
+      "slug": "chest-supported-t-bar-row"
+    },
+    {
+      "id": 127,
+      "name": "Chin Ups",
+      "muscle": "Back",
+      "equipment": "Bodyweight",
+      "slug": "chin-ups"
+    },
+    {
+      "id": 128,
+      "name": "Close-Grip Barbell Curl",
+      "muscle": "Biceps",
+      "equipment": "Barbell",
+      "slug": "close-grip-barbell-curl"
+    },
+    {
+      "id": 129,
+      "name": "Cossack Squat",
+      "muscle": "Quadriceps · Adductors",
+      "equipment": "Bodyweight",
+      "slug": "cossack-squat"
+    },
+    {
+      "id": 130,
+      "name": "Cross-Body Hammer Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "cross-body-hammer-curl"
+    },
+    {
+      "id": 131,
+      "name": "Cuban Press",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "cuban-press"
+    },
+    {
+      "id": 132,
+      "name": "Cycling Cooldown",
+      "muscle": "Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "cycling-cooldown"
+    },
+    {
+      "id": 133,
+      "name": "Cycling Intervals",
+      "muscle": "Quadriceps",
+      "equipment": "Bicycle",
+      "slug": "cycling-intervals"
+    },
+    {
+      "id": 134,
+      "name": "Cycling Sprint",
+      "muscle": "Quadriceps",
+      "equipment": "Bicycle",
+      "slug": "cycling-sprint"
+    },
+    {
+      "id": 135,
+      "name": "Cycling Warmup",
+      "muscle": "Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "cycling-warmup"
+    },
+    {
+      "id": 136,
+      "name": "Dead Bug",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "dead-bug"
+    },
+    {
+      "id": 137,
+      "name": "Dead Hang",
+      "muscle": "Forearms",
+      "equipment": "Bodyweight",
+      "slug": "dead-hang"
+    },
+    {
+      "id": 138,
+      "name": "Decline Barbell Bench Press",
+      "muscle": "Chest",
+      "equipment": "Barbell",
+      "slug": "decline-barbell-bench-press"
+    },
+    {
+      "id": 139,
+      "name": "Decline Crunch",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "decline-crunch"
+    },
+    {
+      "id": 140,
+      "name": "Decline Machine Chest Press",
+      "muscle": "Chest",
+      "equipment": "Machine",
+      "slug": "decline-machine-chest-press"
+    },
+    {
+      "id": 141,
+      "name": "Decline Push Up",
+      "muscle": "Chest",
+      "equipment": "Bodyweight",
+      "slug": "decline-push-up"
+    },
+    {
+      "id": 142,
+      "name": "Decline Sit-Up",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "decline-sit-up"
+    },
+    {
+      "id": 143,
+      "name": "Deficit Deadlift",
+      "muscle": "Glutes · Hamstrings · Quadriceps",
+      "equipment": "Barbell",
+      "slug": "deficit-deadlift"
+    },
+    {
+      "id": 144,
+      "name": "Deficit Dumbbell Romanian Deadlift",
+      "muscle": "Hamstrings · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "deficit-dumbbell-romanian-deadlift"
+    },
+    {
+      "id": 145,
+      "name": "Diamond Push Ups",
+      "muscle": "Triceps",
+      "equipment": "Bodyweight",
+      "slug": "diamond-push-ups"
+    },
+    {
+      "id": 146,
+      "name": "Dumbbell Alternating Forward Lunge",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-alternating-forward-lunge"
+    },
+    {
+      "id": 147,
+      "name": "Dumbbell Back Extension",
+      "muscle": "Lower Back",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-back-extension"
+    },
+    {
+      "id": 148,
+      "name": "Dumbbell Bench Press",
+      "muscle": "Chest",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-bench-press"
+    },
+    {
+      "id": 149,
+      "name": "Dumbbell Bulgarian Split Squat",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-bulgarian-split-squat"
+    },
+    {
+      "id": 150,
+      "name": "Dumbbell Chest Fly",
+      "muscle": "Chest",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-chest-fly"
+    },
+    {
+      "id": 151,
+      "name": "Dumbbell Concentration Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-concentration-curl"
+    },
+    {
+      "id": 152,
+      "name": "Dumbbell Cossack Squat",
+      "muscle": "Quadriceps · Adductors",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-cossack-squat"
+    },
+    {
+      "id": 153,
+      "name": "Dumbbell Cross Body Romanian Deadlift",
+      "muscle": "Glutes · Hamstrings",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-cross-body-romanian-deadlift"
+    },
+    {
+      "id": 154,
+      "name": "Dumbbell Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-curl"
+    },
+    {
+      "id": 155,
+      "name": "Dumbbell Deadlift",
+      "muscle": "Hamstrings · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-deadlift"
+    },
+    {
+      "id": 156,
+      "name": "Dumbbell Decline Bench Press",
+      "muscle": "Chest",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-decline-bench-press"
+    },
+    {
+      "id": 157,
+      "name": "Dumbbell Decline Chest Fly",
+      "muscle": "Chest",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-decline-chest-fly"
+    },
+    {
+      "id": 158,
+      "name": "Dumbbell Decline Skullcrusher",
+      "muscle": "Triceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-decline-skullcrusher"
+    },
+    {
+      "id": 159,
+      "name": "Dumbbell Feet Elevated Glute Bridge",
+      "muscle": "Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-feet-elevated-glute-bridge"
+    },
+    {
+      "id": 160,
+      "name": "Dumbbell Figure Four Heels Elevated Hip Thrust",
+      "muscle": "Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-figure-four-heels-elevated-hip-thrust"
+    },
+    {
+      "id": 161,
+      "name": "Dumbbell Front Raise",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-front-raise"
+    },
+    {
+      "id": 162,
+      "name": "Dumbbell Front Squat",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-front-squat"
+    },
+    {
+      "id": 163,
+      "name": "Dumbbell Front Squat (Tempo)",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-front-squat-tempo"
+    },
+    {
+      "id": 164,
+      "name": "Dumbbell Goblet Alternating Curtsy Lunge",
+      "muscle": "Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-goblet-alternating-curtsy-lunge"
+    },
+    {
+      "id": 165,
+      "name": "Dumbbell Goblet Bulgarian Split Squat",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-goblet-bulgarian-split-squat"
+    },
+    {
+      "id": 166,
+      "name": "Dumbbell Goblet Forward Lunge",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-goblet-forward-lunge"
+    },
+    {
+      "id": 167,
+      "name": "Dumbbell Goblet Reverse Lunge",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-goblet-reverse-lunge"
+    },
+    {
+      "id": 168,
+      "name": "Dumbbell Goblet Split Squat",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-goblet-split-squat"
+    },
+    {
+      "id": 169,
+      "name": "Dumbbell Goblet Squat",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-goblet-squat"
+    },
+    {
+      "id": 170,
+      "name": "Dumbbell Hammer Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-hammer-curl"
+    },
+    {
+      "id": 171,
+      "name": "Dumbbell Heels Elevated Hip Thrust",
+      "muscle": "Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-heels-elevated-hip-thrust"
+    },
+    {
+      "id": 172,
+      "name": "Dumbbell Incline Bench Press",
+      "muscle": "Chest",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-incline-bench-press"
+    },
+    {
+      "id": 173,
+      "name": "Dumbbell Incline Chest Fly",
+      "muscle": "Chest",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-incline-chest-fly"
+    },
+    {
+      "id": 174,
+      "name": "Dumbbell Incline Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-incline-curl"
+    },
+    {
+      "id": 175,
+      "name": "Dumbbell Incline Front Raise",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-incline-front-raise"
+    },
+    {
+      "id": 176,
+      "name": "Dumbbell Incline Hammer Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-incline-hammer-curl"
+    },
+    {
+      "id": 177,
+      "name": "Dumbbell Lateral Lunge",
+      "muscle": "Quadriceps · Adductors",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-lateral-lunge"
+    },
+    {
+      "id": 178,
+      "name": "Dumbbell Lateral Raise",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-lateral-raise"
+    },
+    {
+      "id": 179,
+      "name": "Dumbbell Laying Reverse Fly",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-laying-reverse-fly"
+    },
+    {
+      "id": 180,
+      "name": "Dumbbell Leg Curl",
+      "muscle": "Hamstrings",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-leg-curl"
+    },
+    {
+      "id": 181,
+      "name": "Dumbbell Overhead Squat",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-overhead-squat"
+    },
+    {
+      "id": 182,
+      "name": "Dumbbell Preacher Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-preacher-curl"
+    },
+    {
+      "id": 183,
+      "name": "Dumbbell Push Press",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-push-press"
+    },
+    {
+      "id": 184,
+      "name": "Dumbbell Rear Delt Fly",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-rear-delt-fly"
+    },
+    {
+      "id": 185,
+      "name": "Dumbbell Row Bilateral",
+      "muscle": "Trapezius · Back",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-row-bilateral"
+    },
+    {
+      "id": 186,
+      "name": "Dumbbell Row Unilateral",
+      "muscle": "Trapezius · Back",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-row-unilateral"
+    },
+    {
+      "id": 187,
+      "name": "Dumbbell Russian Twist",
+      "muscle": "Core",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-russian-twist"
+    },
+    {
+      "id": 188,
+      "name": "Dumbbell Seated Overhead Press",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-seated-overhead-press"
+    },
+    {
+      "id": 189,
+      "name": "Dumbbell Seated Overhead Tricep Extension",
+      "muscle": "Triceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-seated-overhead-tricep-extension"
+    },
+    {
+      "id": 190,
+      "name": "Dumbbell Seated Rear Delt Fly",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-seated-rear-delt-fly"
+    },
+    {
+      "id": 191,
+      "name": "Dumbbell Seated Shrug",
+      "muscle": "Trapezius",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-seated-shrug"
+    },
+    {
+      "id": 192,
+      "name": "Dumbbell Shrug",
+      "muscle": "Trapezius",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-shrug"
+    },
+    {
+      "id": 193,
+      "name": "Dumbbell Side Bend",
+      "muscle": "Core",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-side-bend"
+    },
+    {
+      "id": 194,
+      "name": "Dumbbell Single Arm Chest Press",
+      "muscle": "Chest",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-single-arm-chest-press"
+    },
+    {
+      "id": 195,
+      "name": "Dumbbell Single Arm Clean And Press",
+      "muscle": "Core · Glutes · Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-single-arm-clean-and-press"
+    },
+    {
+      "id": 196,
+      "name": "Dumbbell Single Arm Row",
+      "muscle": "Back",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-single-arm-row"
+    },
+    {
+      "id": 197,
+      "name": "Dumbbell Single Leg Calf Raise",
+      "muscle": "Calves",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-single-leg-calf-raise"
+    },
+    {
+      "id": 198,
+      "name": "Dumbbell Single Leg Hip Thrust",
+      "muscle": "Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-single-leg-hip-thrust"
+    },
+    {
+      "id": 199,
+      "name": "Dumbbell Situp",
+      "muscle": "Core",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-situp"
+    },
+    {
+      "id": 200,
+      "name": "Dumbbell Skullcrusher",
+      "muscle": "Triceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-skullcrusher"
+    },
+    {
+      "id": 201,
+      "name": "Dumbbell Spinal Jefferson Curl",
+      "muscle": "Core",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-spinal-jefferson-curl"
+    },
+    {
+      "id": 202,
+      "name": "Dumbbell Standing Single Arm Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-standing-single-arm-curl"
+    },
+    {
+      "id": 203,
+      "name": "Dumbbell Standing Single Arm Hammer Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-standing-single-arm-hammer-curl"
+    },
+    {
+      "id": 204,
+      "name": "Dumbbell Step-Up (Low)",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-step-up-low"
+    },
+    {
+      "id": 205,
+      "name": "Dumbbell Sumo Squat",
+      "muscle": "Glutes",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-sumo-squat"
+    },
+    {
+      "id": 206,
+      "name": "Dumbbell Superman",
+      "muscle": "Core",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-superman"
+    },
+    {
+      "id": 207,
+      "name": "Dumbbell Thruster",
+      "muscle": "Glutes · Shoulders · Quadriceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-thruster"
+    },
+    {
+      "id": 208,
+      "name": "Dumbbell Tricep Kickback",
+      "muscle": "Triceps",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-tricep-kickback"
+    },
+    {
+      "id": 209,
+      "name": "Dumbbell Upright Row",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-upright-row"
+    },
+    {
+      "id": 210,
+      "name": "Dumbbell Wrist Curl",
+      "muscle": "Forearms",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-wrist-curl"
+    },
+    {
+      "id": 211,
+      "name": "Dumbbell Wrist Extension",
+      "muscle": "Forearms",
+      "equipment": "Dumbbell",
+      "slug": "dumbbell-wrist-extension"
+    },
+    {
+      "id": 212,
+      "name": "Elbow Side Plank",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "elbow-side-plank"
+    },
+    {
+      "id": 213,
+      "name": "Elliptical",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Machine",
+      "slug": "elliptical"
+    },
+    {
+      "id": 214,
+      "name": "EZ Bar Preacher Curl",
+      "muscle": "Biceps",
+      "equipment": "Barbell",
+      "slug": "ez-bar-preacher-curl"
+    },
+    {
+      "id": 215,
+      "name": "EZ Bar Reverse Preacher Curl",
+      "muscle": "Biceps · Forearms",
+      "equipment": "Barbell",
+      "slug": "ez-bar-reverse-preacher-curl"
+    },
+    {
+      "id": 216,
+      "name": "Floor Press",
+      "muscle": "Chest · Triceps",
+      "equipment": "Dumbbell",
+      "slug": "floor-press"
+    },
+    {
+      "id": 217,
+      "name": "Forward Lunge",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "forward-lunge"
+    },
+    {
+      "id": 218,
+      "name": "Freestyle Swim",
+      "muscle": "Back · Chest",
+      "equipment": "Bodyweight",
+      "slug": "freestyle-swim"
+    },
+    {
+      "id": 219,
+      "name": "Frog Pump",
+      "muscle": "Glutes",
+      "equipment": "Bodyweight",
+      "slug": "frog-pump"
+    },
+    {
+      "id": 220,
+      "name": "Front Plank on Elbows",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "front-plank-on-elbows"
+    },
+    {
+      "id": 221,
+      "name": "Front Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Barbell",
+      "slug": "front-squat"
+    },
+    {
+      "id": 222,
+      "name": "Front-Foot-Elevated Split Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Dumbbell",
+      "slug": "front-foot-elevated-split-squat"
+    },
+    {
+      "id": 223,
+      "name": "Glute Bridge",
+      "muscle": "Glutes",
+      "equipment": "Bodyweight",
+      "slug": "glute-bridge"
+    },
+    {
+      "id": 224,
+      "name": "Glute Kickback Machine",
+      "muscle": "Glutes",
+      "equipment": "Machine",
+      "slug": "glute-kickback-machine"
+    },
+    {
+      "id": 225,
+      "name": "Good Mornings",
+      "muscle": "Glutes · Hamstrings",
+      "equipment": "Bodyweight",
+      "slug": "good-mornings"
+    },
+    {
+      "id": 226,
+      "name": "Hammer Strength High Row",
+      "muscle": "Back · Trapezius",
+      "equipment": "Machine",
+      "slug": "hammer-strength-high-row"
+    },
+    {
+      "id": 227,
+      "name": "Hammer Strength Iso-Lateral Row",
+      "muscle": "Back · Trapezius",
+      "equipment": "Machine",
+      "slug": "hammer-strength-iso-lateral-row"
+    },
+    {
+      "id": 228,
+      "name": "Hamstring Curl",
+      "muscle": "Hamstrings",
+      "equipment": "Dumbbell",
+      "slug": "hamstring-curl"
+    },
+    {
+      "id": 229,
+      "name": "Hand Plank",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "hand-plank"
+    },
+    {
+      "id": 230,
+      "name": "Hang Clean",
+      "muscle": "Quadriceps · Glutes · Trapezius",
+      "equipment": "Barbell",
+      "slug": "hang-clean"
+    },
+    {
+      "id": 231,
+      "name": "Hang Power Clean",
+      "muscle": "Quadriceps · Glutes · Trapezius",
+      "equipment": "Barbell",
+      "slug": "hang-power-clean"
+    },
+    {
+      "id": 232,
+      "name": "Hang Snatch",
+      "muscle": "Quadriceps · Glutes · Trapezius",
+      "equipment": "Barbell",
+      "slug": "hang-snatch"
+    },
+    {
+      "id": 233,
+      "name": "Hanging Knee Raises",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "hanging-knee-raises"
+    },
+    {
+      "id": 234,
+      "name": "Hiking",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Bodyweight",
+      "slug": "hiking"
+    },
+    {
+      "id": 235,
+      "name": "Hill Climb Repeats",
+      "muscle": "Quadriceps",
+      "equipment": "Bicycle",
+      "slug": "hill-climb-repeats"
+    },
+    {
+      "id": 236,
+      "name": "Hip Hinge Speed Romanian Deadlift",
+      "muscle": "Hamstrings · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "hip-hinge-speed-romanian-deadlift"
+    },
+    {
+      "id": 237,
+      "name": "Incline Machine Chest Press",
+      "muscle": "Chest",
+      "equipment": "Machine",
+      "slug": "incline-machine-chest-press"
+    },
+    {
+      "id": 238,
+      "name": "Incline Push Up",
+      "muscle": "Chest",
+      "equipment": "Bodyweight",
+      "slug": "incline-push-up"
+    },
+    {
+      "id": 239,
+      "name": "Incline Treadmill Walk",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Machine",
+      "slug": "incline-treadmill-walk"
+    },
+    {
+      "id": 240,
+      "name": "Indoor Cycling (Spin Bike)",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "indoor-cycling-spin-bike"
+    },
+    {
+      "id": 241,
+      "name": "Inverted Row",
+      "muscle": "Trapezius · Back",
+      "equipment": "Bodyweight",
+      "slug": "inverted-row"
+    },
+    {
+      "id": 242,
+      "name": "JM Press",
+      "muscle": "Triceps",
+      "equipment": "Barbell",
+      "slug": "jm-press"
+    },
+    {
+      "id": 243,
+      "name": "Jump Rope",
+      "muscle": "Calves",
+      "equipment": "Bodyweight",
+      "slug": "jump-rope"
+    },
+    {
+      "id": 244,
+      "name": "Jump Squats",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "jump-squats"
+    },
+    {
+      "id": 245,
+      "name": "Jumping Jack",
+      "muscle": "Quadriceps · Shoulders",
+      "equipment": "Bodyweight",
+      "slug": "jumping-jack"
+    },
+    {
+      "id": 246,
+      "name": "Kettlebell Alternating Curtsy Lunge",
+      "muscle": "Glutes",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-alternating-curtsy-lunge"
+    },
+    {
+      "id": 247,
+      "name": "Kettlebell Assisted Bulgarian Split Squat",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-assisted-bulgarian-split-squat"
+    },
+    {
+      "id": 248,
+      "name": "Kettlebell Bench Press",
+      "muscle": "Chest",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-bench-press"
+    },
+    {
+      "id": 249,
+      "name": "Kettlebell Calf Raise",
+      "muscle": "Calves",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-calf-raise"
+    },
+    {
+      "id": 250,
+      "name": "Kettlebell Curl",
+      "muscle": "Biceps",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-curl"
+    },
+    {
+      "id": 251,
+      "name": "Kettlebell Farmers Carry",
+      "muscle": "Forearms",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-farmers-carry"
+    },
+    {
+      "id": 252,
+      "name": "Kettlebell Front Raise",
+      "muscle": "Shoulders",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-front-raise"
+    },
+    {
+      "id": 253,
+      "name": "Kettlebell Goblet Curl",
+      "muscle": "Biceps",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-goblet-curl"
+    },
+    {
+      "id": 254,
+      "name": "Kettlebell Goblet Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-goblet-squat"
+    },
+    {
+      "id": 255,
+      "name": "Kettlebell Gorilla Row",
+      "muscle": "Back",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-gorilla-row"
+    },
+    {
+      "id": 256,
+      "name": "Kettlebell Hip Thrust",
+      "muscle": "Glutes",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-hip-thrust"
+    },
+    {
+      "id": 257,
+      "name": "Kettlebell Incline Bench Press",
+      "muscle": "Chest",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-incline-bench-press"
+    },
+    {
+      "id": 258,
+      "name": "Kettlebell Push Press",
+      "muscle": "Shoulders",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-push-press"
+    },
+    {
+      "id": 259,
+      "name": "Kettlebell Romanian Deadlift",
+      "muscle": "Glutes · Hamstrings",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-romanian-deadlift"
+    },
+    {
+      "id": 260,
+      "name": "Kettlebell Row",
+      "muscle": "Back",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-row"
+    },
+    {
+      "id": 261,
+      "name": "Kettlebell Row (Single)",
+      "muscle": "Trapezius · Back",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-row-single"
+    },
+    {
+      "id": 262,
+      "name": "Kettlebell Seated Overhead Press",
+      "muscle": "Shoulders",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-seated-overhead-press"
+    },
+    {
+      "id": 263,
+      "name": "Kettlebell Shrug",
+      "muscle": "Trapezius",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-shrug"
+    },
+    {
+      "id": 264,
+      "name": "Kettlebell Single Arm Row",
+      "muscle": "Back",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-single-arm-row"
+    },
+    {
+      "id": 265,
+      "name": "Kettlebell Spinal Jefferson Curl",
+      "muscle": "Core",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-spinal-jefferson-curl"
+    },
+    {
+      "id": 266,
+      "name": "Kettlebell Sumo Deadlift",
+      "muscle": "Glutes",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-sumo-deadlift"
+    },
+    {
+      "id": 267,
+      "name": "Kettlebell Swing",
+      "muscle": "Glutes · Hamstrings",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-swing"
+    },
+    {
+      "id": 268,
+      "name": "Kettlebell Thruster",
+      "muscle": "Glutes · Shoulders · Quadriceps",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-thruster"
+    },
+    {
+      "id": 269,
+      "name": "Kettlebell Turkish Get-Up",
+      "muscle": "Core · Shoulders · Glutes",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-turkish-get-up"
+    },
+    {
+      "id": 270,
+      "name": "Kettlebell Windmill",
+      "muscle": "Core",
+      "equipment": "Kettlebell",
+      "slug": "kettlebell-windmill"
+    },
+    {
+      "id": 271,
+      "name": "Kickstand Dumbbell Romanian Deadlift",
+      "muscle": "Hamstrings · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "kickstand-dumbbell-romanian-deadlift"
+    },
+    {
+      "id": 272,
+      "name": "Kneeling Cable Crunch",
+      "muscle": "Core",
+      "equipment": "Cable Machine",
+      "slug": "kneeling-cable-crunch"
+    },
+    {
+      "id": 273,
+      "name": "Landmine Press",
+      "muscle": "Shoulders",
+      "equipment": "Barbell",
+      "slug": "landmine-press"
+    },
+    {
+      "id": 274,
+      "name": "Landmine T Bar Rows",
+      "muscle": "Back",
+      "equipment": "Barbell",
+      "slug": "landmine-t-bar-rows"
+    },
+    {
+      "id": 275,
+      "name": "Lat Pulldown",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "lat-pulldown"
+    },
+    {
+      "id": 276,
+      "name": "Leaning Cable Lateral Raise",
+      "muscle": "Shoulders",
+      "equipment": "Cable Machine",
+      "slug": "leaning-cable-lateral-raise"
+    },
+    {
+      "id": 277,
+      "name": "Long Run",
+      "muscle": "Calves · Quadriceps",
+      "equipment": "Machine",
+      "slug": "long-run"
+    },
+    {
+      "id": 278,
+      "name": "Lying Leg Curl",
+      "muscle": "Hamstrings",
+      "equipment": "Machine",
+      "slug": "lying-leg-curl"
+    },
+    {
+      "id": 279,
+      "name": "Machine 45 Degree Back Extension",
+      "muscle": "Core",
+      "equipment": "Machine",
+      "slug": "machine-45-degree-back-extension"
+    },
+    {
+      "id": 280,
+      "name": "Machine Assisted Pull Up",
+      "muscle": "Back",
+      "equipment": "Machine",
+      "slug": "machine-assisted-pull-up"
+    },
+    {
+      "id": 281,
+      "name": "Machine Cable V Bar Push Downs",
+      "muscle": "Triceps",
+      "equipment": "Cable Machine",
+      "slug": "machine-cable-v-bar-push-downs"
+    },
+    {
+      "id": 282,
+      "name": "Machine Chest Press",
+      "muscle": "Chest",
+      "equipment": "Machine",
+      "slug": "machine-chest-press"
+    },
+    {
+      "id": 283,
+      "name": "Machine Crunch",
+      "muscle": "Core",
+      "equipment": "Machine",
+      "slug": "machine-crunch"
+    },
+    {
+      "id": 284,
+      "name": "Machine Dips",
+      "muscle": "Chest",
+      "equipment": "Machine",
+      "slug": "machine-dips"
+    },
+    {
+      "id": 285,
+      "name": "Machine Hack Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "machine-hack-squat"
+    },
+    {
+      "id": 286,
+      "name": "Machine Hip Abduction",
+      "muscle": "Glutes",
+      "equipment": "Machine",
+      "slug": "machine-hip-abduction"
+    },
+    {
+      "id": 287,
+      "name": "Machine Hip Adduction",
+      "muscle": "Adductors",
+      "equipment": "Machine",
+      "slug": "machine-hip-adduction"
+    },
+    {
+      "id": 288,
+      "name": "Machine Hip Thrust",
+      "muscle": "Glutes",
+      "equipment": "Machine",
+      "slug": "machine-hip-thrust"
+    },
+    {
+      "id": 289,
+      "name": "Machine Horizontal Leg Press",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "machine-horizontal-leg-press"
+    },
+    {
+      "id": 290,
+      "name": "Machine Lat Pullover",
+      "muscle": "Back",
+      "equipment": "Machine",
+      "slug": "machine-lat-pullover"
+    },
+    {
+      "id": 291,
+      "name": "Machine Lateral Raise",
+      "muscle": "Shoulders",
+      "equipment": "Machine",
+      "slug": "machine-lateral-raise"
+    },
+    {
+      "id": 292,
+      "name": "Machine Leg Extension",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "machine-leg-extension"
+    },
+    {
+      "id": 293,
+      "name": "Machine Leg Press",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Machine",
+      "slug": "machine-leg-press"
+    },
+    {
+      "id": 294,
+      "name": "Machine Neutral Row",
+      "muscle": "Back",
+      "equipment": "Machine",
+      "slug": "machine-neutral-row"
+    },
+    {
+      "id": 295,
+      "name": "Machine Pec Fly",
+      "muscle": "Chest",
+      "equipment": "Machine",
+      "slug": "machine-pec-fly"
+    },
+    {
+      "id": 296,
+      "name": "Machine Plate Loaded Front Military Press",
+      "muscle": "Shoulders",
+      "equipment": "Machine",
+      "slug": "machine-plate-loaded-front-military-press"
+    },
+    {
+      "id": 297,
+      "name": "Machine Plate Loaded Leg Extension",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "machine-plate-loaded-leg-extension"
+    },
+    {
+      "id": 298,
+      "name": "Machine Plate Loaded T Bar Row",
+      "muscle": "Back",
+      "equipment": "Machine",
+      "slug": "machine-plate-loaded-t-bar-row"
+    },
+    {
+      "id": 299,
+      "name": "Machine Preacher Curl",
+      "muscle": "Biceps",
+      "equipment": "Machine",
+      "slug": "machine-preacher-curl"
+    },
+    {
+      "id": 300,
+      "name": "Machine Pulldown",
+      "muscle": "Back",
+      "equipment": "Machine",
+      "slug": "machine-pulldown"
+    },
+    {
+      "id": 301,
+      "name": "Machine Seated Cable Row",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "machine-seated-cable-row"
+    },
+    {
+      "id": 302,
+      "name": "Machine Tricep Extension",
+      "muscle": "Triceps",
+      "equipment": "Machine",
+      "slug": "machine-tricep-extension"
+    },
+    {
+      "id": 303,
+      "name": "Machine Underhand Row",
+      "muscle": "Biceps · Back",
+      "equipment": "Machine",
+      "slug": "machine-underhand-row"
+    },
+    {
+      "id": 304,
+      "name": "Man Maker",
+      "muscle": "Quadriceps · Shoulders · Back",
+      "equipment": "Dumbbell",
+      "slug": "man-maker"
+    },
+    {
+      "id": 305,
+      "name": "Meadows Row",
+      "muscle": "Back",
+      "equipment": "Barbell",
+      "slug": "meadows-row"
+    },
+    {
+      "id": 306,
+      "name": "Mountain Climber",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "mountain-climber"
+    },
+    {
+      "id": 307,
+      "name": "Narrow Pulldown",
+      "muscle": "Back",
+      "equipment": "Machine",
+      "slug": "narrow-pulldown"
+    },
+    {
+      "id": 308,
+      "name": "Neck Curl",
+      "muscle": "Neck",
+      "equipment": "Bodyweight",
+      "slug": "neck-curl"
+    },
+    {
+      "id": 309,
+      "name": "Neck Extension",
+      "muscle": "Trapezius",
+      "equipment": "Bodyweight",
+      "slug": "neck-extension"
+    },
+    {
+      "id": 310,
+      "name": "Neutral-Grip Dumbbell Bench Press",
+      "muscle": "Chest",
+      "equipment": "Dumbbell",
+      "slug": "neutral-grip-dumbbell-bench-press"
+    },
+    {
+      "id": 311,
+      "name": "Neutral-Grip Lat Pulldown",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "neutral-grip-lat-pulldown"
+    },
+    {
+      "id": 312,
+      "name": "Neutral-Grip Pull-Up",
+      "muscle": "Back",
+      "equipment": "Bodyweight",
+      "slug": "neutral-grip-pull-up"
+    },
+    {
+      "id": 313,
+      "name": "Nordic Hamstring Curl",
+      "muscle": "Hamstrings",
+      "equipment": "Bodyweight",
+      "slug": "nordic-hamstring-curl"
+    },
+    {
+      "id": 314,
+      "name": "Pallof Press",
+      "muscle": "Core",
+      "equipment": "Cable Machine · Band",
+      "slug": "pallof-press"
+    },
+    {
+      "id": 315,
+      "name": "Parallel Bar Dips",
+      "muscle": "Chest",
+      "equipment": "Bodyweight",
+      "slug": "parallel-bar-dips"
+    },
+    {
+      "id": 316,
+      "name": "Pause Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "pause-squat"
+    },
+    {
+      "id": 317,
+      "name": "Pendlay Row",
+      "muscle": "Back · Trapezius",
+      "equipment": "Barbell",
+      "slug": "pendlay-row"
+    },
+    {
+      "id": 318,
+      "name": "Pendulum Squat / V-Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "pendulum-squat-v-squat"
+    },
+    {
+      "id": 319,
+      "name": "Plate Forward Lunge",
+      "muscle": "Quadriceps",
+      "equipment": "Weight Plate",
+      "slug": "plate-forward-lunge"
+    },
+    {
+      "id": 320,
+      "name": "Plate Front Raise",
+      "muscle": "Shoulders",
+      "equipment": "Weight Plate",
+      "slug": "plate-front-raise"
+    },
+    {
+      "id": 321,
+      "name": "Plate Pinch",
+      "muscle": "Forearms",
+      "equipment": "Weight Plate",
+      "slug": "plate-pinch"
+    },
+    {
+      "id": 322,
+      "name": "Power Clean - no overhead press",
+      "muscle": "Glutes · Hamstrings · Quadriceps",
+      "equipment": "Barbell",
+      "slug": "power-clean-no-overhead-press"
+    },
+    {
+      "id": 323,
+      "name": "Pull Ups",
+      "muscle": "Back",
+      "equipment": "Bodyweight",
+      "slug": "pull-ups"
+    },
+    {
+      "id": 324,
+      "name": "Push Jerk",
+      "muscle": "Shoulders · Quadriceps",
+      "equipment": "Barbell",
+      "slug": "push-jerk"
+    },
+    {
+      "id": 325,
+      "name": "Push Up",
+      "muscle": "Chest",
+      "equipment": "Bodyweight",
+      "slug": "push-up"
+    },
+    {
+      "id": 326,
+      "name": "Reverse Grip Barbell Curl",
+      "muscle": "Forearms",
+      "equipment": "Barbell",
+      "slug": "reverse-grip-barbell-curl"
+    },
+    {
+      "id": 327,
+      "name": "Reverse Hack Squat",
+      "muscle": "Glutes · Hamstrings",
+      "equipment": "Machine",
+      "slug": "reverse-hack-squat"
+    },
+    {
+      "id": 328,
+      "name": "Reverse Hyperextension",
+      "muscle": "Glutes",
+      "equipment": "Bodyweight",
+      "slug": "reverse-hyperextension"
+    },
+    {
+      "id": 329,
+      "name": "Reverse Pec Deck",
+      "muscle": "Shoulders",
+      "equipment": "Machine",
+      "slug": "reverse-pec-deck"
+    },
+    {
+      "id": 330,
+      "name": "Reverse-Grip Barbell Bench Press",
+      "muscle": "Chest",
+      "equipment": "Barbell",
+      "slug": "reverse-grip-barbell-bench-press"
+    },
+    {
+      "id": 331,
+      "name": "Reverse-Grip Tricep Pushdown",
+      "muscle": "Triceps",
+      "equipment": "Cable Machine",
+      "slug": "reverse-grip-tricep-pushdown"
+    },
+    {
+      "id": 332,
+      "name": "Romanian Deadlift Hamstring Sweeps",
+      "muscle": "Hamstrings",
+      "equipment": "Bodyweight",
+      "slug": "romanian-deadlift-hamstring-sweeps"
+    },
+    {
+      "id": 333,
+      "name": "Rowing Intervals",
+      "muscle": "Quadriceps · Back",
+      "equipment": "Machine",
+      "slug": "rowing-intervals"
+    },
+    {
+      "id": 334,
+      "name": "Rowing Sprint",
+      "muscle": "Quadriceps · Back",
+      "equipment": "Machine",
+      "slug": "rowing-sprint"
+    },
+    {
+      "id": 335,
+      "name": "Running Cooldown",
+      "muscle": "Quadriceps · Glutes · Calves",
+      "equipment": "Bodyweight",
+      "slug": "running-cooldown"
+    },
+    {
+      "id": 336,
+      "name": "Running Intervals",
+      "muscle": "Quadriceps · Glutes · Calves",
+      "equipment": "Bodyweight",
+      "slug": "running-intervals"
+    },
+    {
+      "id": 337,
+      "name": "Seal Row",
+      "muscle": "Back · Trapezius",
+      "equipment": "Barbell",
+      "slug": "seal-row"
+    },
+    {
+      "id": 338,
+      "name": "Seated Calf Raise",
+      "muscle": "Calves",
+      "equipment": "Dumbbell",
+      "slug": "seated-calf-raise"
+    },
+    {
+      "id": 339,
+      "name": "Seated Dumbbell Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "seated-dumbbell-curl"
+    },
+    {
+      "id": 340,
+      "name": "Seated Leg Curl",
+      "muscle": "Hamstrings",
+      "equipment": "Machine",
+      "slug": "seated-leg-curl"
+    },
+    {
+      "id": 341,
+      "name": "Shadow Boxing",
+      "muscle": "Shoulders · Triceps",
+      "equipment": "Bodyweight",
+      "slug": "shadow-boxing"
+    },
+    {
+      "id": 342,
+      "name": "Single Leg Glute Bridge",
+      "muscle": "Glutes",
+      "equipment": "Bodyweight",
+      "slug": "single-leg-glute-bridge"
+    },
+    {
+      "id": 343,
+      "name": "Single Legged Romanian Deadlifts",
+      "muscle": "Glutes · Hamstrings",
+      "equipment": "Bodyweight",
+      "slug": "single-legged-romanian-deadlifts"
+    },
+    {
+      "id": 344,
+      "name": "Single-Arm Cable Fly",
+      "muscle": "Chest",
+      "equipment": "Cable Machine",
+      "slug": "single-arm-cable-fly"
+    },
+    {
+      "id": 345,
+      "name": "Single-Arm Dumbbell Overhead Press",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "single-arm-dumbbell-overhead-press"
+    },
+    {
+      "id": 346,
+      "name": "Single-Arm Landmine Press",
+      "muscle": "Shoulders",
+      "equipment": "Barbell",
+      "slug": "single-arm-landmine-press"
+    },
+    {
+      "id": 347,
+      "name": "Single-Arm Lat Pulldown",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "single-arm-lat-pulldown"
+    },
+    {
+      "id": 348,
+      "name": "Single-Arm Overhead Cable Extension",
+      "muscle": "Triceps",
+      "equipment": "Cable Machine",
+      "slug": "single-arm-overhead-cable-extension"
+    },
+    {
+      "id": 349,
+      "name": "Single-Arm Tricep Extension",
+      "muscle": "Triceps",
+      "equipment": "Dumbbell",
+      "slug": "single-arm-tricep-extension"
+    },
+    {
+      "id": 350,
+      "name": "Single-Leg Dumbbell Romanian Deadlift",
+      "muscle": "Hamstrings · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "single-leg-dumbbell-romanian-deadlift"
+    },
+    {
+      "id": 351,
+      "name": "Single-Leg Dumbbell Romanian Deadlift (Deficit)",
+      "muscle": "Hamstrings · Glutes",
+      "equipment": "Dumbbell",
+      "slug": "single-leg-dumbbell-romanian-deadlift-deficit"
+    },
+    {
+      "id": 352,
+      "name": "Single-Leg Hip Thrust",
+      "muscle": "Glutes",
+      "equipment": "Bodyweight",
+      "slug": "single-leg-hip-thrust"
+    },
+    {
+      "id": 353,
+      "name": "Single-Leg Press",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "single-leg-press"
+    },
+    {
+      "id": 354,
+      "name": "Single-Leg Standing Calf Raise",
+      "muscle": "Calves",
+      "equipment": "Bodyweight",
+      "slug": "single-leg-standing-calf-raise"
+    },
+    {
+      "id": 355,
+      "name": "Single-Leg Step-Down",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Bodyweight",
+      "slug": "single-leg-step-down"
+    },
+    {
+      "id": 356,
+      "name": "Sissy Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Bench",
+      "slug": "sissy-squat"
+    },
+    {
+      "id": 357,
+      "name": "Ski Erg",
+      "muscle": "Back · Core · Triceps",
+      "equipment": "Machine",
+      "slug": "ski-erg"
+    },
+    {
+      "id": 358,
+      "name": "Sled Pull",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Sled",
+      "slug": "sled-pull"
+    },
+    {
+      "id": 359,
+      "name": "Sled Push/Pull",
+      "muscle": "Quadriceps",
+      "equipment": "Sled",
+      "slug": "sled-push-pull"
+    },
+    {
+      "id": 360,
+      "name": "Smith Machine Bench Press",
+      "muscle": "Chest",
+      "equipment": "Machine",
+      "slug": "smith-machine-bench-press"
+    },
+    {
+      "id": 361,
+      "name": "Smith Machine Bent-Over Row",
+      "muscle": "Back · Trapezius",
+      "equipment": "Machine",
+      "slug": "smith-machine-bent-over-row"
+    },
+    {
+      "id": 362,
+      "name": "Smith Machine Calf Raise",
+      "muscle": "Calves",
+      "equipment": "Machine",
+      "slug": "smith-machine-calf-raise"
+    },
+    {
+      "id": 363,
+      "name": "Smith Machine Close Grip Bench Press",
+      "muscle": "Triceps",
+      "equipment": "Machine",
+      "slug": "smith-machine-close-grip-bench-press"
+    },
+    {
+      "id": 364,
+      "name": "Smith Machine Front Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "smith-machine-front-squat"
+    },
+    {
+      "id": 365,
+      "name": "Smith Machine Incline Bench Press",
+      "muscle": "Chest",
+      "equipment": "Machine",
+      "slug": "smith-machine-incline-bench-press"
+    },
+    {
+      "id": 366,
+      "name": "Smith Machine Seated Overhead Press",
+      "muscle": "Shoulders",
+      "equipment": "Machine",
+      "slug": "smith-machine-seated-overhead-press"
+    },
+    {
+      "id": 367,
+      "name": "Smith Machine Squat",
+      "muscle": "Quadriceps",
+      "equipment": "Machine",
+      "slug": "smith-machine-squat"
+    },
+    {
+      "id": 368,
+      "name": "Smith Machine Standing Shrugs",
+      "muscle": "Trapezius",
+      "equipment": "Machine",
+      "slug": "smith-machine-standing-shrugs"
+    },
+    {
+      "id": 369,
+      "name": "Smith Machine Sumo Romanian Deadlift",
+      "muscle": "Glutes",
+      "equipment": "Machine",
+      "slug": "smith-machine-sumo-romanian-deadlift"
+    },
+    {
+      "id": 370,
+      "name": "Snatch Pull",
+      "muscle": "Trapezius · Glutes · Hamstrings",
+      "equipment": "Barbell",
+      "slug": "snatch-pull"
+    },
+    {
+      "id": 371,
+      "name": "Snatch-Grip Deadlift",
+      "muscle": "Hamstrings · Glutes · Back",
+      "equipment": "Barbell",
+      "slug": "snatch-grip-deadlift"
+    },
+    {
+      "id": 372,
+      "name": "Snatch-Grip High Pull",
+      "muscle": "Trapezius · Shoulders",
+      "equipment": "Barbell",
+      "slug": "snatch-grip-high-pull"
+    },
+    {
+      "id": 373,
+      "name": "Spider Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "spider-curl"
+    },
+    {
+      "id": 374,
+      "name": "Split Jerk",
+      "muscle": "Quadriceps · Shoulders",
+      "equipment": "Barbell",
+      "slug": "split-jerk"
+    },
+    {
+      "id": 375,
+      "name": "Split Squat Isometric Hold",
+      "muscle": "Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "split-squat-isometric-hold"
+    },
+    {
+      "id": 376,
+      "name": "Stability Ball Leg Curl",
+      "muscle": "Hamstrings",
+      "equipment": "Bodyweight",
+      "slug": "stability-ball-leg-curl"
+    },
+    {
+      "id": 377,
+      "name": "Stair Climber",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Machine",
+      "slug": "stair-climber"
+    },
+    {
+      "id": 378,
+      "name": "Standing Cable Hip Abduction",
+      "muscle": "Glutes",
+      "equipment": "Cable Machine",
+      "slug": "standing-cable-hip-abduction"
+    },
+    {
+      "id": 379,
+      "name": "Standing Calf Raise (Machine)",
+      "muscle": "Calves",
+      "equipment": "Machine",
+      "slug": "standing-calf-raise-machine"
+    },
+    {
+      "id": 380,
+      "name": "Steady State Ride",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Bicycle",
+      "slug": "steady-state-ride"
+    },
+    {
+      "id": 381,
+      "name": "Steady-State Rowing Machine",
+      "muscle": "Quadriceps · Back",
+      "equipment": "Machine",
+      "slug": "steady-state-rowing-machine"
+    },
+    {
+      "id": 382,
+      "name": "Straight-Arm Lat Pulldown",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "straight-arm-lat-pulldown"
+    },
+    {
+      "id": 383,
+      "name": "Supermans",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "supermans"
+    },
+    {
+      "id": 384,
+      "name": "Swim Kick Drill",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Bodyweight",
+      "slug": "swim-kick-drill"
+    },
+    {
+      "id": 385,
+      "name": "Swim Pull Drill",
+      "muscle": "Back · Chest",
+      "equipment": "Bodyweight",
+      "slug": "swim-pull-drill"
+    },
+    {
+      "id": 386,
+      "name": "Swim Sprint Intervals",
+      "muscle": "Back · Chest",
+      "equipment": "Bodyweight",
+      "slug": "swim-sprint-intervals"
+    },
+    {
+      "id": 387,
+      "name": "Tate Press",
+      "muscle": "Triceps",
+      "equipment": "Dumbbell",
+      "slug": "tate-press"
+    },
+    {
+      "id": 388,
+      "name": "Tempo Run",
+      "muscle": "Quadriceps · Glutes · Calves",
+      "equipment": "Machine",
+      "slug": "tempo-run"
+    },
+    {
+      "id": 389,
+      "name": "Tibialis Raise",
+      "muscle": "Tibialis",
+      "equipment": "Bodyweight",
+      "slug": "tibialis-raise"
+    },
+    {
+      "id": 390,
+      "name": "Toes-to-Bar",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "toes-to-bar"
+    },
+    {
+      "id": 391,
+      "name": "Towel Slide Leg Curl",
+      "muscle": "Hamstrings",
+      "equipment": "Bodyweight",
+      "slug": "towel-slide-leg-curl"
+    },
+    {
+      "id": 392,
+      "name": "Trail Run",
+      "muscle": "Quadriceps · Glutes · Calves",
+      "equipment": "Bodyweight",
+      "slug": "trail-run"
+    },
+    {
+      "id": 393,
+      "name": "Trap Bar Deadlift",
+      "muscle": "Hamstrings · Glutes · Quadriceps",
+      "equipment": "Barbell",
+      "slug": "trap-bar-deadlift"
+    },
+    {
+      "id": 394,
+      "name": "Trap Bar Shrug",
+      "muscle": "Trapezius",
+      "equipment": "Barbell",
+      "slug": "trap-bar-shrug"
+    },
+    {
+      "id": 395,
+      "name": "Treadmill Run",
+      "muscle": "Quadriceps · Glutes · Calves",
+      "equipment": "Machine",
+      "slug": "treadmill-run"
+    },
+    {
+      "id": 396,
+      "name": "Underhand Barbell Row",
+      "muscle": "Back",
+      "equipment": "Barbell",
+      "slug": "underhand-barbell-row"
+    },
+    {
+      "id": 397,
+      "name": "V-Up",
+      "muscle": "Core",
+      "equipment": "Bodyweight",
+      "slug": "v-up"
+    },
+    {
+      "id": 398,
+      "name": "VersaClimber",
+      "muscle": "Quadriceps · Glutes · Back",
+      "equipment": "Machine",
+      "slug": "versaclimber"
+    },
+    {
+      "id": 399,
+      "name": "Walking Lunge",
+      "muscle": "Glutes · Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "walking-lunge"
+    },
+    {
+      "id": 400,
+      "name": "Wall Ball",
+      "muscle": "Quadriceps · Glutes · Shoulders",
+      "equipment": "Bodyweight",
+      "slug": "wall-ball"
+    },
+    {
+      "id": 401,
+      "name": "Wall Sit",
+      "muscle": "Quadriceps",
+      "equipment": "Bodyweight",
+      "slug": "wall-sit"
+    },
+    {
+      "id": 402,
+      "name": "Weighted Pull Ups",
+      "muscle": "Back",
+      "equipment": "Bodyweight",
+      "slug": "weighted-pull-ups"
+    },
+    {
+      "id": 403,
+      "name": "Wide-Grip Barbell Bench Press",
+      "muscle": "Chest",
+      "equipment": "Barbell",
+      "slug": "wide-grip-barbell-bench-press"
+    },
+    {
+      "id": 404,
+      "name": "Wide-Grip Barbell Curl",
+      "muscle": "Biceps",
+      "equipment": "Barbell",
+      "slug": "wide-grip-barbell-curl"
+    },
+    {
+      "id": 405,
+      "name": "Wide-Grip Lat Pulldown",
+      "muscle": "Back",
+      "equipment": "Cable Machine",
+      "slug": "wide-grip-lat-pulldown"
+    },
+    {
+      "id": 406,
+      "name": "Wide-Grip Pull-Up",
+      "muscle": "Back",
+      "equipment": "Bodyweight",
+      "slug": "wide-grip-pull-up"
+    },
+    {
+      "id": 407,
+      "name": "Wide-Grip Seated Cable Row",
+      "muscle": "Back · Trapezius",
+      "equipment": "Cable Machine",
+      "slug": "wide-grip-seated-cable-row"
+    },
+    {
+      "id": 408,
+      "name": "Wrist Roller",
+      "muscle": "Forearms",
+      "equipment": "Wrist Roller · Weight Plate",
+      "slug": "wrist-roller"
+    },
+    {
+      "id": 409,
+      "name": "Yates Row",
+      "muscle": "Back",
+      "equipment": "Barbell",
+      "slug": "yates-row"
+    },
+    {
+      "id": 410,
+      "name": "Z Press",
+      "muscle": "Shoulders",
+      "equipment": "Dumbbell",
+      "slug": "z-press"
+    },
+    {
+      "id": 411,
+      "name": "Zercher Squat",
+      "muscle": "Quadriceps · Glutes",
+      "equipment": "Barbell",
+      "slug": "zercher-squat"
+    },
+    {
+      "id": 412,
+      "name": "Zottman Curl",
+      "muscle": "Biceps",
+      "equipment": "Dumbbell",
+      "slug": "zottman-curl"
+    }
+  ]
+}
