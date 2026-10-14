@@ -46,6 +46,12 @@
     .btn small { display: block; color: #888; font-weight: 400; font-size: 13px; margin-top: 2px; }
     .btn:hover, .btn:focus { border-color: #BF953F; }
     .btn:focus-visible { outline: 2px solid #BF953F; outline-offset: 2px; }
+    .btn.primary { display: block; margin: 0 0 40px; padding: 20px 22px; background: #BF953F; border-color: #BF953F; color: #0a0a0a; font-size: 18px; }
+    .btn.primary small { color: #2a2112; font-size: 14px; }
+    .btn.primary:hover, .btn.primary:focus { background: #d4ab55; }
+    .links { margin-bottom: 32px; }
+    .legal { margin-bottom: 8px; }
+    .legal a { color: #aaa; }
     a { color: #BF953F; text-decoration: none; }
     a:hover { text-decoration: underline; }
     footer {
@@ -68,34 +74,32 @@
     <hr class="rule" />
 
     <main>
+      <a class="btn primary" href="https://fit.liftonapp.com/" lang="mr">
+        LiftOn Marathi Fitness →
+        <small>मराठीत fitness शिका: workout, protein, diet आणि free tools</small>
+      </a>
+
+      <h2>Get the app</h2>
+      <div class="links">
+        <a class="btn" href="https://play.google.com/store/apps/details?id=com.nidhish.aitrainer" rel="noopener">
+          Android
+          <small>Google Play वर download करा</small>
+        </a>
+        <a class="btn" href="https://apps.apple.com/in/app/lifton-fitness/id6792820906" rel="noopener">
+          iPhone
+          <small>App Store वर download करा</small>
+        </a>
+      </div>
+
       <h2>About</h2>
       <p>LiftOn is an AI-assisted fitness app for lifters — adaptive weekly plans, personalised coaching, recovery insights, and progress tracking that learns from every session you log.</p>
-
-      <h2>Learn fitness in Marathi</h2>
-      <div class="links">
-        <a class="btn" href="https://fit.liftonapp.com/" lang="mr">
-          LiftOn Marathi Fitness →
-          <small>मराठीत fitness शिका: workout, protein, diet आणि free tools</small>
-        </a>
-      </div>
-
-      <h2>Legal</h2>
-      <div class="links">
-        <a class="btn" href="privacy_policy.html">
-          Privacy Policy
-          <small>What we collect and how it is used</small>
-        </a>
-        <a class="btn" href="terms.html">
-          Terms of Use
-          <small>EULA and subscription terms</small>
-        </a>
-      </div>
 
       <h2>Support</h2>
       <p>Questions, bug reports or account requests: <a href="mailto:liftonapp@gmail.com">liftonapp@gmail.com</a></p>
     </main>
 
     <footer>
+      <p class="legal"><a href="privacy_policy.html">Privacy Policy</a> · <a href="terms.html">Terms of Use</a></p>
       <p>&copy; 2026 LiftOn. All rights reserved.</p>
     </footer>
 
